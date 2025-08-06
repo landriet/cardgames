@@ -1,3 +1,114 @@
+describe('Scoundrel Engine Edge Cases', () => {
+  it('removeCardFromCurrentRoom: removing by reference not present returns state unchanged', () => {
+    const card1: DungeonCard = { suit: 'spades', rank: 2 as Rank, type: 'monster' };
+    const card2: DungeonCard = { suit: 'hearts', rank: 5 as Rank, type: 'potion' };
+    const notInRoom: DungeonCard = { suit: 'diamonds', rank: 7 as Rank, type: 'weapon' };
+    const state: ScoundrelGameState = {
+      deck: [],
+      discard: [],
+      currentRoom: { cards: [card1, card2] },
+      nextRoomBase: null,
+      equippedWeapon: null,
+      lastMonsterDefeated: null,
+      health: 20,
+      maxHealth: 20,
+      canDeferRoom: true,
+      lastActionWasDefer: false,
+      monstersOnWeapon: [],
+      gameOver: false,
+      victory: false,
+    };
+    const newState = removeCardFromCurrentRoom(state, notInRoom);
+    expect(newState).toBe(state); // should be same object
+  });
+
+  it('removeCardFromCurrentRoom: removing by out-of-bounds index throws', () => {
+    const card1: DungeonCard = { suit: 'spades', rank: 2 as Rank, type: 'monster' };
+    const state: ScoundrelGameState = {
+      deck: [],
+      discard: [],
+      currentRoom: { cards: [card1] },
+      nextRoomBase: null,
+      equippedWeapon: null,
+      lastMonsterDefeated: null,
+      health: 20,
+      maxHealth: 20,
+      canDeferRoom: true,
+      lastActionWasDefer: false,
+      monstersOnWeapon: [],
+      gameOver: false,
+      victory: false,
+    };
+    expect(() => removeCardFromCurrentRoom(state, 2)).toThrow();
+    expect(() => removeCardFromCurrentRoom(state, -1)).toThrow();
+  });
+
+  it('takeWeapon: weapon not in current room still equips and discards correctly', () => {
+    const weapon: DungeonCard = { suit: 'diamonds', rank: 8 as Rank, type: 'weapon' };
+    const state: ScoundrelGameState = {
+      deck: [],
+      discard: [],
+      currentRoom: { cards: [] },
+      nextRoomBase: null,
+      equippedWeapon: null,
+      lastMonsterDefeated: null,
+      monstersOnWeapon: [],
+      health: 10,
+      maxHealth: 20,
+      canDeferRoom: true,
+      lastActionWasDefer: false,
+      gameOver: false,
+      victory: false,
+    };
+    const newState = takeWeapon(state, weapon);
+    expect(newState.equippedWeapon).toEqual(weapon);
+    expect(newState.currentRoom.cards.length).toBe(0);
+  });
+
+  it('fightMonster: monster not in current room does not affect state', () => {
+    const monster: DungeonCard = { suit: 'spades', rank: 8 as Rank, type: 'monster' };
+    const notInRoom: DungeonCard = { suit: 'clubs', rank: 10 as Rank, type: 'monster' };
+    const state: ScoundrelGameState = {
+      deck: [],
+      discard: [],
+      currentRoom: { cards: [monster] },
+      nextRoomBase: null,
+      equippedWeapon: null,
+      lastMonsterDefeated: null,
+      health: 15,
+      maxHealth: 20,
+      canDeferRoom: true,
+      lastActionWasDefer: false,
+      monstersOnWeapon: [],
+      gameOver: false,
+      victory: false,
+    };
+    const newState = fightMonster(state, notInRoom, 'barehanded');
+    // Should be unchanged except for health and discard (since removal is a no-op)
+    expect(newState.currentRoom.cards).toEqual([monster]);
+    expect(newState.discard).toContain(notInRoom);
+  });
+
+  it('removeCardFromCurrentRoom: throws if no current room', () => {
+    const card: DungeonCard = { suit: 'spades', rank: 2 as Rank, type: 'monster' };
+    const state: ScoundrelGameState = {
+      deck: [],
+      discard: [],
+      currentRoom: null as any,
+      nextRoomBase: null,
+      equippedWeapon: null,
+      lastMonsterDefeated: null,
+      health: 20,
+      maxHealth: 20,
+      canDeferRoom: true,
+      lastActionWasDefer: false,
+      monstersOnWeapon: [],
+      gameOver: false,
+      victory: false,
+    };
+    expect(() => removeCardFromCurrentRoom(state, card)).toThrow();
+  });
+});
 import { beforeEach, describe, expect, it, test } from 'vitest';
 import { CardType, DungeonCard, Rank, ScoundrelGameState } from '../../../../types/scoundrel';
 import { avoidRoom, createScoundrelDeck, dealRoom, enterRoom, fightMonster, fightMonsterBarehanded, initGame, removeCardFromCurrentRoom, shuffle, takeWeapon } from '../engine';
