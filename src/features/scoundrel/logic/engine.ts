@@ -1,3 +1,23 @@
+// Remove a card from the current room by reference (object equality)
+export function removeCardFromCurrentRoomByReference(state: ScoundrelGameState, card: DungeonCard): ScoundrelGameState {
+  if (!state.currentRoom || !Array.isArray(state.currentRoom.cards)) {
+    throw new Error('No current room to remove card from');
+  }
+  const cardIndex = state.currentRoom.cards.findIndex(c => c === card);
+  if (cardIndex === -1) {
+    // Card not found, return state unchanged
+    return state;
+  }
+  const newCards = state.currentRoom.cards.slice();
+  newCards.splice(cardIndex, 1);
+  return {
+    ...state,
+    currentRoom: {
+      ...state.currentRoom,
+      cards: newCards,
+    },
+  };
+}
 // Remove a card from the current room by index
 export function removeCardFromCurrentRoom(state: ScoundrelGameState, cardIndex: number): ScoundrelGameState {
   if (!state.currentRoom || !Array.isArray(state.currentRoom.cards)) {
@@ -79,30 +99,16 @@ export function fightMonster(
     // Calculate damage
     const damage = Math.max(monster.rank - weapon.rank, 0);
 
-    // Remove monster from current room
-    let newCurrentRoom = state.currentRoom;
-    if (state.currentRoom && Array.isArray(state.currentRoom.cards)) {
-      const monsterIndex = state.currentRoom.cards.findIndex(card => card === monster);
-      if (monsterIndex !== -1) {
-        const newCards = state.currentRoom.cards.slice();
-        newCards.splice(monsterIndex, 1);
-        newCurrentRoom = {
-          ...state.currentRoom,
-          cards: newCards,
-        };
-      }
-    }
-
+    // Remove monster from current room using utility
+    const stateAfterRemoval = removeCardFromCurrentRoomByReference(state, monster);
     // Add monster to discard
-    const newDiscard = [...state.discard, monster];
-
+    const newDiscard = [...stateAfterRemoval.discard, monster];
     // Place monster on weapon (track in monstersOnWeapon)
     return {
-      ...state,
+      ...stateAfterRemoval,
       health: state.health - damage,
       lastMonsterDefeated: monster,
       monstersOnWeapon: [...(state.monstersOnWeapon || []), monster],
-      currentRoom: newCurrentRoom,
       discard: newDiscard,
     };
   }
@@ -113,26 +119,12 @@ export function fightMonsterBarehanded(state: ScoundrelGameState, monster: Dunge
     throw new Error('Card is not a monster');
   }
   const newHealth = state.health - monster.rank;
-
-  // Remove monster from current room
-  let newCurrentRoom = state.currentRoom;
-  if (state.currentRoom && Array.isArray(state.currentRoom.cards)) {
-    const monsterIndex = state.currentRoom.cards.findIndex(card => card === monster);
-    if (monsterIndex !== -1) {
-      const newCards = state.currentRoom.cards.slice();
-      newCards.splice(monsterIndex, 1);
-      newCurrentRoom = {
-        ...state.currentRoom,
-        cards: newCards,
-      };
-    }
-  }
-
+  // Remove monster from current room using utility
+  const stateAfterRemoval = removeCardFromCurrentRoomByReference(state, monster);
   return {
-    ...state,
+    ...stateAfterRemoval,
     health: newHealth,
-    discard: [...state.discard, monster],
-    currentRoom: newCurrentRoom,
+    discard: [...stateAfterRemoval.discard, monster],
   };
 }
 import { CardType, DungeonCard, Room, ScoundrelGameState, Suit, Rank } from '../../../types/scoundrel';
