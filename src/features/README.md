@@ -98,11 +98,7 @@ Choose to fight **barehanded** or **with equipped weapon**:
 - Weapons are retained until replaced, even when "weakened" by use
 
 ## TODO list
-- [x] Implement fighting a monster:
-    - [x] Barehanded: take full monster damage, discard monster
-    - [ ] With weapon: place monster on weapon, calculate damage (monster - weapon, min 0), enforce weapon kill limit
 - [ ] Implement logic for entering a room: player must face 3 of 4 cards, leave the 4th as nextRoomBase
-- [ ] Implement taking a weapon: must equip immediately, discard previous weapon and monsters on it
 - [ ] Implement taking a health potion: add value to health, discard, enforce max 20 health, only one per turn
 - [ ] Enforce weapon weakening: weapon can only be used on monsters ≤ last monster it killed
 - [ ] Enforce potion rule: only one potion per turn, extras discarded with no effect
