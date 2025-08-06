@@ -3,8 +3,8 @@
 	"tasks": [
 		{
 			"type": "shell",
-			"label": "Initialize git repository",
-			"command": "git init && git status",
+			"label": "Run Vite dev server",
+			"command": "npm run dev",
 			"group": "build"
 		}
 	]
