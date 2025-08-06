@@ -1,3 +1,39 @@
+// Fight a monster, either barehanded or with weapon
+export function fightMonster(
+  state: ScoundrelGameState,
+  monster: DungeonCard,
+  mode: 'barehanded' | 'weapon'
+): ScoundrelGameState {
+  if (monster.type !== 'monster') {
+    throw new Error('Card is not a monster');
+  }
+  if (mode === 'barehanded') {
+    // Use barehanded logic
+    return fightMonsterBarehanded(state, monster);
+  } else if (!state.equippedWeapon) {
+    throw new Error('No weapon equipped for weapon mode');
+  } else {
+    // With weapon
+    const weapon = state.equippedWeapon;
+    // Enforce weapon kill limit: can only be used on monsters <= last monster it killed (if any)
+    if (
+      state.lastMonsterDefeated &&
+      monster.rank > state.lastMonsterDefeated.rank
+    ) {
+      throw new Error('Weapon cannot be used on monster stronger than last defeated');
+    }
+    // Calculate damage
+    const damage = Math.max(monster.rank - weapon.rank, 0);
+    // Place monster on weapon (not tracked in state yet, but could be added)
+    // Update lastMonsterDefeated
+    return {
+      ...state,
+      health: state.health - damage,
+      lastMonsterDefeated: monster,
+      discard: [...state.discard, /* optionally track monsters on weapon elsewhere */],
+    };
+  }
+}
 // Fight a monster barehanded: take full monster damage, discard monster
 export function fightMonsterBarehanded(state: ScoundrelGameState, monster: DungeonCard): ScoundrelGameState {
   if (monster.type !== 'monster') {

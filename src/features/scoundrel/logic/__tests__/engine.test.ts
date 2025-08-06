@@ -1,5 +1,5 @@
 /// <reference types="vitest" />
-import { initGame, avoidRoom, enterRoom, createScoundrelDeck, shuffle, dealRoom, fightMonsterBarehanded } from '../engine';
+import { initGame, avoidRoom, enterRoom, createScoundrelDeck, shuffle, dealRoom, fightMonsterBarehanded, fightMonster } from '../engine';
 import { ScoundrelGameState, CardType, Rank, Suit, DungeonCard } from '../../../../types/scoundrel';
 import { describe, beforeEach, test, expect, it } from 'vitest';
 
@@ -71,6 +71,70 @@ describe('Scoundrel Engine', () => {
     const newState = fightMonsterBarehanded(state, monster);
     expect(newState.health).toBe(9); // 20 - 11
     expect(newState.discard).toContain(monster);
+  });
+
+  it('fightMonster: barehanded mode matches fightMonsterBarehanded', () => {
+    const monster: DungeonCard = { suit: 'spades', rank: 8 as Rank, type: 'monster' as CardType };
+    const state: ScoundrelGameState = {
+      deck: [],
+      discard: [],
+      currentRoom: { cards: [monster] },
+      nextRoomBase: null,
+      equippedWeapon: null,
+      lastMonsterDefeated: null,
+      health: 15,
+      maxHealth: 20,
+      canDeferRoom: true,
+      lastActionWasDefer: false,
+      gameOver: false,
+      victory: false,
+    };
+    const newState = fightMonster(state, monster, 'barehanded');
+    expect(newState.health).toBe(7); // 15 - 8
+    expect(newState.discard).toContain(monster);
+  });
+
+  it('fightMonster: with weapon, takes reduced damage and updates lastMonsterDefeated', () => {
+    const monster: DungeonCard = { suit: 'spades', rank: 12 as Rank, type: 'monster' as CardType };
+    const weapon: DungeonCard = { suit: 'diamonds', rank: 9 as Rank, type: 'weapon' as CardType };
+    const state: ScoundrelGameState = {
+      deck: [],
+      discard: [],
+      currentRoom: { cards: [monster] },
+      nextRoomBase: null,
+      equippedWeapon: weapon,
+      lastMonsterDefeated: null,
+      health: 20,
+      maxHealth: 20,
+      canDeferRoom: true,
+      lastActionWasDefer: false,
+      gameOver: false,
+      victory: false,
+    };
+    const newState = fightMonster(state, monster, 'weapon');
+    expect(newState.health).toBe(17); // 20 - (12-9)
+    expect(newState.lastMonsterDefeated).toEqual(monster);
+  });
+
+  it('fightMonster: weapon kill limit enforced', () => {
+    const monster: DungeonCard = { suit: 'spades', rank: 13 as Rank, type: 'monster' as CardType };
+    const weapon: DungeonCard = { suit: 'diamonds', rank: 7 as Rank, type: 'weapon' as CardType };
+    const lastKilled: DungeonCard = { suit: 'spades', rank: 10 as Rank, type: 'monster' as CardType };
+    const state: ScoundrelGameState = {
+      deck: [],
+      discard: [],
+      currentRoom: { cards: [monster] },
+      nextRoomBase: null,
+      equippedWeapon: weapon,
+      lastMonsterDefeated: lastKilled,
+      health: 20,
+      maxHealth: 20,
+      canDeferRoom: true,
+      lastActionWasDefer: false,
+      gameOver: false,
+      victory: false,
+    };
+    expect(() => fightMonster(state, monster, 'weapon')).toThrow('Weapon cannot be used on monster stronger than last defeated');
   });
   it('creates a deck with only valid cards', () => {
     const deck = createScoundrelDeck();

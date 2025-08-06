@@ -1,9 +1,8 @@
 import { useState } from 'react';
 
-import { initGame } from '../logic/engine';
+import { initGame, fightMonster } from '../logic/engine';
 import { ScoundrelGameState, DungeonCard } from '../../../types/scoundrel';
 import Card from '../../../components/Card';
-
 
 // Map numeric rank to string rank for Card component
 const rankToString = (rank: number): string => {
@@ -22,13 +21,26 @@ const cardLabel = (card: DungeonCard) => {
 export default function ScoundrelGame() {
   const [game, setGame] = useState<ScoundrelGameState>(initGame());
 
-  // TODO: Add handlers for actions (attack, equip, use potion, defer room)
+  // Handler to fight a monster barehanded
+  const handleFightBarehanded = (monster: DungeonCard) => {
+    setGame((prev) => fightMonster(prev, monster, 'barehanded'));
+  };
 
   return (
     <div className="p-4 max-w-xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Scoundrel</h1>
-      <div className="mb-2">Health: <span className="font-mono">{game.health} / {game.maxHealth}</span></div>
-      <div className="mb-2">Equipped Weapon: <span className="font-mono">{game.equippedWeapon ? cardLabel(game.equippedWeapon) : 'None'}</span></div>
+      <div className="mb-2">
+        Health:{' '}
+        <span className="font-mono">
+          {game.health} / {game.maxHealth}
+        </span>
+      </div>
+      <div className="mb-2">
+        Equipped Weapon:{' '}
+        <span className="font-mono">
+          {game.equippedWeapon ? cardLabel(game.equippedWeapon) : 'None'}
+        </span>
+      </div>
       <div className="mb-4">
         <h2 className="font-semibold">Current Room</h2>
         <div className="flex gap-2 mt-2">
@@ -40,6 +52,14 @@ export default function ScoundrelGame() {
                 faceUp={true}
               />
               <div className="text-xs text-gray-500 mt-1">{card.type}</div>
+              {card.type === 'monster' && (
+                <button
+                  className="mt-1 px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                  onClick={() => handleFightBarehanded(card)}
+                >
+                  Fight Barehanded
+                </button>
+              )}
             </div>
           ))}
         </div>
