@@ -1,6 +1,6 @@
 /// <reference types="vitest" />
-import { initGame, avoidRoom, enterRoom, createScoundrelDeck, shuffle, dealRoom } from '../engine';
-import { ScoundrelGameState } from '../../../../types/scoundrel';
+import { initGame, avoidRoom, enterRoom, createScoundrelDeck, shuffle, dealRoom, fightMonsterBarehanded } from '../engine';
+import { ScoundrelGameState, CardType, Rank, Suit, DungeonCard } from '../../../../types/scoundrel';
 import { describe, beforeEach, test, expect, it } from 'vitest';
 
 describe('Scoundrel Engine - Room Entry/Avoid Logic', () => {
@@ -52,6 +52,26 @@ describe('Scoundrel Engine - Room Entry/Avoid Logic', () => {
 });
 
 describe('Scoundrel Engine', () => {
+  it('fightMonsterBarehanded: takes full monster damage and discards monster', () => {
+    const monster: DungeonCard = { suit: 'spades', rank: 11 as Rank, type: 'monster' as CardType };
+    const state: ScoundrelGameState = {
+      deck: [],
+      discard: [],
+      currentRoom: { cards: [monster] },
+      nextRoomBase: null,
+      equippedWeapon: null,
+      lastMonsterDefeated: null,
+      health: 20,
+      maxHealth: 20,
+      canDeferRoom: true,
+      lastActionWasDefer: false,
+      gameOver: false,
+      victory: false,
+    };
+    const newState = fightMonsterBarehanded(state, monster);
+    expect(newState.health).toBe(9); // 20 - 11
+    expect(newState.discard).toContain(monster);
+  });
   it('creates a deck with only valid cards', () => {
     const deck = createScoundrelDeck();
     expect(deck.length).toBeGreaterThan(0);

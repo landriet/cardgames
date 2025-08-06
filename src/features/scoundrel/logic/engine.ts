@@ -1,3 +1,15 @@
+// Fight a monster barehanded: take full monster damage, discard monster
+export function fightMonsterBarehanded(state: ScoundrelGameState, monster: DungeonCard): ScoundrelGameState {
+  if (monster.type !== 'monster') {
+    throw new Error('Card is not a monster');
+  }
+  const newHealth = state.health - monster.rank;
+  return {
+    ...state,
+    health: newHealth,
+    discard: [...state.discard, monster],
+  };
+}
 import { CardType, DungeonCard, Room, ScoundrelGameState, Suit, Rank } from '../../../types/scoundrel';
 
 // Utility: Create a deck for Scoundrel
