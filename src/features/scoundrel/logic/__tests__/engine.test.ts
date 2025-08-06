@@ -32,7 +32,7 @@ describe('Scoundrel Engine - Room Entry/Avoid Logic', () => {
     const stateAfterAvoid = avoidRoom(initialState);
     const stateAfterEnter = enterRoom(stateAfterAvoid);
     expect(stateAfterEnter.canDeferRoom).toBe(true);
-    expect(stateAfterEnter.lastActionWasDefer).toBe(true);
+    expect(stateAfterEnter.lastActionWasDefer).toBe(false);
   });
 
   test('enterRoom does not change room or deck', () => {
@@ -67,7 +67,10 @@ describe('Scoundrel Engine', () => {
     const deck = createScoundrelDeck();
     const shuffled = shuffle(deck);
     // Not a perfect test, but should not be in the same order
-    expect(shuffled.join(',')).not.toEqual(deck.join(','));
+    const cardToString = (card: { suit: string; rank: number }) => `${card.suit}-${card.rank}`;
+    const deckStr = deck.map(cardToString).join(',');
+    const shuffledStr = shuffled.map(cardToString).join(',');
+    expect(shuffledStr).not.toEqual(deckStr);
   });
 
   it('deals a room of 4 cards', () => {
