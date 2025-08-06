@@ -161,6 +161,8 @@ describe('Scoundrel Engine', () => {
     const newState = fightMonsterBarehanded(state, monster);
     expect(newState.health).toBe(9); // 20 - 11
     expect(newState.discard).toContain(monster);
+    // Monster should be removed from currentRoom.cards
+    expect(newState.currentRoom.cards).not.toContain(monster);
   });
 
   it('fightMonster: barehanded mode matches fightMonsterBarehanded', () => {
@@ -183,6 +185,8 @@ describe('Scoundrel Engine', () => {
     const newState = fightMonster(state, monster, 'barehanded');
     expect(newState.health).toBe(7); // 15 - 8
     expect(newState.discard).toContain(monster);
+    // Monster should be removed from currentRoom.cards
+    expect(newState.currentRoom.cards).not.toContain(monster);
   });
 
   it('fightMonster: with weapon, takes reduced damage and updates lastMonsterDefeated', () => {
@@ -206,6 +210,10 @@ describe('Scoundrel Engine', () => {
     const newState = fightMonster(state, monster, 'weapon');
     expect(newState.health).toBe(17); // 20 - (12-9)
     expect(newState.lastMonsterDefeated).toEqual(monster);
+    // Monster should be removed from currentRoom.cards
+    expect(newState.currentRoom.cards).not.toContain(monster);
+    // Monster should be in discard
+    expect(newState.discard).toContain(monster);
   });
 
   it('fightMonster: weapon kill limit enforced', () => {

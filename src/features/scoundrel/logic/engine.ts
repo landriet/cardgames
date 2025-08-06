@@ -78,12 +78,32 @@ export function fightMonster(
     }
     // Calculate damage
     const damage = Math.max(monster.rank - weapon.rank, 0);
+
+    // Remove monster from current room
+    let newCurrentRoom = state.currentRoom;
+    if (state.currentRoom && Array.isArray(state.currentRoom.cards)) {
+      const monsterIndex = state.currentRoom.cards.findIndex(card => card === monster);
+      if (monsterIndex !== -1) {
+        const newCards = state.currentRoom.cards.slice();
+        newCards.splice(monsterIndex, 1);
+        newCurrentRoom = {
+          ...state.currentRoom,
+          cards: newCards,
+        };
+      }
+    }
+
+    // Add monster to discard
+    const newDiscard = [...state.discard, monster];
+
     // Place monster on weapon (track in monstersOnWeapon)
     return {
       ...state,
       health: state.health - damage,
       lastMonsterDefeated: monster,
       monstersOnWeapon: [...(state.monstersOnWeapon || []), monster],
+      currentRoom: newCurrentRoom,
+      discard: newDiscard,
     };
   }
 }
@@ -93,10 +113,26 @@ export function fightMonsterBarehanded(state: ScoundrelGameState, monster: Dunge
     throw new Error('Card is not a monster');
   }
   const newHealth = state.health - monster.rank;
+
+  // Remove monster from current room
+  let newCurrentRoom = state.currentRoom;
+  if (state.currentRoom && Array.isArray(state.currentRoom.cards)) {
+    const monsterIndex = state.currentRoom.cards.findIndex(card => card === monster);
+    if (monsterIndex !== -1) {
+      const newCards = state.currentRoom.cards.slice();
+      newCards.splice(monsterIndex, 1);
+      newCurrentRoom = {
+        ...state.currentRoom,
+        cards: newCards,
+      };
+    }
+  }
+
   return {
     ...state,
     health: newHealth,
     discard: [...state.discard, monster],
+    currentRoom: newCurrentRoom,
   };
 }
 import { CardType, DungeonCard, Room, ScoundrelGameState, Suit, Rank } from '../../../types/scoundrel';
