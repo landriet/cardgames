@@ -1,4 +1,7 @@
-import { removeCardFromCurrentRoom } from '../engine';
+import { beforeEach, describe, expect, it, test } from 'vitest';
+import { CardType, DungeonCard, Rank, ScoundrelGameState } from '../../../../types/scoundrel';
+import { avoidRoom, createScoundrelDeck, dealRoom, enterRoom, fightMonster, fightMonsterBarehanded, initGame, removeCardFromCurrentRoom, shuffle, takeWeapon } from '../engine';
+
 describe('takeWeapon', () => {
   it('equips new weapon and discards previous weapon and monsters on it', () => {
     const prevWeapon: DungeonCard = { suit: 'diamonds', rank: 5 as Rank, type: 'weapon' };
@@ -27,6 +30,9 @@ describe('takeWeapon', () => {
     expect(newState.monstersOnWeapon).toEqual([]);
     expect(newState.discard).toEqual([prevWeapon, ...prevMonsters]);
     expect(newState.lastMonsterDefeated).toBeNull();
+    // Assert weapon is removed from currentRoom.cards
+    expect(newState.currentRoom.cards).not.toContain(newWeapon);
+    expect(newState.currentRoom.cards.length).toBe(0);
   });
 
   it('equips weapon when no previous weapon', () => {
@@ -51,12 +57,11 @@ describe('takeWeapon', () => {
     expect(newState.monstersOnWeapon).toEqual([]);
     expect(newState.discard).toEqual([]);
     expect(newState.lastMonsterDefeated).toBeNull();
+    // Assert weapon is removed from currentRoom.cards
+    expect(newState.currentRoom.cards).not.toContain(newWeapon);
+    expect(newState.currentRoom.cards.length).toBe(0);
   });
 });
-/// <reference types="vitest" />
-import { initGame, avoidRoom, enterRoom, createScoundrelDeck, shuffle, dealRoom, fightMonsterBarehanded, fightMonster, takeWeapon } from '../engine';
-import { ScoundrelGameState, CardType, Rank, Suit, DungeonCard } from '../../../../types/scoundrel';
-import { describe, beforeEach, test, expect, it } from 'vitest';
 
 describe('Scoundrel Engine - Room Entry/Avoid Logic', () => {
   let initialState: ScoundrelGameState;

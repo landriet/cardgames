@@ -28,12 +28,28 @@ export function takeWeapon(state: ScoundrelGameState, weapon: DungeonCard): Scou
       newDiscard = newDiscard.concat(state.monstersOnWeapon);
     }
   }
+  // Remove the weapon from the current room's cards, if present
+  let newCurrentRoom = state.currentRoom;
+  if (state.currentRoom && Array.isArray(state.currentRoom.cards)) {
+    const weaponIndex = state.currentRoom.cards.findIndex(
+      (card) => card === weapon
+    );
+    if (weaponIndex !== -1) {
+      const newCards = state.currentRoom.cards.slice();
+      newCards.splice(weaponIndex, 1);
+      newCurrentRoom = {
+        ...state.currentRoom,
+        cards: newCards,
+      };
+    }
+  }
   return {
     ...state,
     equippedWeapon: weapon,
     monstersOnWeapon: [],
     discard: newDiscard,
     lastMonsterDefeated: null, // reset kill limit
+    currentRoom: newCurrentRoom,
   };
 }
 // Fight a monster, either barehanded or with weapon
