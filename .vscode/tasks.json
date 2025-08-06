@@ -1,0 +1,11 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "shell",
+			"label": "Initialize git repository",
+			"command": "git init && git status",
+			"group": "build"
+		}
+	]
+}
