@@ -1,11 +1,17 @@
 {
 	"version": "2.0.0",
-	"tasks": [
-		{
-			"type": "shell",
-			"label": "Run Vite dev server",
-			"command": "npm run dev",
-			"group": "build"
-		}
-	]
+  "tasks": [
+	{
+	  "type": "shell",
+	  "label": "Run Vite dev server",
+	  "command": "npm run dev",
+	  "group": "build"
+	},
+	{
+	  "type": "shell",
+	  "label": "Run Storybook",
+	  "command": "npm run storybook",
+	  "group": "build"
+	}
+  ]
 }

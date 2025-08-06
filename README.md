@@ -1,5 +1,37 @@
 # React + TypeScript + Vite
 
+## Storybook
+
+This project uses [Storybook](https://storybook.js.org/) for developing and testing UI components in isolation.
+
+### Running Storybook
+
+- **From the command line:**
+  ```sh
+  npm run storybook
+  ```
+  This will start Storybook at [http://localhost:6006](http://localhost:6006).
+
+- **From VS Code:**
+  - Open the Command Palette (⇧⌘P) and run `Tasks: Run Task`, then select `Run Storybook`.
+
+### Adding Stories
+
+- Add new stories in `src/stories/` following the examples provided.
+- Stories for components should import the component and export story objects.
+
+### Tailwind CSS Support
+
+Storybook is configured to use the project's Tailwind CSS setup. All components will render with the same styles as in the main app.
+
+### Building Storybook
+
+- To build a static version of Storybook:
+  ```sh
+  npm run build-storybook
+  ```
+  The output will be in the `storybook-static` directory.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
