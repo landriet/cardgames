@@ -16,11 +16,15 @@ export default defineConfig({
   plugins: [react()],
   test: {
     projects: [
+      // Default project for all .test.ts(x) files in src
+      {
+        testMatch: ['src/**/*.test.{ts,tsx}'],
+        environment: 'node',
+      },
+      // Storybook project (browser-based)
       {
         extends: true,
         plugins: [
-          // The plugin will run tests for the stories defined in your Storybook config
-          // See options at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon#storybooktest
           storybookTest({
             configDir: path.join(dirname, '.storybook'),
           }),

@@ -1,6 +1,6 @@
 /// <reference types="vitest" />
 import { initGame, avoidRoom, enterRoom, createScoundrelDeck, shuffle, dealRoom } from '../engine';
-import { ScoundrelGameState, DungeonCard } from '../../../../types/scoundrel';
+import { ScoundrelGameState } from '../../../../types/scoundrel';
 import { describe, beforeEach, test, expect, it } from 'vitest';
 
 describe('Scoundrel Engine - Room Entry/Avoid Logic', () => {
