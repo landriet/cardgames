@@ -1,3 +1,21 @@
+// Remove a card from the current room by index
+export function removeCardFromCurrentRoom(state: ScoundrelGameState, cardIndex: number): ScoundrelGameState {
+  if (!state.currentRoom || !Array.isArray(state.currentRoom.cards)) {
+    throw new Error('No current room to remove card from');
+  }
+  if (cardIndex < 0 || cardIndex >= state.currentRoom.cards.length) {
+    throw new Error('Invalid card index');
+  }
+  const newCards = state.currentRoom.cards.slice();
+  newCards.splice(cardIndex, 1);
+  return {
+    ...state,
+    currentRoom: {
+      ...state.currentRoom,
+      cards: newCards,
+    },
+  };
+}
 // Take a weapon: must equip immediately, discard previous weapon and monsters on it
 export function takeWeapon(state: ScoundrelGameState, weapon: DungeonCard): ScoundrelGameState {
   if (weapon.type !== 'weapon') {

@@ -98,6 +98,7 @@ Choose to fight **barehanded** or **with equipped weapon**:
 - Weapons are retained until replaced, even when "weakened" by use
 
 ## TODO list
+- [ ] Implement discard pile logic: cards discarded face down, weapons/monsters handled per rules
 - [ ] Implement logic for entering a room: player must face 3 of 4 cards, leave the 4th as nextRoomBase
 - [ ] Implement taking a health potion: add value to health, discard, enforce max 20 health, only one per turn
 - [ ] Enforce weapon weakening: weapon can only be used on monsters ≤ last monster it killed
@@ -105,4 +106,3 @@ Choose to fight **barehanded** or **with equipped weapon**:
 - [ ] Implement end conditions:
     - [ ] Death: health reaches 0, subtract remaining monster values from health, score = negative health
     - [ ] Victory: dungeon complete, score = remaining health (bonus if last card was potion and health is 20)
-- [ ] Implement discard pile logic: cards discarded face down, weapons/monsters handled per rules
