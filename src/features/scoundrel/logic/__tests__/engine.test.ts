@@ -22,27 +22,6 @@ describe('Scoundrel Engine Edge Cases', () => {
     expect(newState).toBe(state); // should be same object
   });
 
-  it('removeCardFromCurrentRoom: removing by out-of-bounds index throws', () => {
-    const card1: DungeonCard = { suit: 'spades', rank: 2 as Rank, type: 'monster' };
-    const state: ScoundrelGameState = {
-      deck: [],
-      discard: [],
-      currentRoom: { cards: [card1] },
-      nextRoomBase: null,
-      equippedWeapon: null,
-      lastMonsterDefeated: null,
-      health: 20,
-      maxHealth: 20,
-      canDeferRoom: true,
-      lastActionWasDefer: false,
-      monstersOnWeapon: [],
-      gameOver: false,
-      victory: false,
-    };
-    expect(() => removeCardFromCurrentRoom(state, 2)).toThrow();
-    expect(() => removeCardFromCurrentRoom(state, -1)).toThrow();
-  });
-
   it('takeWeapon: weapon not in current room still equips and discards correctly', () => {
     const weapon: DungeonCard = { suit: 'diamonds', rank: 8 as Rank, type: 'weapon' };
     const state: ScoundrelGameState = {
@@ -223,35 +202,7 @@ describe('Scoundrel Engine - Room Entry/Avoid Logic', () => {
 });
 
 describe('Scoundrel Engine', () => {
-  it('removeCardFromCurrentRoom: removes the specified card by index', () => {
-    const card1: DungeonCard = { suit: 'spades', rank: 2 as Rank, type: 'monster' };
-    const card2: DungeonCard = { suit: 'hearts', rank: 5 as Rank, type: 'potion' };
-    const card3: DungeonCard = { suit: 'diamonds', rank: 7 as Rank, type: 'weapon' };
-    const card4: DungeonCard = { suit: 'clubs', rank: 9 as Rank, type: 'monster' };
-    const state: ScoundrelGameState = {
-      deck: [],
-      discard: [],
-      currentRoom: { cards: [card1, card2, card3, card4] },
-      nextRoomBase: null,
-      equippedWeapon: null,
-      lastMonsterDefeated: null,
-      health: 20,
-      maxHealth: 20,
-      canDeferRoom: true,
-      lastActionWasDefer: false,
-      monstersOnWeapon: [],
-      gameOver: false,
-      victory: false,
-    };
-    // Remove the second card (index 1)
-    const newState = removeCardFromCurrentRoom(state, 1);
-    expect(newState.currentRoom.cards.length).toBe(3);
-    expect(newState.currentRoom.cards).toEqual([card1, card3, card4]);
-    // Remove the first card (index 0)
-    const newState2 = removeCardFromCurrentRoom(newState, 0);
-    expect(newState2.currentRoom.cards.length).toBe(2);
-    expect(newState2.currentRoom.cards).toEqual([card3, card4]);
-  });
+  
   it('fightMonsterBarehanded: takes full monster damage and discards monster', () => {
     const monster: DungeonCard = { suit: 'spades', rank: 11 as Rank, type: 'monster' as CardType };
     const state: ScoundrelGameState = {

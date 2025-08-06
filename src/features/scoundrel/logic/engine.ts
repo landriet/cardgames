@@ -10,7 +10,7 @@
  */
 export function removeCardFromCurrentRoom(
   state: ScoundrelGameState,
-  cardOrIndex: DungeonCard | number
+  cardOrIndex: DungeonCard
 ): ScoundrelGameState {
   if (!state.currentRoom || !Array.isArray(state.currentRoom.cards)) {
     throw new Error(
@@ -18,20 +18,11 @@ export function removeCardFromCurrentRoom(
     );
   }
   let cardIndex: number;
-  if (typeof cardOrIndex === 'number') {
-    cardIndex = cardOrIndex;
-    if (cardIndex < 0 || cardIndex >= state.currentRoom.cards.length) {
-      throw new Error(
-        `[removeCardFromCurrentRoom] Invalid card index: ${cardIndex}. Room has ${state.currentRoom.cards.length} cards.`
-      );
-    }
-  } else {
-    cardIndex = state.currentRoom.cards.findIndex((c) => c === cardOrIndex);
-    if (cardIndex === -1) {
-      // Card not found, return state unchanged
-      // This is not an error: it may be called with a card not present in the room
-      return state;
-    }
+  cardIndex = state.currentRoom.cards.findIndex((c) => c === cardOrIndex);
+  if (cardIndex === -1) {
+    // Card not found, return state unchanged
+    // This is not an error: it may be called with a card not present in the room
+    return state;
   }
   const newCards = state.currentRoom.cards.slice();
   newCards.splice(cardIndex, 1);
