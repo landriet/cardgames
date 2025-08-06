@@ -51,9 +51,17 @@ export default function ScoundrelGame() {
       </div>
       <div className="mb-2">
         Equipped Weapon:{' '}
-        <span className="font-mono">
-          {game.equippedWeapon ? cardLabel(game.equippedWeapon) : 'None'}
-        </span>
+        {game.equippedWeapon ? (
+          <span className="inline-flex flex-col items-center ml-2">
+            <Card
+              suit={game.equippedWeapon.suit as any}
+              rank={rankToString(game.equippedWeapon.rank) as any}
+              faceUp={true}
+            />
+          </span>
+        ) : (
+          <span className="font-mono">None</span>
+        )}
       </div>
       <div className="mb-4">
         <h2 className="font-semibold">Current Room</h2>
