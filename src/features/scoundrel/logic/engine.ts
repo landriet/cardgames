@@ -1,3 +1,23 @@
+// Take a weapon: must equip immediately, discard previous weapon and monsters on it
+export function takeWeapon(state: ScoundrelGameState, weapon: DungeonCard): ScoundrelGameState {
+  if (weapon.type !== 'weapon') {
+    throw new Error('Card is not a weapon');
+  }
+  let newDiscard = [...state.discard];
+  if (state.equippedWeapon) {
+    newDiscard.push(state.equippedWeapon);
+    if (state.monstersOnWeapon && state.monstersOnWeapon.length > 0) {
+      newDiscard = newDiscard.concat(state.monstersOnWeapon);
+    }
+  }
+  return {
+    ...state,
+    equippedWeapon: weapon,
+    monstersOnWeapon: [],
+    discard: newDiscard,
+    lastMonsterDefeated: null, // reset kill limit
+  };
+}
 // Fight a monster, either barehanded or with weapon
 export function fightMonster(
   state: ScoundrelGameState,
@@ -24,13 +44,12 @@ export function fightMonster(
     }
     // Calculate damage
     const damage = Math.max(monster.rank - weapon.rank, 0);
-    // Place monster on weapon (not tracked in state yet, but could be added)
-    // Update lastMonsterDefeated
+    // Place monster on weapon (track in monstersOnWeapon)
     return {
       ...state,
       health: state.health - damage,
       lastMonsterDefeated: monster,
-      discard: [...state.discard, /* optionally track monsters on weapon elsewhere */],
+      monstersOnWeapon: [...(state.monstersOnWeapon || []), monster],
     };
   }
 }
@@ -103,6 +122,7 @@ export function initGame(): ScoundrelGameState {
     nextRoomBase: null,
     equippedWeapon: null,
     lastMonsterDefeated: null,
+    monstersOnWeapon: [],
     health: 20,
     maxHealth: 20,
     canDeferRoom: true,

@@ -25,6 +25,7 @@ export interface ScoundrelGameState {
   nextRoomBase: DungeonCard | null;
   equippedWeapon: DungeonCard | null;
   lastMonsterDefeated: DungeonCard | null;
+  monstersOnWeapon: DungeonCard[]; // monsters stacked on equipped weapon
   health: number;
   maxHealth: number;
   canDeferRoom: boolean;

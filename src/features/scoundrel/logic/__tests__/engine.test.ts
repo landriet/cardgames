@@ -1,5 +1,59 @@
+describe('takeWeapon', () => {
+  it('equips new weapon and discards previous weapon and monsters on it', () => {
+    const prevWeapon: DungeonCard = { suit: 'diamonds', rank: 5 as Rank, type: 'weapon' };
+    const prevMonsters: DungeonCard[] = [
+      { suit: 'spades', rank: 7 as Rank, type: 'monster' },
+      { suit: 'clubs', rank: 4 as Rank, type: 'monster' },
+    ];
+    const newWeapon: DungeonCard = { suit: 'diamonds', rank: 9 as Rank, type: 'weapon' };
+    const state: ScoundrelGameState = {
+      deck: [],
+      discard: [],
+      currentRoom: { cards: [newWeapon] },
+      nextRoomBase: null,
+      equippedWeapon: prevWeapon,
+      lastMonsterDefeated: { suit: 'spades', rank: 7 as Rank, type: 'monster' },
+      monstersOnWeapon: prevMonsters,
+      health: 10,
+      maxHealth: 20,
+      canDeferRoom: true,
+      lastActionWasDefer: false,
+      gameOver: false,
+      victory: false,
+    };
+    const newState = takeWeapon(state, newWeapon);
+    expect(newState.equippedWeapon).toEqual(newWeapon);
+    expect(newState.monstersOnWeapon).toEqual([]);
+    expect(newState.discard).toEqual([prevWeapon, ...prevMonsters]);
+    expect(newState.lastMonsterDefeated).toBeNull();
+  });
+
+  it('equips weapon when no previous weapon', () => {
+    const newWeapon: DungeonCard = { suit: 'diamonds', rank: 8 as Rank, type: 'weapon' };
+    const state: ScoundrelGameState = {
+      deck: [],
+      discard: [],
+      currentRoom: { cards: [newWeapon] },
+      nextRoomBase: null,
+      equippedWeapon: null,
+      lastMonsterDefeated: null,
+      monstersOnWeapon: [],
+      health: 10,
+      maxHealth: 20,
+      canDeferRoom: true,
+      lastActionWasDefer: false,
+      gameOver: false,
+      victory: false,
+    };
+    const newState = takeWeapon(state, newWeapon);
+    expect(newState.equippedWeapon).toEqual(newWeapon);
+    expect(newState.monstersOnWeapon).toEqual([]);
+    expect(newState.discard).toEqual([]);
+    expect(newState.lastMonsterDefeated).toBeNull();
+  });
+});
 /// <reference types="vitest" />
-import { initGame, avoidRoom, enterRoom, createScoundrelDeck, shuffle, dealRoom, fightMonsterBarehanded, fightMonster } from '../engine';
+import { initGame, avoidRoom, enterRoom, createScoundrelDeck, shuffle, dealRoom, fightMonsterBarehanded, fightMonster, takeWeapon } from '../engine';
 import { ScoundrelGameState, CardType, Rank, Suit, DungeonCard } from '../../../../types/scoundrel';
 import { describe, beforeEach, test, expect, it } from 'vitest';
 
@@ -65,6 +119,7 @@ describe('Scoundrel Engine', () => {
       maxHealth: 20,
       canDeferRoom: true,
       lastActionWasDefer: false,
+      monstersOnWeapon: [],
       gameOver: false,
       victory: false,
     };
@@ -86,6 +141,7 @@ describe('Scoundrel Engine', () => {
       maxHealth: 20,
       canDeferRoom: true,
       lastActionWasDefer: false,
+      monstersOnWeapon: [],
       gameOver: false,
       victory: false,
     };
@@ -108,6 +164,7 @@ describe('Scoundrel Engine', () => {
       maxHealth: 20,
       canDeferRoom: true,
       lastActionWasDefer: false,
+      monstersOnWeapon: [],
       gameOver: false,
       victory: false,
     };
@@ -131,6 +188,7 @@ describe('Scoundrel Engine', () => {
       maxHealth: 20,
       canDeferRoom: true,
       lastActionWasDefer: false,
+      monstersOnWeapon: [],
       gameOver: false,
       victory: false,
     };
