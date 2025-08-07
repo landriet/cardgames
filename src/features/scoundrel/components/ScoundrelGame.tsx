@@ -41,15 +41,15 @@ export default function ScoundrelGame() {
   };
 
   return (
-    <div className="p-4 max-w-xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Scoundrel</h1>
-      <div className="mb-2">
+    <div className="p-4 max-w-xl mx-auto bg-white dark:bg-gray-900">
+      <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">Scoundrel</h1>
+      <div className="mb-2 text-gray-800 dark:text-gray-100">
         Health:{' '}
         <span className="font-mono">
           {game.health} / {game.maxHealth}
         </span>
       </div>
-      <div className="mb-2">
+      <div className="mb-2 text-gray-800 dark:text-gray-100">
         Equipped Weapon:{' '}
         {game.equippedWeapon ? (
           <span className="inline-flex flex-col items-center ml-2">
@@ -75,12 +75,12 @@ export default function ScoundrelGame() {
                 <Card suit={game.deck[0].suit as any} rank={rankToString(game.deck[0].rank) as any} faceUp={false} />
               </div>
             </div>
-            <div className="text-xs text-gray-500 mt-1">{game.deck.length} card{game.deck.length > 1 ? 's' : ''} left</div>
+            <div className="text-xs text-gray-800 dark:text-gray-200 mt-1">{game.deck.length} card{game.deck.length > 1 ? 's' : ''} left</div>
           </div>
         )}
         {/* Room cards on the right */}
         <div className="flex-1">
-          <h2 className="font-semibold">Current Room</h2>
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100">Current Room</h2>
           <div className="flex gap-2 mt-2">
             {game.currentRoom.cards.map((card: DungeonCard, idx: number) => (
               <div key={idx} className="flex flex-col items-center">
@@ -89,7 +89,7 @@ export default function ScoundrelGame() {
                   rank={rankToString(card.rank) as any}
                   faceUp={true}
                 />
-                <div className="text-xs text-gray-500 mt-1">{card.type}</div>
+                <div className="text-xs text-gray-800 dark:text-gray-200 mt-1">{card.type}</div>
                 {card.type === 'monster' && (
                   <>
                     <button
