@@ -72,16 +72,33 @@ export default function ScoundrelGame() {
           </div>
         </div>
       </div>
-      {/* Equipped Weapon display moved below deck/room */}
+      {/* Equipped Weapon display with stacked monsters */}
       <div className="mb-4 text-gray-800 dark:text-gray-100">
         Equipped Weapon:{' '}
         {game.equippedWeapon ? (
-          <span className="inline-flex flex-col items-center ml-2">
-            <Card
-              suit={game.equippedWeapon.suit as any}
-              rank={rankToString(game.equippedWeapon.rank) as any}
-              faceUp={true}
-            />
+          <span className="relative inline-block ml-2" style={{ minWidth: '80px', minHeight: '120px' }}>
+            {/* Weapon card at base */}
+            <div className="absolute top-0 left-0 z-10">
+              <Card
+                suit={game.equippedWeapon.suit as any}
+                rank={rankToString(game.equippedWeapon.rank) as any}
+                faceUp={true}
+              />
+            </div>
+            {/* Stack monsters on weapon, each offset lower and right */}
+            {game.monstersOnWeapon && game.monstersOnWeapon.map((monster, idx) => (
+              <div
+                key={idx}
+                className="absolute z-20"
+                style={{ top: `${(idx + 1) * 16}px`, left: `${(idx + 1) * 30}px` }}
+              >
+                <Card
+                  suit={monster.suit as any}
+                  rank={rankToString(monster.rank) as any}
+                  faceUp={true}
+                />
+              </div>
+            ))}
           </span>
         ) : (
           <span className="font-mono">None</span>
