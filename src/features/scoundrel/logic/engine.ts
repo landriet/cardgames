@@ -7,6 +7,10 @@ export function handleCardAction(
   state: ScoundrelGameState,
   card: DungeonCard
 ): ScoundrelGameState {
+  // Prevent any action if game is over
+  if (state.gameOver) {
+    return state;
+  }
   // Prevent acting on the last card in the room only during the resolve 3 of 4 phase
   if (
     state.currentRoom &&
@@ -74,6 +78,10 @@ export function applyTurnRules(state: ScoundrelGameState): ScoundrelGameState {
   // Game over if health <= 0
   if (newState.health <= 0) {
     newState.gameOver = true;
+    // Death scoring: sum monster values in dungeon, subtract from current health
+    const monstersLeft = newState.deck.filter(card => card.type === 'monster');
+    const monstersValue = monstersLeft.reduce((sum, card) => sum + card.rank, 0);
+    newState.score = (newState.health - monstersValue);
   }
   // Victory if deck is empty and currentRoom/cards are empty
   if (
@@ -182,6 +190,9 @@ export function takeWeapon(
     console.error('[takeWeapon] Card is not a weapon.');
     return state;
   }
+  if (state.gameOver) {
+    return state;
+  }
   let newDiscard = [...state.discard];
   if (state.equippedWeapon) {
     newDiscard.push(state.equippedWeapon);
@@ -212,6 +223,9 @@ export function fightMonster(
 ): ScoundrelGameState {
   if (monster.type !== 'monster') {
     console.error('[fightMonster] Card is not a monster.');
+    return state;
+  }
+  if (state.gameOver) {
     return state;
   }
   if (mode === 'barehanded') {
@@ -259,6 +273,9 @@ export function fightMonsterBarehanded(
 ): ScoundrelGameState {
   if (monster.type !== 'monster') {
     console.error('[fightMonsterBarehanded] Card is not a monster.');
+    return state;
+  }
+  if (state.gameOver) {
     return state;
   }
   const newHealth = state.health - monster.rank;
