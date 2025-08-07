@@ -18,20 +18,45 @@ export function handleCardAction(
   ) {
     return state; // Do nothing, last card in room
   }
+  let newState: ScoundrelGameState;
   if (card.type === 'monster') {
     if (state.equippedWeapon) {
-      // Try weapon fight, throw if not allowed
-      return fightMonster(state, card, 'weapon');
+      newState = fightMonster(state, card, 'weapon');
     } else {
-      return fightMonster(state, card, 'barehanded');
+      newState = fightMonster(state, card, 'barehanded');
     }
   } else if (card.type === 'weapon') {
-    return takeWeapon(state, card);
+    newState = takeWeapon(state, card);
   } else if (card.type === 'potion') {
-    return takePotion(state, card);
+    newState = takePotion(state, card);
   } else {
     throw new Error('[handleCardAction] Unknown card type.');
   }
+
+  // After resolving a card, check if only one card remains in the room
+  if (
+    newState.currentRoom &&
+    Array.isArray(newState.currentRoom.cards) &&
+    newState.currentRoom.cards.length === 1 &&
+    newState.nextRoomBase == null &&
+    newState.deck.length > 0
+  ) {
+    // Finalize the room: move the last card to nextRoomBase, clear currentRoom
+    const finalizedState = finalizeRoom(newState);
+    // Deal the next room automatically
+    const { room, deck: updatedDeck } = dealRoom(finalizedState.deck, finalizedState.nextRoomBase);
+    return {
+      ...finalizedState,
+      currentRoom: room,
+      deck: updatedDeck,
+      nextRoomBase: null,
+      // Reset per-turn flags as needed
+      potionTakenThisTurn: false,
+      canDeferRoom: true,
+      lastActionWasDefer: false,
+    };
+  }
+  return newState;
 }
 
 /**
