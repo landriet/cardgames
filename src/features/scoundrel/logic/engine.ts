@@ -1,3 +1,35 @@
+/**
+ * Take a health potion: only one per turn, extras discarded with no effect.
+ * Adds value to health (max 20), sets potionTakenThisTurn flag, discards potion.
+ * If already taken, discards potion with no effect.
+ * @throws Error if card is not a potion
+ */
+export function takePotion(
+  state: ScoundrelGameState,
+  potion: DungeonCard
+): ScoundrelGameState {
+  if (potion.type !== 'potion') {
+    throw new Error('[takePotion] Card is not a potion.');
+  }
+  // Remove potion from current room
+  const stateAfterRemoval = removeCardFromCurrentRoom(state, potion);
+  if (state.potionTakenThisTurn) {
+    // Already took a potion this turn, discard with no effect
+    return {
+      ...stateAfterRemoval,
+      discard: [...stateAfterRemoval.discard, potion],
+      potionTakenThisTurn: true,
+    };
+  }
+  // Take potion: add value to health, max 20
+  const newHealth = Math.min(state.health + potion.rank, state.maxHealth);
+  return {
+    ...stateAfterRemoval,
+    health: newHealth,
+    discard: [...stateAfterRemoval.discard, potion],
+    potionTakenThisTurn: true,
+  };
+}
 
 import {
   CardType,
@@ -238,9 +270,11 @@ export function avoidRoom(state: ScoundrelGameState): ScoundrelGameState {
 export function enterRoom(state: ScoundrelGameState): ScoundrelGameState {
   // After entering, player must resolve 3 of 4 cards, leave 4th as nextRoomBase
   // (actual card resolution handled elsewhere)
+  // Reset potionTakenThisTurn at start of turn
   return {
     ...state,
     canDeferRoom: true, // can avoid next room if desired
     lastActionWasDefer: false,
+    potionTakenThisTurn: false,
   };
 }

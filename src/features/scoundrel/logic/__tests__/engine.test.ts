@@ -1,3 +1,60 @@
+import { takePotion } from '../engine';
+describe('takePotion', () => {
+  it('only allows one potion per turn, extras discarded with no effect', () => {
+    const potion1: DungeonCard = { suit: 'hearts', rank: 5 as Rank, type: 'potion' };
+    const potion2: DungeonCard = { suit: 'hearts', rank: 7 as Rank, type: 'potion' };
+    let state: ScoundrelGameState = {
+      deck: [],
+      discard: [],
+      currentRoom: { cards: [potion1, potion2] },
+      nextRoomBase: null,
+      equippedWeapon: null,
+      lastMonsterDefeated: null,
+      monstersOnWeapon: [],
+      health: 10,
+      maxHealth: 20,
+      canDeferRoom: true,
+      lastActionWasDefer: false,
+      gameOver: false,
+      victory: false,
+      potionTakenThisTurn: false,
+    };
+    // Take first potion
+    state = takePotion(state, potion1);
+    expect(state.health).toBe(15); // 10 + 5
+    expect(state.potionTakenThisTurn).toBe(true);
+    expect(state.discard).toContain(potion1);
+    // Take second potion (should have no effect)
+    state = takePotion(state, potion2);
+    expect(state.health).toBe(15); // unchanged
+    expect(state.discard).toContain(potion2);
+    expect(state.potionTakenThisTurn).toBe(true);
+  });
+
+  it('does not allow health to exceed maxHealth', () => {
+    const potion: DungeonCard = { suit: 'hearts', rank: 8 as Rank, type: 'potion' };
+    let state: ScoundrelGameState = {
+      deck: [],
+      discard: [],
+      currentRoom: { cards: [potion] },
+      nextRoomBase: null,
+      equippedWeapon: null,
+      lastMonsterDefeated: null,
+      monstersOnWeapon: [],
+      health: 18,
+      maxHealth: 20,
+      canDeferRoom: true,
+      lastActionWasDefer: false,
+      gameOver: false,
+      victory: false,
+      potionTakenThisTurn: false,
+    };
+    state = takePotion(state, potion);
+    expect(state.health).toBe(20); // maxHealth
+    expect(state.discard).toContain(potion);
+    expect(state.potionTakenThisTurn).toBe(true);
+  });
+});
 describe('Scoundrel Engine Edge Cases', () => {
   it('removeCardFromCurrentRoom: removing by reference not present returns state unchanged', () => {
     const card1: DungeonCard = { suit: 'spades', rank: 2 as Rank, type: 'monster' };

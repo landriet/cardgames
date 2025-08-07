@@ -32,4 +32,5 @@ export interface ScoundrelGameState {
   lastActionWasDefer: boolean;
   gameOver: boolean;
   victory: boolean;
+  potionTakenThisTurn?: boolean;
 }

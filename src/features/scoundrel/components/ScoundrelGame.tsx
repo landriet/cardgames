@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { initGame, fightMonster, takeWeapon } from '../logic/engine';
+import { takePotion } from '../logic/engine';
 import { ScoundrelGameState, DungeonCard } from '../../../types/scoundrel';
 import Card from '../../../components/Card';
 
@@ -14,6 +15,9 @@ export const rankToString = (rank: number): string => {
 };
 
 export default function ScoundrelGame() {
+  const handleTakePotion = (potion: DungeonCard) => {
+    setGame((prev: ScoundrelGameState) => takePotion(prev, potion));
+  };
   const [game, setGame] = useState<ScoundrelGameState>(initGame());
 
   const handleFightBarehanded = (monster: DungeonCard) => {
@@ -91,6 +95,14 @@ export default function ScoundrelGame() {
                     onClick={() => handleEquipWeapon(card)}
                   >
                     Equip Weapon
+                  </button>
+                )}
+                {card.type === 'potion' && (
+                  <button
+                    className="mt-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                    onClick={() => handleTakePotion(card)}
+                  >
+                    Take Potion
                   </button>
                 )}
               </div>
