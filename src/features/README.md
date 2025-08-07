@@ -1,98 +1,128 @@
-# Scoundrel - Single Player Rogue-like Card Game
-*Version 1.0 - Created by Zach Gage and Kurt Bieg*
+# Scoundrel - Complete Rules
+*A Single Player Rogue-like Card Game by Zach Gage and Kurt Bieg*  
+*Version 1.0 - August 15th, 2011*
 
 ## Setup
 
-1. Use a standard deck of playing cards
-2. Remove all **Jokers, Red Face Cards, and Red Aces** - set them aside (not used)
-3. Shuffle the remaining cards and place face down on your left - this is the **Dungeon**
-4. Start with **20 Health** (track on paper or in memory)
+### Deck Preparation
+1. Start with a standard deck of playing cards
+2. Remove and set aside (not used in game):
+   - All Jokers
+   - All Red Face Cards (Hearts and Diamonds: Jacks, Queens, Kings)
+   - All Red Aces (Hearts and Diamonds)
+3. Shuffle the remaining cards
+4. Place the shuffled deck face down on your left - this is called the **Dungeon**
 
-## Card Types
+### Health Tracking
+- Start with 20 Health points
+- Track this on paper or in memory
 
-### Monsters (26 cards - all Clubs and Spades)
-- Damage equals their ordered value:
-  - Number cards = face value
-  - Jack = 11
-  - Queen = 12
-  - King = 13
-  - Ace = 14
-
-### Weapons (9 cards - all Diamonds)
-- Damage equals face value
-- **Binding**: Must equip when picked up, discarding previous weapon
-- Can only be used on monsters with value ≤ the last monster it killed
-
-### Health Potions (9 cards - all Hearts)
-- Restore health equal to face value
-- **One per turn maximum** (second potion is discarded)
-- Cannot exceed starting 20 health
-
-## Table Layout
+### Table Layout
 ```
-[Dungeon]  [Room - 4 face-up cards]  [Discard]
-           [Equipped Weapon]
-           [Monsters on Weapon]
+Dungeon (face down)    Room (4 face up cards)    Discard (face down)
+     |                                                    |
+     |                Equipped Weapon                     |
+     |           (with Monsters on top)                   |
 ```
+
+## Card Types & Values
+
+### Monsters (26 cards - All Clubs and Spades)
+- **Damage Value**: Equal to card's ordered value
+  - Number cards: Face value (2-10)
+  - Jack: 11 damage
+  - Queen: 12 damage  
+  - King: 13 damage
+  - Ace: 14 damage
+
+### Weapons (9 cards - All Diamonds)
+- **Damage Value**: Equal to card's face value
+- **Binding**: When picked up, must equip immediately and discard previous weapon
+- **Usage Restriction**: After killing a monster, weapon can only be used on monsters with value ≤ the last monster it killed
+
+### Health Potions (9 cards - All Hearts)
+- **Healing Value**: Equal to card's face value
+- **Restrictions**:
+  - Only one potion per turn (second potion is discarded with no effect)
+  - Cannot exceed maximum health of 20
+  - Discard after use
 
 ## Gameplay
 
-### Each Turn:
-1. Flip cards from Dungeon until you have **4 face-up cards** forming a Room
-2. Choose to **Enter** or **Avoid** the Room
+### Turn Structure
+1. **Room Creation**: Flip 4 cards face up from the Dungeon to create a Room
+2. **Room Decision**: Choose to enter the Room OR avoid it
 
-### Avoiding Rooms:
-- Scoop all 4 cards and place at bottom of Dungeon
-- Cannot avoid **two Rooms in a row**
-- No limit on total avoided rooms
+### Room Avoidance
+- You may avoid any Room by scooping up all 4 cards and placing them at the bottom of the Dungeon
+- **Restriction**: Cannot avoid two Rooms in a row
+- No limit on total rooms avoided (except the consecutive rule)
 
-### Entering Rooms:
-- Must face **3 of the 4 cards** one at a time
-- Leave the 4th card face-up for next Room
+### Enter a Room
+If you choose to enter a Room:
+1. Face 3 of the 4 cards one by one, resolving each according to its type (weapon, health potion, monster).
+2. After you have resolved 3 cards, your turn is complete.
+3. The fourth (unresolved) card remains face up in front of you. This card will become part of the next Room you create on your next turn, joined by 3 new cards drawn from the Dungeon.
 
-### Taking Cards:
+**Summary:** After resolving 3 cards, always leave the fourth card face up; it is carried forward into the next Room. At the start of each new Room, always draw 3 new cards from the Dungeon if available; if fewer than 3 remain, use all remaining cards.
 
-#### Weapon:
-- Must equip immediately
-- Place face-up between you and Room
-- Previous weapon and any monsters on it go to discard
+#### Card Resolution
 
-#### Health Potion:
-- Add value to health, then discard
-- Cannot exceed 20 health
-- Only one per turn (extras discarded with no effect)
+##### When You Choose a Weapon
+1. Must equip it immediately
+2. Place face up between you and remaining Room cards
+3. If you had a previous weapon:
+   - Move old weapon to discard
+   - Move any monsters on old weapon to discard
 
-#### Monster:
-Choose to fight **barehanded** or **with equipped weapon**:
+##### When You Choose a Health Potion
+1. Add its value to your current health
+2. Discard the potion
+3. Health cannot exceed 20
+4. If second potion in same turn: discard with no healing effect
 
-**Barehanded:**
-- Take full monster damage
-- Discard monster
+##### When You Choose a Monster
+Choose one combat option:
 
-**With Weapon:**
-- Place monster on top of weapon (staggered to show weapon value)
-- Damage = Monster value - Weapon value
-- Take remaining damage (minimum 0)
-- Weapon can now only kill monsters ≤ this monster's value
+**Fight Barehanded:**
+- Subtract monster's full damage value from your Health
+- Move monster to discard deck
 
-### Combat Examples:
-- 5 Weapon vs 3 Monster: 3 - 5 = 0 damage taken
-- 5 Weapon vs Jack (11): 11 - 5 = 6 damage taken
-- 5 Weapon that killed Queen (12) can still fight monsters value ≤ 12
-- 5 Weapon that killed 6 Monster cannot fight Queen (12 > 6) - must fight barehanded
+**Fight with Equipped Weapon:**
+- Place monster face up on top of weapon (stagger so weapon value shows)
+- Calculate: Monster Value - Weapon Value = Damage taken
+- If result is 0 or negative, take no damage
+- Subtract any positive damage from your Health
+- Monster remains on weapon (weapon not discarded)
+- **Important**: Weapon can now only fight monsters with value ≤ this monster's value
+
+### Combat Examples
+
+#### Weapon Combat Calculations
+- **5 Weapon vs 3 Monster**: 3 - 5 = -2 → No damage taken
+- **5 Weapon vs Jack (11)**: 11 - 5 = 6 → Take 6 damage
+
+#### Weapon Usage Restrictions
+- **5 Weapon kills Queen (12)**: Can later fight any monster ≤ 12
+- **5 Weapon kills 6 Monster**: Can later only fight monsters ≤ 6
+- **Cannot use weapon on stronger monsters**: Must fight barehanded
 
 ## Game End Conditions
 
-### Death (Health reaches 0):
-- Find all remaining monsters in Dungeon
-- Subtract their total value from current health
-- **Score = negative health value**
+### Death (Health reaches 0)
+- Game ends immediately
+- **Score**: Find remaining monsters in Dungeon, add their values, subtract from current health (negative score)
 
-### Victory (Complete Dungeon):
-- **Score = remaining positive health**
-- If health is exactly 20 and last card was a health potion: **Score = 20 + potion value**
+### Victory (Complete entire Dungeon)
+- **Score**: Your remaining positive health
+- **Special**: If health is exactly 20 and last card was a health potion, add potion's value to score
 
-## Additional Notes
-- Discard pile can be placed anywhere (recommended to right of Room)
-- Cards are discarded face down
-- Weapons are retained until replaced, even when "weakened" by use
+## Key Strategic Notes
+
+1. **Weapon Management**: Consider the long-term impact of which monsters you use weapons against
+2. **Room Avoidance**: Use strategically but remember the consecutive restriction
+3. **Health Potion Timing**: Plan usage carefully since only one per turn
+4. **Risk Assessment**: Weigh fighting barehanded vs. limiting weapon effectiveness
+
+---
+*© 2011, Zach Gage and Kurt Bieg*

@@ -281,6 +281,30 @@ describe('Scoundrel Engine - Room Entry/Avoid Logic', () => {
     state = enterRoom(state);
     expect(state.canDeferRoom).toBe(true);
   });
+
+  test('room carry-forward mechanic: resolve 3 cards, finalize, next room includes carried card', () => {
+    let state = initGame();
+    // Simulate resolving 3 cards (remove 3 from currentRoom)
+    const initialRoomCards = [...state.currentRoom.cards];
+    // Remove first 3 cards
+    for (let i = 0; i < 3; i++) {
+      state = removeCardFromCurrentRoom(state, initialRoomCards[i]);
+    }
+    // Only 1 card left in room
+    expect(state.currentRoom.cards.length).toBe(1);
+    const carriedCard = state.currentRoom.cards[0];
+    // Finalize room
+    state = finalizeRoom(state);
+    expect(state.nextRoomBase).toEqual(carriedCard);
+    expect(state.currentRoom.cards.length).toBe(0);
+    // Deal next room
+    const { room, deck: newDeck } = dealRoom(state.deck, state.nextRoomBase);
+    // Room should contain carried card and 3 new cards
+    expect(room.cards.length).toBe(4);
+    expect(room.cards[0]).toEqual(carriedCard);
+    // The other 3 should be from the deck
+    expect(newDeck.length).toBe(state.deck.length - 3);
+  });
 });
 
 describe('Scoundrel Engine', () => {

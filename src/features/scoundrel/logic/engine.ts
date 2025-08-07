@@ -16,7 +16,7 @@ export function handleCardAction(
     state.nextRoomBase == null &&
     state.deck.length > 0
   ) {
-    throw new Error('[handleCardAction] Cannot act on the last card in the room before finalizing.');
+    return state; // Do nothing, last card in room
   }
   if (card.type === 'monster') {
     if (state.equippedWeapon) {
