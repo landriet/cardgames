@@ -1,10 +1,24 @@
-import ScoundrelGame from '../features/scoundrel/components/ScoundrelGame';
-import MainLayout from '../layouts/MainLayout';
+import React, { useState, useEffect } from 'react';
+import ScoundrelGame from '../features/scoundrel/components/ScoundrelGame.tsx';
+import Header from '../components/Header.tsx';
 
-export default function ScoundrelPage() {
+const ScoundrelPage: React.FC = () => {
+  const [dark, setDark] = useState(false);
+
+  useEffect(() => {
+    if (dark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [dark]);
+
   return (
-    <MainLayout>
+    <div className="min-h-screen w-screen flex flex-col">
+      <Header dark={dark} setDark={setDark} />
       <ScoundrelGame />
-    </MainLayout>
+    </div>
   );
-}
+};
+
+export default ScoundrelPage;
