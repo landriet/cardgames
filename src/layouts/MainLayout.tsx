@@ -6,7 +6,7 @@ interface MainLayoutProps {
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children, sidebar }) => (
-  <div className="min-h-screen flex flex-col bg-gray-50">
+  <div className="h-screen w-screen flex flex-col bg-gray-50">
     <header className="bg-white shadow-md" role="banner">
       <div className="max-w-7xl mx-auto flex justify-between items-center p-4">
         <span className="text-2xl font-bold">CardGames</span>
@@ -17,17 +17,17 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, sidebar }) => (
         </nav>
       </div>
     </header>
-    <div className="flex flex-1">
+    <div className="flex flex-1 min-h-0">
       {sidebar && (
         <aside className="hidden md:block w-64 bg-gray-100 p-4 border-r border-gray-200" role="complementary">
           {sidebar}
         </aside>
       )}
-      <main className="flex-1 p-4" role="main">
+      <main className="flex-1 p-4 overflow-auto" role="main">
         {children}
       </main>
     </div>
-    <footer className="bg-gray-100 p-4 mt-8" role="contentinfo">
+    <footer className="bg-gray-100 p-4" role="contentinfo">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between text-gray-500 text-sm">
         <span>&copy; 2025 CardGames. All rights reserved.</span>
         <div className="flex gap-3 mt-2 md:mt-0">
