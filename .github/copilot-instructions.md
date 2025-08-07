@@ -26,9 +26,10 @@
 
 
 ## Conventions & Patterns
-- **TypeScript:** Strict mode, no unused locals/params, enforced via `tsconfig.*.json`.
-- **Imports:** Use `.ts`/`.tsx` extensions in imports (Vite/TS config allows this).
-- **Styling:**
+ **TypeScript:** Strict mode, no unused locals/params, enforced via `tsconfig.*.json`.
+ **Imports:**
+   - Always place all import statements at the very top of each file, before any other code or comments.
+   - Use `.ts`/`.tsx` extensions in imports (Vite/TS config allows this).
   - Use [Tailwind CSS](https://tailwindcss.com/) utility classes for styling components and layouts.
   - Global styles: `src/index.css`, `src/styles/`
   - Component styles: co-located or imported as needed
