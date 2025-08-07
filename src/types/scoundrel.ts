@@ -18,6 +18,7 @@ export interface Room {
   cards: DungeonCard[]; // 4 cards per room
 }
 
+export interface ScoundrelGameState {
   deck: DungeonCard[];
   discard: DungeonCard[];
   currentRoom: Room;
