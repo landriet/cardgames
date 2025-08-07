@@ -1,7 +1,6 @@
 import { useState } from 'react';
 
-import { initGame, fightMonster, takeWeapon } from '../logic/engine';
-import { takePotion } from '../logic/engine';
+import { initGame, handleCardAction } from '../logic/engine';
 import { ScoundrelGameState, DungeonCard } from '../../../types/scoundrel';
 import Card from '../../../components/Card';
 
@@ -17,23 +16,12 @@ export const rankToString = (rank: number): string => {
 export default function ScoundrelGame() {
   const [game, setGame] = useState<ScoundrelGameState>(initGame());
 
-  // Unified handler for card click
+  // Unified handler for card click, delegates to engine
   const handleCardClick = (card: DungeonCard) => {
-    if (card.type === 'monster') {
-      // If weapon equipped, try weapon fight, else barehanded
-      if (game.equippedWeapon) {
-        try {
-          setGame((prev: ScoundrelGameState) => fightMonster(prev, card, 'weapon'));
-        } catch (e: any) {
-          alert(e.message || 'Cannot fight with weapon');
-        }
-      } else {
-        setGame((prev: ScoundrelGameState) => fightMonster(prev, card, 'barehanded'));
-      }
-    } else if (card.type === 'weapon') {
-      setGame((prev: ScoundrelGameState) => takeWeapon(prev, card));
-    } else if (card.type === 'potion') {
-      setGame((prev: ScoundrelGameState) => takePotion(prev, card));
+    try {
+      setGame((prev: ScoundrelGameState) => handleCardAction(prev, card));
+    } catch (e: any) {
+      alert(e.message || 'Invalid action');
     }
   };
 

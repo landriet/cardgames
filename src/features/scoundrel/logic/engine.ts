@@ -1,4 +1,40 @@
 /**
+ * Unified handler for card actions (monster, weapon, potion).
+ * Moves business logic out of UI layer.
+ * Throws errors for invalid actions (e.g., weapon fight with no weapon).
+ */
+export function handleCardAction(
+  state: ScoundrelGameState,
+  card: DungeonCard
+): ScoundrelGameState {
+  // Prevent acting on the last card in the room only during the resolve 3 of 4 phase
+  if (
+    state.currentRoom &&
+    Array.isArray(state.currentRoom.cards) &&
+    state.currentRoom.cards.length === 1 &&
+    state.currentRoom.cards[0] === card &&
+    state.nextRoomBase == null &&
+    state.deck.length > 0
+  ) {
+    throw new Error('[handleCardAction] Cannot act on the last card in the room before finalizing.');
+  }
+  if (card.type === 'monster') {
+    if (state.equippedWeapon) {
+      // Try weapon fight, throw if not allowed
+      return fightMonster(state, card, 'weapon');
+    } else {
+      return fightMonster(state, card, 'barehanded');
+    }
+  } else if (card.type === 'weapon') {
+    return takeWeapon(state, card);
+  } else if (card.type === 'potion') {
+    return takePotion(state, card);
+  } else {
+    throw new Error('[handleCardAction] Unknown card type.');
+  }
+}
+
+/**
  * Centralized per-turn rule enforcement. Call after every player action.
  * - Resets potionTakenThisTurn if needed
  * - Checks for game over/victory
