@@ -1,4 +1,9 @@
 import { takePotion } from '../engine';
+import { beforeEach, describe, expect, it, test } from 'vitest';
+import { CardType, DungeonCard, Rank, ScoundrelGameState } from '../../../../types/scoundrel';
+import { avoidRoom, createScoundrelDeck, dealRoom, enterRoom, fightMonster, fightMonsterBarehanded, initGame, removeCardFromCurrentRoom, shuffle, takeWeapon } from '../engine';
+import { finalizeRoom } from '../engine';
+
 describe('takePotion', () => {
   it('only allows one potion per turn, extras discarded with no effect', () => {
     const potion1: DungeonCard = { suit: 'hearts', rank: 5 as Rank, type: 'potion' };
@@ -145,9 +150,6 @@ describe('Scoundrel Engine Edge Cases', () => {
     expect(() => removeCardFromCurrentRoom(state, card)).toThrow();
   });
 });
-import { beforeEach, describe, expect, it, test } from 'vitest';
-import { CardType, DungeonCard, Rank, ScoundrelGameState } from '../../../../types/scoundrel';
-import { avoidRoom, createScoundrelDeck, dealRoom, enterRoom, fightMonster, fightMonsterBarehanded, initGame, removeCardFromCurrentRoom, shuffle, takeWeapon } from '../engine';
 
 describe('takeWeapon', () => {
   it('equips new weapon and discards previous weapon and monsters on it', () => {
@@ -211,6 +213,29 @@ describe('takeWeapon', () => {
 });
 
 describe('Scoundrel Engine - Room Entry/Avoid Logic', () => {
+  test('finalizeRoom leaves 4th card as nextRoomBase and empties room', () => {
+    // Setup: room with 1 card left after resolving 3
+    const lastCard: DungeonCard = { suit: 'spades', rank: 7 as Rank, type: 'monster' };
+    const state: ScoundrelGameState = {
+      deck: [],
+      discard: [],
+      currentRoom: { cards: [lastCard] },
+      nextRoomBase: null,
+      equippedWeapon: null,
+      lastMonsterDefeated: null,
+      monstersOnWeapon: [],
+      health: 10,
+      maxHealth: 20,
+      canDeferRoom: true,
+      lastActionWasDefer: false,
+      gameOver: false,
+      victory: false,
+      potionTakenThisTurn: false,
+    };
+    const newState = finalizeRoom(state);
+    expect(newState.nextRoomBase).toEqual(lastCard);
+    expect(newState.currentRoom.cards.length).toBe(0);
+  });
   let initialState: ScoundrelGameState;
 
   beforeEach(() => {
@@ -218,7 +243,7 @@ describe('Scoundrel Engine - Room Entry/Avoid Logic', () => {
   });
 
   test('avoidRoom moves all 4 cards to bottom of deck and deals new room', () => {
-    const prevDeck = [...initialState.deck];
+    // const prevDeck = [...initialState.deck]; // removed unused variable
     const prevRoom = [...initialState.currentRoom.cards];
     const stateAfterAvoid = avoidRoom(initialState);
     // The avoided cards should now be at the end of the deck

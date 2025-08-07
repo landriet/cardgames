@@ -1,4 +1,31 @@
 /**
+ * Centralized per-turn rule enforcement. Call after every player action.
+ * - Resets potionTakenThisTurn if needed
+ * - Checks for game over/victory
+ * - Enforces health boundaries
+ * - Add other per-turn rules here
+ */
+export function applyTurnRules(state: ScoundrelGameState): ScoundrelGameState {
+  let newState = { ...state };
+  // Clamp health between 0 and maxHealth
+  newState.health = Math.max(0, Math.min(newState.health, newState.maxHealth));
+  // Game over if health <= 0
+  if (newState.health <= 0) {
+    newState.gameOver = true;
+  }
+  // Victory if deck is empty and currentRoom/cards are empty
+  if (
+    newState.deck.length === 0 &&
+    (!newState.currentRoom || newState.currentRoom.cards.length === 0)
+  ) {
+    newState.victory = true;
+  }
+  // Reset potionTakenThisTurn if entering a new room (handled in enterRoom)
+  // Add other per-turn rules as needed
+  return newState;
+}
+
+/**
  * Take a health potion: only one per turn, extras discarded with no effect.
  * Adds value to health (max 20), sets potionTakenThisTurn flag, discards potion.
  * If already taken, discards potion with no effect.
@@ -13,22 +40,25 @@ export function takePotion(
   }
   // Remove potion from current room
   const stateAfterRemoval = removeCardFromCurrentRoom(state, potion);
+  let newState;
   if (state.potionTakenThisTurn) {
     // Already took a potion this turn, discard with no effect
-    return {
+    newState = {
       ...stateAfterRemoval,
       discard: [...stateAfterRemoval.discard, potion],
       potionTakenThisTurn: true,
     };
+  } else {
+    // Take potion: add value to health, max 20
+    const newHealth = Math.min(state.health + potion.rank, state.maxHealth);
+    newState = {
+      ...stateAfterRemoval,
+      health: newHealth,
+      discard: [...stateAfterRemoval.discard, potion],
+      potionTakenThisTurn: true,
+    };
   }
-  // Take potion: add value to health, max 20
-  const newHealth = Math.min(state.health + potion.rank, state.maxHealth);
-  return {
-    ...stateAfterRemoval,
-    health: newHealth,
-    discard: [...stateAfterRemoval.discard, potion],
-    potionTakenThisTurn: true,
-  };
+  return applyTurnRules(newState);
 }
 
 import {
@@ -77,7 +107,6 @@ export function removeCardFromCurrentRoom(
   };
 }
 
-
 /**
  * Take a weapon: must equip immediately, discard previous weapon and monsters on it.
  * Removes the weapon from the current room if present.
@@ -99,13 +128,14 @@ export function takeWeapon(
   }
   // Remove the weapon from the current room's cards, if present
   const newState = removeCardFromCurrentRoom(state, weapon);
-  return {
+  const updatedState = {
     ...newState,
     equippedWeapon: weapon,
     monstersOnWeapon: [],
     discard: newDiscard,
     lastMonsterDefeated: null, // reset kill limit
   };
+  return applyTurnRules(updatedState);
 }
 /**
  * Fight a monster, either barehanded or with weapon.
@@ -145,13 +175,14 @@ export function fightMonster(
     // Add monster to discard
     const newDiscard = [...stateAfterRemoval.discard, monster];
     // Place monster on weapon (track in monstersOnWeapon)
-    return {
+    const updatedState = {
       ...stateAfterRemoval,
       health: state.health - damage,
       lastMonsterDefeated: monster,
       monstersOnWeapon: [...(state.monstersOnWeapon || []), monster],
       discard: newDiscard,
     };
+    return applyTurnRules(updatedState);
   }
 }
 /**
@@ -168,11 +199,12 @@ export function fightMonsterBarehanded(
   const newHealth = state.health - monster.rank;
   // Remove monster from current room using utility
   const stateAfterRemoval = removeCardFromCurrentRoom(state, monster);
-  return {
+  const updatedState = {
     ...stateAfterRemoval,
     health: newHealth,
     discard: [...stateAfterRemoval.discard, monster],
   };
+  return applyTurnRules(updatedState);
 }
 
 // Utility: Create a deck for Scoundrel
@@ -271,10 +303,35 @@ export function enterRoom(state: ScoundrelGameState): ScoundrelGameState {
   // After entering, player must resolve 3 of 4 cards, leave 4th as nextRoomBase
   // (actual card resolution handled elsewhere)
   // Reset potionTakenThisTurn at start of turn
+  // If currentRoom has 4 cards, set nextRoomBase to the remaining card after 3 are resolved
+  // This function should be called at the start of entering a room, so we just set flags and leave nextRoomBase null for now
+  // The mechanic is enforced after 3 cards are resolved, so add a helper to finalize the room
   return {
     ...state,
     canDeferRoom: true, // can avoid next room if desired
     lastActionWasDefer: false,
     potionTakenThisTurn: false,
+    // nextRoomBase will be set after 3 cards are resolved
+  };
+}
+
+/**
+ * Finalize the room after 3 cards have been resolved: leave the 4th card as nextRoomBase
+ * Should be called after the player has resolved 3 cards in the room
+ */
+export function finalizeRoom(state: ScoundrelGameState): ScoundrelGameState {
+  if (!state.currentRoom || !Array.isArray(state.currentRoom.cards)) {
+    throw new Error('[finalizeRoom] No current room or cards.');
+  }
+  if (state.currentRoom.cards.length !== 1) {
+    throw new Error(
+      '[finalizeRoom] Room must have exactly 1 card left to finalize.'
+    );
+  }
+  // The remaining card becomes nextRoomBase
+  return {
+    ...state,
+    nextRoomBase: state.currentRoom.cards[0],
+    currentRoom: { cards: [] },
   };
 }

@@ -15,25 +15,26 @@ export const rankToString = (rank: number): string => {
 };
 
 export default function ScoundrelGame() {
-  const handleTakePotion = (potion: DungeonCard) => {
-    setGame((prev: ScoundrelGameState) => takePotion(prev, potion));
-  };
   const [game, setGame] = useState<ScoundrelGameState>(initGame());
 
-  const handleFightBarehanded = (monster: DungeonCard) => {
-    setGame((prev: ScoundrelGameState) => fightMonster(prev, monster, 'barehanded'));
-  };
-
-  const handleFightWithWeapon = (monster: DungeonCard) => {
-    try {
-      setGame((prev: ScoundrelGameState) => fightMonster(prev, monster, 'weapon'));
-    } catch (e: any) {
-      alert(e.message || 'Cannot fight with weapon');
+  // Unified handler for card click
+  const handleCardClick = (card: DungeonCard) => {
+    if (card.type === 'monster') {
+      // If weapon equipped, try weapon fight, else barehanded
+      if (game.equippedWeapon) {
+        try {
+          setGame((prev: ScoundrelGameState) => fightMonster(prev, card, 'weapon'));
+        } catch (e: any) {
+          alert(e.message || 'Cannot fight with weapon');
+        }
+      } else {
+        setGame((prev: ScoundrelGameState) => fightMonster(prev, card, 'barehanded'));
+      }
+    } else if (card.type === 'weapon') {
+      setGame((prev: ScoundrelGameState) => takeWeapon(prev, card));
+    } else if (card.type === 'potion') {
+      setGame((prev: ScoundrelGameState) => takePotion(prev, card));
     }
-  };
-
-  const handleEquipWeapon = (weapon: DungeonCard) => {
-    setGame((prev: ScoundrelGameState) => takeWeapon(prev, weapon));
   };
 
   return (
@@ -64,47 +65,20 @@ export default function ScoundrelGame() {
         <div className="flex-1">
           <div className="flex gap-2 mt-2">
             {game.currentRoom.cards.map((card: DungeonCard, idx: number) => (
-              <div key={idx} className="flex flex-col items-center">
+              <div
+                key={idx}
+                className="flex flex-col items-center cursor-pointer hover:scale-105 transition-transform"
+                onClick={() => handleCardClick(card)}
+                tabIndex={0}
+                role="button"
+                aria-label={`Interact with ${card.type}`}
+              >
                 <Card
                   suit={card.suit as any}
                   rank={rankToString(card.rank) as any}
                   faceUp={true}
                 />
                 <div className="text-xs text-gray-800 dark:text-gray-200 mt-1">{card.type}</div>
-                {card.type === 'monster' && (
-                  <>
-                    <button
-                      className="mt-1 px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
-                      onClick={() => handleFightBarehanded(card)}
-                    >
-                      Fight Barehanded
-                    </button>
-                    {game.equippedWeapon && (
-                      <button
-                        className="mt-1 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 ml-1"
-                        onClick={() => handleFightWithWeapon(card)}
-                      >
-                        Fight with Weapon
-                      </button>
-                    )}
-                  </>
-                )}
-                {card.type === 'weapon' && (
-                  <button
-                    className="mt-1 px-2 py-1 text-xs bg-yellow-600 text-white rounded hover:bg-yellow-700"
-                    onClick={() => handleEquipWeapon(card)}
-                  >
-                    Equip Weapon
-                  </button>
-                )}
-                {card.type === 'potion' && (
-                  <button
-                    className="mt-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
-                    onClick={() => handleTakePotion(card)}
-                  >
-                    Take Potion
-                  </button>
-                )}
               </div>
             ))}
           </div>
