@@ -1,8 +1,9 @@
 import { useState } from 'react';
-
 import { initGame, handleCardAction, avoidRoom } from '../logic/engine';
 import { ScoundrelGameState, DungeonCard } from '../../../types/scoundrel';
 import Card from '../../../components/Card';
+import Modal from '../../../components/Modal';
+import MonsterAttackChoice from '../../../components/MonsterAttackChoice';
 
 // Map numeric rank to string rank for Card component
 export const rankToString = (rank: number): string => {
@@ -16,14 +17,14 @@ export const rankToString = (rank: number): string => {
 export default function ScoundrelGame() {
   const [game, setGame] = useState<ScoundrelGameState>(initGame());
 
-  // Unified handler for card click, delegates to engine
+  // Unified handler for card click, always delegates to engine
   const handleCardClick = (card: DungeonCard) => {
     try {
       setGame((prev: ScoundrelGameState) => handleCardAction(prev, card));
     } catch (e: any) {
       alert(e.message || 'Invalid action');
     }
-  };
+  } 
 
   return (
     <div className="p-4 max-w-xl mx-auto bg-white dark:bg-gray-900">
@@ -86,7 +87,7 @@ export default function ScoundrelGame() {
               />
             </div>
             {/* Stack monsters on weapon, each offset lower and right */}
-            {game.monstersOnWeapon && game.monstersOnWeapon.map((monster, idx) => (
+            {game.monstersOnWeapon && game.monstersOnWeapon.map((monster: DungeonCard, idx: number) => (
               <div
                 key={idx}
                 className="absolute z-20"
@@ -110,7 +111,7 @@ export default function ScoundrelGame() {
           className={`px-4 py-2 rounded ${game.canDeferRoom && !game.lastActionWasDefer && game.currentRoom.cards.length === 4 ? 'bg-yellow-600 text-white hover:bg-yellow-700' : 'bg-gray-400 text-gray-200 cursor-not-allowed'}`}
           onClick={() => {
             if (game.canDeferRoom && !game.lastActionWasDefer && game.currentRoom.cards.length === 4) {
-              setGame(prev => avoidRoom(prev));
+          setGame((prev: ScoundrelGameState) => avoidRoom(prev));
             }
           }}
           disabled={!game.canDeferRoom || game.lastActionWasDefer || game.currentRoom.cards.length !== 4}
@@ -124,6 +125,28 @@ export default function ScoundrelGame() {
           Restart Game
         </button>
       </div>
+
+      {/* Monster attack choice modal */}
+      <Modal
+        isOpen={!!game.pendingMonsterChoice}
+        onClose={() => {
+          setGame((prev: ScoundrelGameState) => ({ ...prev, pendingMonsterChoice: undefined }));
+        }}
+        ariaLabel="Choose attack mode"
+      >
+        <MonsterAttackChoice
+          onBarehand={() => {
+            if (game.pendingMonsterChoice) {
+              setGame((prev: ScoundrelGameState) => handleCardAction(prev, game.pendingMonsterChoice!.monster, 'barehanded'));
+            }
+          }}
+          onWeapon={() => {
+            if (game.pendingMonsterChoice) {
+              setGame((prev: ScoundrelGameState) => handleCardAction(prev, game.pendingMonsterChoice!.monster, 'weapon'));
+            }
+          }}
+        />
+      </Modal>
     </div>
   );
 }

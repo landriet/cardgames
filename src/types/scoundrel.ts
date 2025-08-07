@@ -18,7 +18,6 @@ export interface Room {
   cards: DungeonCard[]; // 4 cards per room
 }
 
-export interface ScoundrelGameState {
   deck: DungeonCard[];
   discard: DungeonCard[];
   currentRoom: Room;
@@ -34,4 +33,5 @@ export interface ScoundrelGameState {
   victory: boolean;
   potionTakenThisTurn?: boolean;
   score?: number;
+  pendingMonsterChoice?: { monster: DungeonCard };
 }

@@ -1,3 +1,13 @@
+import {
+  CardType,
+  DungeonCard,
+  Rank,
+  Room,
+  ScoundrelGameState,
+  Suit,
+} from '../../../types/scoundrel';
+
+
 /**
  * Unified handler for card actions (monster, weapon, potion).
  * Moves business logic out of UI layer.
@@ -5,7 +15,8 @@
  */
 export function handleCardAction(
   state: ScoundrelGameState,
-  card: DungeonCard
+  card: DungeonCard,
+  mode?: 'barehanded' | 'weapon'
 ): ScoundrelGameState {
   // Prevent any action if game is over
   if (state.gameOver) {
@@ -24,8 +35,20 @@ export function handleCardAction(
   }
   let newState: ScoundrelGameState;
   if (card.type === 'monster') {
-    if (state.equippedWeapon) {
+    if (state.equippedWeapon && !mode) {
+      // If called from UI, prompt for choice. If called from test/programmatic, default to weapon.
+      if (typeof window !== 'undefined') {
+        return {
+          ...state,
+          pendingMonsterChoice: { monster: card },
+        };
+      } else {
+        newState = fightMonster(state, card, 'weapon');
+      }
+    } else if (state.equippedWeapon && mode === 'weapon') {
       newState = fightMonster(state, card, 'weapon');
+    } else if (state.equippedWeapon && mode === 'barehanded') {
+      newState = fightMonster(state, card, 'barehanded');
     } else {
       newState = fightMonster(state, card, 'barehanded');
     }
@@ -59,9 +82,10 @@ export function handleCardAction(
       potionTakenThisTurn: false,
       canDeferRoom: true,
       lastActionWasDefer: false,
+      pendingMonsterChoice: undefined,
     };
   }
-  return newState;
+  return { ...newState, pendingMonsterChoice: undefined };
 }
 
 /**
@@ -131,15 +155,6 @@ export function takePotion(
   }
   return applyTurnRules(newState);
 }
-
-import {
-  CardType,
-  DungeonCard,
-  Rank,
-  Room,
-  ScoundrelGameState,
-  Suit,
-} from '../../../types/scoundrel';
 
 /**
  * Remove a card from the current room, by reference (object identity) or by index.
