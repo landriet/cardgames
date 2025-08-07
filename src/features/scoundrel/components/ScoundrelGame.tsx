@@ -1,43 +1,27 @@
 import { useState } from 'react';
 
-import { initGame, fightMonster, takeWeapon } from '../logic/engine';
+import { initGame, fightMonster, takeWeapon, rankToString } from '../logic/engine';
 import { ScoundrelGameState, DungeonCard } from '../../../types/scoundrel';
 import Card from '../../../components/Card';
 
-// Map numeric rank to string rank for Card component
-const rankToString = (rank: number): string => {
-  if (rank === 14) return 'A';
-  if (rank === 13) return 'K';
-  if (rank === 12) return 'Q';
-  if (rank === 11) return 'J';
-  return rank.toString();
-};
-
-const cardLabel = (card: DungeonCard) => {
-  const rank = rankToString(card.rank);
-  return `${rank} ${card.suit.charAt(0).toUpperCase() + card.suit.slice(1)}`;
-};
 
 export default function ScoundrelGame() {
   const [game, setGame] = useState<ScoundrelGameState>(initGame());
 
-  // Handler to fight a monster barehanded
   const handleFightBarehanded = (monster: DungeonCard) => {
     setGame((prev: ScoundrelGameState) => fightMonster(prev, monster, 'barehanded'));
   };
 
-  // Handler to equip a weapon
-  const handleEquipWeapon = (weapon: DungeonCard) => {
-    setGame((prev: ScoundrelGameState) => takeWeapon(prev, weapon));
-  };
-
-  // Handler to fight a monster with weapon
   const handleFightWithWeapon = (monster: DungeonCard) => {
     try {
       setGame((prev: ScoundrelGameState) => fightMonster(prev, monster, 'weapon'));
     } catch (e: any) {
       alert(e.message || 'Cannot fight with weapon');
     }
+  };
+
+  const handleEquipWeapon = (weapon: DungeonCard) => {
+    setGame((prev: ScoundrelGameState) => takeWeapon(prev, weapon));
   };
 
   return (
@@ -80,7 +64,6 @@ export default function ScoundrelGame() {
         )}
         {/* Room cards on the right */}
         <div className="flex-1">
-          <h2 className="font-semibold text-gray-900 dark:text-gray-100">Current Room</h2>
           <div className="flex gap-2 mt-2">
             {game.currentRoom.cards.map((card: DungeonCard, idx: number) => (
               <div key={idx} className="flex flex-col items-center">

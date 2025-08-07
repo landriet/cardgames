@@ -35,6 +35,15 @@ export function removeCardFromCurrentRoom(
   };
 }
 
+// Map numeric rank to string rank for Card component
+export const rankToString = (rank: number): string => {
+  if (rank === 14) return 'A';
+  if (rank === 13) return 'K';
+  if (rank === 12) return 'Q';
+  if (rank === 11) return 'J';
+  return rank.toString();
+};
+
 /**
  * Take a weapon: must equip immediately, discard previous weapon and monsters on it.
  * Removes the weapon from the current room if present.
