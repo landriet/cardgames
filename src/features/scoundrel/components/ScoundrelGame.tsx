@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { initGame, handleCardAction } from '../logic/engine';
+import { initGame, handleCardAction, avoidRoom } from '../logic/engine';
 import { ScoundrelGameState, DungeonCard } from '../../../types/scoundrel';
 import Card from '../../../components/Card';
 
@@ -104,13 +104,26 @@ export default function ScoundrelGame() {
           <span className="font-mono">None</span>
         )}
       </div>
-      {/* TODO: Add action buttons and game over/victory display */}
-      <button
-        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        onClick={() => setGame(initGame())}
-      >
-        Restart Game
-      </button>
+      {/* Action buttons */}
+      <div className="flex gap-4 mt-8">
+        <button
+          className={`px-4 py-2 rounded ${game.canDeferRoom && !game.lastActionWasDefer && game.currentRoom.cards.length === 4 ? 'bg-yellow-600 text-white hover:bg-yellow-700' : 'bg-gray-400 text-gray-200 cursor-not-allowed'}`}
+          onClick={() => {
+            if (game.canDeferRoom && !game.lastActionWasDefer && game.currentRoom.cards.length === 4) {
+              setGame(prev => avoidRoom(prev));
+            }
+          }}
+          disabled={!game.canDeferRoom || game.lastActionWasDefer || game.currentRoom.cards.length !== 4}
+        >
+          Skip Room
+        </button>
+        <button
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          onClick={() => setGame(initGame())}
+        >
+          Restart Game
+        </button>
+      </div>
     </div>
   );
 }
