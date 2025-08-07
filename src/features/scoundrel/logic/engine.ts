@@ -30,7 +30,8 @@ export function handleCardAction(
   } else if (card.type === 'potion') {
     newState = takePotion(state, card);
   } else {
-    throw new Error('[handleCardAction] Unknown card type.');
+    console.error('[handleCardAction] Unknown card type.');
+    return state;
   }
 
   // After resolving a card, check if only one card remains in the room
@@ -97,7 +98,8 @@ export function takePotion(
   potion: DungeonCard
 ): ScoundrelGameState {
   if (potion.type !== 'potion') {
-    throw new Error('[takePotion] Card is not a potion.');
+    console.error('[takePotion] Card is not a potion.');
+    return state;
   }
   // Remove potion from current room
   const stateAfterRemoval = removeCardFromCurrentRoom(state, potion);
@@ -146,9 +148,8 @@ export function removeCardFromCurrentRoom(
   cardOrIndex: DungeonCard
 ): ScoundrelGameState {
   if (!state.currentRoom || !Array.isArray(state.currentRoom.cards)) {
-    throw new Error(
-      '[removeCardFromCurrentRoom] No current room or cards to remove from.'
-    );
+    console.error('[removeCardFromCurrentRoom] No current room or cards to remove from.');
+    return state;
   }
   let cardIndex: number;
   cardIndex = state.currentRoom.cards.findIndex((c) => c === cardOrIndex);
@@ -178,7 +179,8 @@ export function takeWeapon(
   weapon: DungeonCard
 ): ScoundrelGameState {
   if (weapon.type !== 'weapon') {
-    throw new Error('[takeWeapon] Card is not a weapon.');
+    console.error('[takeWeapon] Card is not a weapon.');
+    return state;
   }
   let newDiscard = [...state.discard];
   if (state.equippedWeapon) {
@@ -209,13 +211,15 @@ export function fightMonster(
   mode: 'barehanded' | 'weapon'
 ): ScoundrelGameState {
   if (monster.type !== 'monster') {
-    throw new Error('[fightMonster] Card is not a monster.');
+    console.error('[fightMonster] Card is not a monster.');
+    return state;
   }
   if (mode === 'barehanded') {
     // Use barehanded logic
     return fightMonsterBarehanded(state, monster);
   } else if (!state.equippedWeapon) {
-    throw new Error('[fightMonster] No weapon equipped for weapon mode.');
+    console.error('[fightMonster] No weapon equipped for weapon mode.');
+    return state;
   } else {
     // With weapon
     const weapon = state.equippedWeapon;
@@ -224,9 +228,8 @@ export function fightMonster(
       state.lastMonsterDefeated &&
       monster.rank > state.lastMonsterDefeated.rank
     ) {
-      throw new Error(
-        '[fightMonster] Weapon cannot be used on monster stronger than last defeated.'
-      );
+      console.error('[fightMonster] Weapon cannot be used on monster stronger than last defeated.');
+      return state;
     }
     // Calculate damage
     const damage = Math.max(monster.rank - weapon.rank, 0);
@@ -255,7 +258,8 @@ export function fightMonsterBarehanded(
   monster: DungeonCard
 ): ScoundrelGameState {
   if (monster.type !== 'monster') {
-    throw new Error('[fightMonsterBarehanded] Card is not a monster.');
+    console.error('[fightMonsterBarehanded] Card is not a monster.');
+    return state;
   }
   const newHealth = state.health - monster.rank;
   // Remove monster from current room using utility
@@ -342,7 +346,8 @@ export function initGame(): ScoundrelGameState {
 // Avoid the current room: move all 4 cards to bottom of deck, enforce avoid rules
 export function avoidRoom(state: ScoundrelGameState): ScoundrelGameState {
   if (!state.canDeferRoom || state.lastActionWasDefer) {
-    throw new Error('Cannot avoid two rooms in a row.');
+    console.error('Cannot avoid two rooms in a row.');
+    return state;
   }
   // Move all 4 cards to bottom of deck
   const avoidedCards = [...state.currentRoom.cards];
@@ -382,12 +387,12 @@ export function enterRoom(state: ScoundrelGameState): ScoundrelGameState {
  */
 export function finalizeRoom(state: ScoundrelGameState): ScoundrelGameState {
   if (!state.currentRoom || !Array.isArray(state.currentRoom.cards)) {
-    throw new Error('[finalizeRoom] No current room or cards.');
+    console.error('[finalizeRoom] No current room or cards.');
+    return state;
   }
   if (state.currentRoom.cards.length !== 1) {
-    throw new Error(
-      '[finalizeRoom] Room must have exactly 1 card left to finalize.'
-    );
+    console.error('[finalizeRoom] Room must have exactly 1 card left to finalize.');
+    return state;
   }
   // The remaining card becomes nextRoomBase
   return {

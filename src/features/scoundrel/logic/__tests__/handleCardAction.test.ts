@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { vi } from 'vitest';
 import { handleCardAction } from '../engine';
 import { CardType, DungeonCard, Rank, ScoundrelGameState } from '../../../../types/scoundrel';
 
@@ -73,9 +74,13 @@ describe('handleCardAction', () => {
     expect(newState.currentRoom.cards).not.toContain(potion);
   });
 
-  it('throws error for unknown card type', () => {
+  it('logs error and returns state unchanged for unknown card type', () => {
     const badCard = { suit: 'spades' as const, rank: 2 as Rank, type: 'unknown' as CardType };
     const state = getBaseState();
-    expect(() => handleCardAction(state, badCard)).toThrow('[handleCardAction] Unknown card type.');
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const newState = handleCardAction(state, badCard);
+    expect(newState).toBe(state);
+    expect(spy).toHaveBeenCalledWith('[handleCardAction] Unknown card type.');
+    spy.mockRestore();
   });
 });

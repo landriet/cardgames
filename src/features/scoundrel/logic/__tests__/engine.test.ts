@@ -1,5 +1,6 @@
 import { takePotion } from '../engine';
 import { beforeEach, describe, expect, it, test } from 'vitest';
+import { vi } from 'vitest';
 import { CardType, DungeonCard, Rank, ScoundrelGameState } from '../../../../types/scoundrel';
 import { avoidRoom, createScoundrelDeck, dealRoom, enterRoom, fightMonster, fightMonsterBarehanded, initGame, removeCardFromCurrentRoom, shuffle, takeWeapon } from '../engine';
 import { finalizeRoom } from '../engine';
@@ -130,7 +131,7 @@ describe('Scoundrel Engine Edge Cases', () => {
     expect(newState.discard).toContain(notInRoom);
   });
 
-  it('removeCardFromCurrentRoom: throws if no current room', () => {
+  it('removeCardFromCurrentRoom: logs error and returns state unchanged if no current room', () => {
     const card: DungeonCard = { suit: 'spades', rank: 2 as Rank, type: 'monster' };
     const state: ScoundrelGameState = {
       deck: [],
@@ -147,7 +148,11 @@ describe('Scoundrel Engine Edge Cases', () => {
       gameOver: false,
       victory: false,
     };
-    expect(() => removeCardFromCurrentRoom(state, card)).toThrow();
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const newState = removeCardFromCurrentRoom(state, card);
+    expect(newState).toBe(state);
+    expect(spy).toHaveBeenCalledWith('[removeCardFromCurrentRoom] No current room or cards to remove from.');
+    spy.mockRestore();
   });
 });
 
@@ -255,9 +260,13 @@ describe('Scoundrel Engine - Room Entry/Avoid Logic', () => {
     expect(stateAfterAvoid.lastActionWasDefer).toBe(true);
   });
 
-  test('avoidRoom throws if trying to avoid two rooms in a row', () => {
+  test('avoidRoom logs error and returns state unchanged if trying to avoid two rooms in a row', () => {
     const stateAfterAvoid = avoidRoom(initialState);
-    expect(() => avoidRoom(stateAfterAvoid)).toThrow('Cannot avoid two rooms in a row.');
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const newState = avoidRoom(stateAfterAvoid);
+    expect(newState).toBe(stateAfterAvoid);
+    expect(spy).toHaveBeenCalledWith('Cannot avoid two rooms in a row.');
+    spy.mockRestore();
   });
 
   test('enterRoom resets avoid flag and does not throw', () => {
@@ -384,7 +393,7 @@ describe('Scoundrel Engine', () => {
     expect(newState.discard).toContain(monster);
   });
 
-  it('fightMonster: weapon kill limit enforced', () => {
+  it('fightMonster: weapon kill limit logs error and returns state unchanged', () => {
     const monster: DungeonCard = { suit: 'spades', rank: 13 as Rank, type: 'monster' as CardType };
     const weapon: DungeonCard = { suit: 'diamonds', rank: 7 as Rank, type: 'weapon' as CardType };
     const lastKilled: DungeonCard = { suit: 'spades', rank: 10 as Rank, type: 'monster' as CardType };
@@ -403,7 +412,11 @@ describe('Scoundrel Engine', () => {
       gameOver: false,
       victory: false,
     };
-    expect(() => fightMonster(state, monster, 'weapon')).toThrow('Weapon cannot be used on monster stronger than last defeated');
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const newState = fightMonster(state, monster, 'weapon');
+    expect(newState).toBe(state);
+    expect(spy).toHaveBeenCalledWith('[fightMonster] Weapon cannot be used on monster stronger than last defeated.');
+    spy.mockRestore();
   });
   it('creates a deck with only valid cards', () => {
     const deck = createScoundrelDeck();
