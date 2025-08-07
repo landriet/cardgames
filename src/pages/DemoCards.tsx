@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
+import MainLayout from '../layouts/MainLayout.tsx';
 import Card from '../components/Card.tsx';
-import Header from '../components/Header.tsx';
 import Modal from '../components/Modal.tsx';
 
 const suits = ['hearts', 'diamonds', 'clubs', 'spades'] as const;
@@ -8,19 +8,9 @@ const ranks = ['A', '2', '3', 'J', 'Q', 'K'] as const;
 
 const DemoCards: React.FC = () => {
   const [isModalOpen, setModalOpen] = useState(false);
-  const [dark, setDark] = useState(false);
-
-  React.useEffect(() => {
-    if (dark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [dark]);
 
   return (
-    <div className="min-h-screen w-screen flex flex-col dark:bg-gray-900">
-      <Header dark={dark} setDark={setDark} />
+    <MainLayout>
       <div className="flex flex-col items-center justify-center p-8">
         <h1 className="text-2xl font-bold mb-6">Card Component Demo</h1>
         <button
@@ -48,7 +38,7 @@ const DemoCards: React.FC = () => {
           </button>
         </Modal>
       </div>
-    </div>
+    </MainLayout>
   );
 };
 
