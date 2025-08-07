@@ -17,7 +17,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, sidebar }) => {
   }, [dark]);
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-gray-50 dark:bg-gray-900">
+    <div className="h-screen w-screen flex flex-col dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow-md" role="banner">
         <div className="max-w-7xl mx-auto flex justify-between items-center p-4">
           <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">CardGames</span>
