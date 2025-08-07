@@ -1,9 +1,17 @@
 import { useState } from 'react';
 
-import { initGame, fightMonster, takeWeapon, rankToString } from '../logic/engine';
+import { initGame, fightMonster, takeWeapon } from '../logic/engine';
 import { ScoundrelGameState, DungeonCard } from '../../../types/scoundrel';
 import Card from '../../../components/Card';
 
+// Map numeric rank to string rank for Card component
+export const rankToString = (rank: number): string => {
+  if (rank === 14) return 'A';
+  if (rank === 13) return 'K';
+  if (rank === 12) return 'Q';
+  if (rank === 11) return 'J';
+  return rank.toString();
+};
 
 export default function ScoundrelGame() {
   const [game, setGame] = useState<ScoundrelGameState>(initGame());

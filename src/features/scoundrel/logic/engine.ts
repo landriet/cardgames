@@ -1,3 +1,13 @@
+
+import {
+  CardType,
+  DungeonCard,
+  Rank,
+  Room,
+  ScoundrelGameState,
+  Suit,
+} from '../../../types/scoundrel';
+
 /**
  * Remove a card from the current room, by reference (object identity) or by index.
  * Note: Card removal by reference relies on strict object identity (===).
@@ -35,14 +45,6 @@ export function removeCardFromCurrentRoom(
   };
 }
 
-// Map numeric rank to string rank for Card component
-export const rankToString = (rank: number): string => {
-  if (rank === 14) return 'A';
-  if (rank === 13) return 'K';
-  if (rank === 12) return 'Q';
-  if (rank === 11) return 'J';
-  return rank.toString();
-};
 
 /**
  * Take a weapon: must equip immediately, discard previous weapon and monsters on it.
@@ -140,14 +142,6 @@ export function fightMonsterBarehanded(
     discard: [...stateAfterRemoval.discard, monster],
   };
 }
-import {
-  CardType,
-  DungeonCard,
-  Rank,
-  Room,
-  ScoundrelGameState,
-  Suit,
-} from '../../../types/scoundrel';
 
 // Utility: Create a deck for Scoundrel
 export function createScoundrelDeck(): DungeonCard[] {
