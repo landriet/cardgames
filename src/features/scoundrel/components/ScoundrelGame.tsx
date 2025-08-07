@@ -41,20 +41,6 @@ export default function ScoundrelGame() {
           {game.health} / {game.maxHealth}
         </span>
       </div>
-      <div className="mb-2 text-gray-800 dark:text-gray-100">
-        Equipped Weapon:{' '}
-        {game.equippedWeapon ? (
-          <span className="inline-flex flex-col items-center ml-2">
-            <Card
-              suit={game.equippedWeapon.suit as any}
-              rank={rankToString(game.equippedWeapon.rank) as any}
-              faceUp={true}
-            />
-          </span>
-        ) : (
-          <span className="font-mono">None</span>
-        )}
-      </div>
 
       {/* Deck and Room side-by-side */}
       <div className="mb-4 flex flex-row items-center gap-8">
@@ -111,6 +97,21 @@ export default function ScoundrelGame() {
             ))}
           </div>
         </div>
+      </div>
+      {/* Equipped Weapon display moved below deck/room */}
+      <div className="mb-4 text-gray-800 dark:text-gray-100">
+        Equipped Weapon:{' '}
+        {game.equippedWeapon ? (
+          <span className="inline-flex flex-col items-center ml-2">
+            <Card
+              suit={game.equippedWeapon.suit as any}
+              rank={rankToString(game.equippedWeapon.rank) as any}
+              faceUp={true}
+            />
+          </span>
+        ) : (
+          <span className="font-mono">None</span>
+        )}
       </div>
       {/* TODO: Add action buttons and game over/victory display */}
       <button
