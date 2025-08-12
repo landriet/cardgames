@@ -5,8 +5,7 @@ import {
   Room,
   ScoundrelGameState,
   Suit,
-} from '../../../types/scoundrel';
-
+} from "../../../types/scoundrel";
 
 /**
  * Unified handler for card actions (monster, weapon, potion).
@@ -16,7 +15,7 @@ import {
 export function handleCardAction(
   state: ScoundrelGameState,
   card: DungeonCard,
-  mode?: 'barehanded' | 'weapon'
+  mode?: "barehanded" | "weapon",
 ): ScoundrelGameState {
   // Prevent any action if game is over
   if (state.gameOver) {
@@ -34,30 +33,30 @@ export function handleCardAction(
     return state; // Do nothing, last card in room
   }
   let newState: ScoundrelGameState;
-  if (card.type === 'monster') {
+  if (card.type === "monster") {
     if (state.equippedWeapon && !mode) {
       // If called from UI, prompt for choice. If called from test/programmatic, default to weapon.
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         return {
           ...state,
           pendingMonsterChoice: { monster: card },
         };
       } else {
-        newState = fightMonster(state, card, 'weapon');
+        newState = fightMonster(state, card, "weapon");
       }
-    } else if (state.equippedWeapon && mode === 'weapon') {
-      newState = fightMonster(state, card, 'weapon');
-    } else if (state.equippedWeapon && mode === 'barehanded') {
-      newState = fightMonster(state, card, 'barehanded');
+    } else if (state.equippedWeapon && mode === "weapon") {
+      newState = fightMonster(state, card, "weapon");
+    } else if (state.equippedWeapon && mode === "barehanded") {
+      newState = fightMonster(state, card, "barehanded");
     } else {
-      newState = fightMonster(state, card, 'barehanded');
+      newState = fightMonster(state, card, "barehanded");
     }
-  } else if (card.type === 'weapon') {
+  } else if (card.type === "weapon") {
     newState = takeWeapon(state, card);
-  } else if (card.type === 'potion') {
+  } else if (card.type === "potion") {
     newState = takePotion(state, card);
   } else {
-    console.error('[handleCardAction] Unknown card type.');
+    console.error("[handleCardAction] Unknown card type.");
     return state;
   }
 
@@ -72,7 +71,10 @@ export function handleCardAction(
     // Finalize the room: move the last card to nextRoomBase, clear currentRoom
     const finalizedState = finalizeRoom(newState);
     // Deal the next room automatically
-    const { room, deck: updatedDeck } = dealRoom(finalizedState.deck, finalizedState.nextRoomBase);
+    const { room, deck: updatedDeck } = dealRoom(
+      finalizedState.deck,
+      finalizedState.nextRoomBase,
+    );
     return {
       ...finalizedState,
       currentRoom: room,
@@ -103,9 +105,14 @@ export function applyTurnRules(state: ScoundrelGameState): ScoundrelGameState {
   if (newState.health <= 0) {
     newState.gameOver = true;
     // Death scoring: sum monster values in dungeon, subtract from current health
-    const monstersLeft = newState.deck.filter(card => card.type === 'monster');
-    const monstersValue = monstersLeft.reduce((sum, card) => sum + card.rank, 0);
-    newState.score = (newState.health - monstersValue);
+    const monstersLeft = newState.deck.filter(
+      (card) => card.type === "monster",
+    );
+    const monstersValue = monstersLeft.reduce(
+      (sum, card) => sum + card.rank,
+      0,
+    );
+    newState.score = newState.health - monstersValue;
   }
   // Victory if deck is empty and currentRoom/cards are empty
   if (
@@ -127,10 +134,10 @@ export function applyTurnRules(state: ScoundrelGameState): ScoundrelGameState {
  */
 export function takePotion(
   state: ScoundrelGameState,
-  potion: DungeonCard
+  potion: DungeonCard,
 ): ScoundrelGameState {
-  if (potion.type !== 'potion') {
-    console.error('[takePotion] Card is not a potion.');
+  if (potion.type !== "potion") {
+    console.error("[takePotion] Card is not a potion.");
     return state;
   }
   // Remove potion from current room
@@ -168,10 +175,12 @@ export function takePotion(
  */
 export function removeCardFromCurrentRoom(
   state: ScoundrelGameState,
-  cardOrIndex: DungeonCard
+  cardOrIndex: DungeonCard,
 ): ScoundrelGameState {
   if (!state.currentRoom || !Array.isArray(state.currentRoom.cards)) {
-    console.error('[removeCardFromCurrentRoom] No current room or cards to remove from.');
+    console.error(
+      "[removeCardFromCurrentRoom] No current room or cards to remove from.",
+    );
     return state;
   }
   let cardIndex: number;
@@ -199,10 +208,10 @@ export function removeCardFromCurrentRoom(
  */
 export function takeWeapon(
   state: ScoundrelGameState,
-  weapon: DungeonCard
+  weapon: DungeonCard,
 ): ScoundrelGameState {
-  if (weapon.type !== 'weapon') {
-    console.error('[takeWeapon] Card is not a weapon.');
+  if (weapon.type !== "weapon") {
+    console.error("[takeWeapon] Card is not a weapon.");
     return state;
   }
   if (state.gameOver) {
@@ -234,20 +243,20 @@ export function takeWeapon(
 export function fightMonster(
   state: ScoundrelGameState,
   monster: DungeonCard,
-  mode: 'barehanded' | 'weapon'
+  mode: "barehanded" | "weapon",
 ): ScoundrelGameState {
-  if (monster.type !== 'monster') {
-    console.error('[fightMonster] Card is not a monster.');
+  if (monster.type !== "monster") {
+    console.error("[fightMonster] Card is not a monster.");
     return state;
   }
   if (state.gameOver) {
     return state;
   }
-  if (mode === 'barehanded') {
+  if (mode === "barehanded") {
     // Use barehanded logic
     return fightMonsterBarehanded(state, monster);
   } else if (!state.equippedWeapon) {
-    console.error('[fightMonster] No weapon equipped for weapon mode.');
+    console.error("[fightMonster] No weapon equipped for weapon mode.");
     return state;
   } else {
     // With weapon
@@ -257,7 +266,9 @@ export function fightMonster(
       state.lastMonsterDefeated &&
       monster.rank > state.lastMonsterDefeated.rank
     ) {
-      console.error('[fightMonster] Weapon cannot be used on monster stronger than last defeated.');
+      console.error(
+        "[fightMonster] Weapon cannot be used on monster stronger than last defeated.",
+      );
       return state;
     }
     // Calculate damage
@@ -284,10 +295,10 @@ export function fightMonster(
  */
 export function fightMonsterBarehanded(
   state: ScoundrelGameState,
-  monster: DungeonCard
+  monster: DungeonCard,
 ): ScoundrelGameState {
-  if (monster.type !== 'monster') {
-    console.error('[fightMonsterBarehanded] Card is not a monster.');
+  if (monster.type !== "monster") {
+    console.error("[fightMonsterBarehanded] Card is not a monster.");
     return state;
   }
   if (state.gameOver) {
@@ -306,22 +317,22 @@ export function fightMonsterBarehanded(
 
 // Utility: Create a deck for Scoundrel
 export function createScoundrelDeck(): DungeonCard[] {
-  const suits: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
+  const suits: Suit[] = ["hearts", "diamonds", "clubs", "spades"];
   const deck: DungeonCard[] = [];
   for (const suit of suits) {
     for (let rank = 2; rank <= 14; rank++) {
       // Remove Jokers, red face cards, and red aces
       if (
-        (suit === 'hearts' || suit === 'diamonds') &&
+        (suit === "hearts" || suit === "diamonds") &&
         (rank === 11 || rank === 12 || rank === 13 || rank === 14)
       ) {
         continue;
       }
-      if ((suit === 'hearts' || suit === 'diamonds') && rank === 14) continue; // Red aces
+      if ((suit === "hearts" || suit === "diamonds") && rank === 14) continue; // Red aces
       let type: CardType;
-      if (suit === 'hearts') type = 'potion';
-      else if (suit === 'diamonds') type = 'weapon';
-      else type = 'monster';
+      if (suit === "hearts") type = "potion";
+      else if (suit === "diamonds") type = "weapon";
+      else type = "monster";
       deck.push({ suit, rank: rank as Rank, type });
     }
   }
@@ -340,7 +351,7 @@ export function shuffle<T>(array: T[]): T[] {
 
 export function dealRoom(
   deck: DungeonCard[],
-  nextRoomBase: DungeonCard | null
+  nextRoomBase: DungeonCard | null,
 ): { room: Room; deck: DungeonCard[] } {
   const cards: DungeonCard[] = [];
   let workingDeck = [...deck];
@@ -378,7 +389,7 @@ export function initGame(): ScoundrelGameState {
 // Avoid the current room: move all 4 cards to bottom of deck, enforce avoid rules
 export function avoidRoom(state: ScoundrelGameState): ScoundrelGameState {
   if (!state.canDeferRoom || state.lastActionWasDefer) {
-    console.error('Cannot avoid two rooms in a row.');
+    console.error("Cannot avoid two rooms in a row.");
     return state;
   }
   // Move all 4 cards to bottom of deck
@@ -419,11 +430,13 @@ export function enterRoom(state: ScoundrelGameState): ScoundrelGameState {
  */
 export function finalizeRoom(state: ScoundrelGameState): ScoundrelGameState {
   if (!state.currentRoom || !Array.isArray(state.currentRoom.cards)) {
-    console.error('[finalizeRoom] No current room or cards.');
+    console.error("[finalizeRoom] No current room or cards.");
     return state;
   }
   if (state.currentRoom.cards.length !== 1) {
-    console.error('[finalizeRoom] Room must have exactly 1 card left to finalize.');
+    console.error(
+      "[finalizeRoom] Room must have exactly 1 card left to finalize.",
+    );
     return state;
   }
   // The remaining card becomes nextRoomBase

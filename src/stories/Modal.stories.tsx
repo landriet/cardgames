@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
-import type { Meta, StoryObj } from '@storybook/react';
-import Modal from '../components/Modal';
+import React, { useState } from "react";
+import type { Meta, StoryObj } from "@storybook/react";
+import Modal from "../components/Modal";
 
 const meta: Meta<typeof Modal> = {
-  title: 'Components/Modal',
+  title: "Components/Modal",
   component: Modal,
-  tags: ['autodocs'],
+  tags: ["autodocs"],
   argTypes: {
-    isOpen: { control: 'boolean' },
-    ariaLabel: { control: 'text' },
+    isOpen: { control: "boolean" },
+    ariaLabel: { control: "text" },
   },
 };
 export default meta;
@@ -26,9 +26,16 @@ export const Default: Story = {
         >
           Show Popup
         </button>
-        <Modal isOpen={open} onClose={() => setOpen(false)} ariaLabel={args.ariaLabel}>
+        <Modal
+          isOpen={open}
+          onClose={() => setOpen(false)}
+          ariaLabel={args.ariaLabel}
+        >
           <h2 className="text-xl font-bold mb-2">Beautiful Popup</h2>
-          <p className="mb-4">This is a demo popup for displaying actions or text on top of the UI.</p>
+          <p className="mb-4">
+            This is a demo popup for displaying actions or text on top of the
+            UI.
+          </p>
           <button
             className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
             onClick={() => setOpen(false)}
@@ -41,6 +48,6 @@ export const Default: Story = {
   },
   args: {
     isOpen: false,
-    ariaLabel: 'Demo Popup',
+    ariaLabel: "Demo Popup",
   },
 };

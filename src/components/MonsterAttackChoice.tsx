@@ -1,12 +1,15 @@
-import React from 'react';
-import { Hand, Sword } from 'lucide-react';
+import React from "react";
+import { Hand, Sword } from "lucide-react";
 
 interface MonsterAttackChoiceProps {
   onBarehand: () => void;
   onWeapon: () => void;
 }
 
-const MonsterAttackChoice: React.FC<MonsterAttackChoiceProps> = ({ onBarehand, onWeapon }) => {
+const MonsterAttackChoice: React.FC<MonsterAttackChoiceProps> = ({
+  onBarehand,
+  onWeapon,
+}) => {
   return (
     <div className="flex justify-center gap-8">
       <button

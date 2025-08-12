@@ -1,8 +1,12 @@
-import Modal from '../../../components/Modal';
-import MonsterAttackChoice from '../../../components/MonsterAttackChoice';
+import Modal from "../../../components/Modal";
+import MonsterAttackChoice from "../../../components/MonsterAttackChoice";
 
-
-export default function MonsterAttackModal({ isOpen, onBarehand, onWeapon, onClose }: {
+export default function MonsterAttackModal({
+  isOpen,
+  onBarehand,
+  onWeapon,
+  onClose,
+}: {
   isOpen: boolean;
   onBarehand: () => void;
   onWeapon: () => void;

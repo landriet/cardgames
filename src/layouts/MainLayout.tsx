@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import Header from '../components/Header.tsx';
+import React, { useEffect, useState } from "react";
+import Header from "../components/Header.tsx";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -11,9 +11,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, sidebar }) => {
 
   useEffect(() => {
     if (dark) {
-      document.documentElement.classList.add('dark');
+      document.documentElement.classList.add("dark");
     } else {
-      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.remove("dark");
     }
   }, [dark]);
 
@@ -22,11 +22,17 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, sidebar }) => {
       <Header dark={dark} setDark={setDark} />
       <div className="flex flex-1 min-h-0">
         {sidebar && (
-          <aside className="hidden md:block w-64 bg-gray-100 dark:bg-gray-900 p-4 border-r border-gray-200 dark:border-gray-800" role="complementary">
+          <aside
+            className="hidden md:block w-64 bg-gray-100 dark:bg-gray-900 p-4 border-r border-gray-200 dark:border-gray-800"
+            role="complementary"
+          >
             {sidebar}
           </aside>
         )}
-        <main className="flex-1 p-4 overflow-auto text-gray-900 dark:text-gray-100" role="main">
+        <main
+          className="flex-1 p-4 overflow-auto text-gray-900 dark:text-gray-100"
+          role="main"
+        >
           {children}
         </main>
       </div>

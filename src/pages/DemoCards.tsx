@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import MainLayout from '../layouts/MainLayout.tsx';
-import Card from '../components/Card.tsx';
-import Modal from '../components/Modal.tsx';
+import React, { useState } from "react";
+import MainLayout from "../layouts/MainLayout.tsx";
+import Card from "../components/Card.tsx";
+import Modal from "../components/Modal.tsx";
 
-const suits = ['hearts', 'diamonds', 'clubs', 'spades'] as const;
-const ranks = ['A', '2', '3', 'J', 'Q', 'K'] as const;
+const suits = ["hearts", "diamonds", "clubs", "spades"] as const;
+const ranks = ["A", "2", "3", "J", "Q", "K"] as const;
 
 const DemoCards: React.FC = () => {
   const [isModalOpen, setModalOpen] = useState(false);
@@ -23,13 +23,20 @@ const DemoCards: React.FC = () => {
           {suits.map((suit) =>
             ranks.map((rank) => (
               <Card key={`${suit}-${rank}`} suit={suit} rank={rank} />
-            ))
+            )),
           )}
           <Card suit="spades" rank="A" faceUp={false} />
         </div>
-        <Modal isOpen={isModalOpen} onClose={() => setModalOpen(false)} ariaLabel="Demo Popup">
+        <Modal
+          isOpen={isModalOpen}
+          onClose={() => setModalOpen(false)}
+          ariaLabel="Demo Popup"
+        >
           <h2 className="text-xl font-bold mb-2">Beautiful Popup</h2>
-          <p className="mb-4">This is a demo popup for displaying actions or text on top of the UI.</p>
+          <p className="mb-4">
+            This is a demo popup for displaying actions or text on top of the
+            UI.
+          </p>
           <button
             className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
             onClick={() => setModalOpen(false)}

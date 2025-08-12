@@ -1,9 +1,9 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Home from '../pages/Home';
+import React from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Home from "../pages/Home";
 
-import ScoundrelPage from '../pages/Scoundrel';
-import DemoCards from '../pages/DemoCards';
+import ScoundrelPage from "../pages/Scoundrel";
+import DemoCards from "../pages/DemoCards";
 
 const Router: React.FC = () => (
   <BrowserRouter>

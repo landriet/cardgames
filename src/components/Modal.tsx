@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from "react";
 
 export interface ModalProps {
   isOpen: boolean;
@@ -7,7 +7,12 @@ export interface ModalProps {
   ariaLabel?: string;
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, ariaLabel }) => {
+const Modal: React.FC<ModalProps> = ({
+  isOpen,
+  onClose,
+  children,
+  ariaLabel,
+}) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
   // Focus trap for accessibility
@@ -24,11 +29,11 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, ariaLabel }) =
       className="fixed inset-0 z-50 flex items-center justify-center bg-gray-800 bg-opacity-50 transition-opacity duration-300 ease-out"
       role="dialog"
       aria-modal="true"
-      aria-label={ariaLabel || 'Popup'}
+      aria-label={ariaLabel || "Popup"}
       tabIndex={-1}
       ref={modalRef}
-      onKeyDown={e => {
-        if (e.key === 'Escape') onClose();
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
       }}
     >
       <div className="relative bg-white p-6 rounded-lg shadow-lg transform transition-transform duration-300 ease-out w-full max-w-md mx-4">

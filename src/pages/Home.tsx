@@ -1,5 +1,4 @@
-
-import MainLayout from '../layouts/MainLayout.tsx';
+import MainLayout from "../layouts/MainLayout.tsx";
 
 const Home: React.FC = () => {
   return (

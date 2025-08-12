@@ -1,6 +1,6 @@
 // Types for Scoundrel card game
 
-export type Suit = 'hearts' | 'diamonds' | 'clubs' | 'spades';
+export type Suit = "hearts" | "diamonds" | "clubs" | "spades";
 export type Rank = 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14; // 11=J, 12=Q, 13=K, 14=A
 
 export interface Card {
@@ -8,7 +8,7 @@ export interface Card {
   rank: Rank;
 }
 
-export type CardType = 'monster' | 'weapon' | 'potion';
+export type CardType = "monster" | "weapon" | "potion";
 
 export interface DungeonCard extends Card {
   type: CardType;

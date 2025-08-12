@@ -1,26 +1,40 @@
-import type { Meta, StoryObj } from '@storybook/react-vite';
-import Card, { Suit, Rank } from '../components/Card';
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import Card, { Suit, Rank } from "../components/Card";
 
 const meta: Meta<typeof Card> = {
-  title: 'Components/Card',
+  title: "Components/Card",
   component: Card,
-  tags: ['autodocs'],
+  tags: ["autodocs"],
   argTypes: {
     suit: {
-      control: 'select',
-      options: ['hearts', 'diamonds', 'clubs', 'spades'],
+      control: "select",
+      options: ["hearts", "diamonds", "clubs", "spades"],
     },
     rank: {
-      control: 'select',
-      options: ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'],
+      control: "select",
+      options: [
+        "A",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "J",
+        "Q",
+        "K",
+      ],
     },
     faceUp: {
-      control: 'boolean',
+      control: "boolean",
     },
   },
   args: {
-    suit: 'spades',
-    rank: 'A',
+    suit: "spades",
+    rank: "A",
     faceUp: true,
   },
 };
@@ -38,8 +52,8 @@ export const FaceDown: Story = {
 
 export const AllSuits: Story = {
   render: (args) => (
-    <div style={{ display: 'flex', gap: 8 }}>
-      {(['hearts', 'diamonds', 'clubs', 'spades'] as Suit[]).map((suit) => (
+    <div style={{ display: "flex", gap: 8 }}>
+      {(["hearts", "diamonds", "clubs", "spades"] as Suit[]).map((suit) => (
         <Card key={suit} {...args} suit={suit} />
       ))}
     </div>
@@ -48,8 +62,24 @@ export const AllSuits: Story = {
 
 export const AllRanks: Story = {
   render: (args) => (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-      {(['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'] as Rank[]).map((rank) => (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+      {(
+        [
+          "A",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "J",
+          "Q",
+          "K",
+        ] as Rank[]
+      ).map((rank) => (
         <Card key={rank} {...args} rank={rank} />
       ))}
     </div>
