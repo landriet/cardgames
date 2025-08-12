@@ -40,12 +40,10 @@ export default function ScoundrelGame() {
       </div>
 
       {/* Deck and Room side-by-side */}
-      <div className="mb-4 flex flex-row items-center gap-8">
+      <div className="mb-4 flex flex-row items-top gap-8">
         {/* Deck pile display on the left */}
         <DeckDisplay deck={game.deck} />
-        <div className="flex-1">
-          <RoomCards cards={game.currentRoom.cards} onCardClick={handleCardClick} />
-        </div>
+        <RoomCards cards={game.currentRoom.cards} onCardClick={handleCardClick} />
       </div>
       {/* Equipped Weapon display with stacked monsters */}
       <div className="mb-4 text-gray-800 dark:text-gray-100">

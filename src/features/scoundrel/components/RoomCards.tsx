@@ -10,13 +10,13 @@ export default function RoomCards({
   onCardClick: (card: DungeonCard) => void;
 }) {
   return (
-    <div className="grid grid-cols-4 gap-2 mt-2">
+    <div className="grid grid-cols-4 gap-2">
       {[0, 1, 2, 3].map((idx) => {
         const card = cards[idx];
         return (
           <div
             key={idx}
-            className="relative flex flex-col items-center justify-center h-32 w-20 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50 dark:bg-gray-800 transition-transform"
+            className="relative flex flex-col items-center justify-center h-32 rounded-lg bg-gray-100 dark:bg-gray-800 transition-transform"
             tabIndex={card ? 0 : -1}
             role={card ? "button" : undefined}
             aria-label={card ? `Interact with ${card.type}` : `Empty spot`}
