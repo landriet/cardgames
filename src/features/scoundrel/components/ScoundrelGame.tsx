@@ -31,9 +31,7 @@ export default function ScoundrelGame() {
 
   return (
     <div className="p-4 max-w-xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">
-        Scoundrel
-      </h1>
+      <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">Scoundrel</h1>
       <div className="mb-2 text-gray-800 dark:text-gray-100">
         Health:{" "}
         <span className="font-mono">
@@ -46,29 +44,18 @@ export default function ScoundrelGame() {
         {/* Deck pile display on the left */}
         <DeckDisplay deck={game.deck} />
         <div className="flex-1">
-          <RoomCards
-            cards={game.currentRoom.cards}
-            onCardClick={handleCardClick}
-          />
+          <RoomCards cards={game.currentRoom.cards} onCardClick={handleCardClick} />
         </div>
       </div>
       {/* Equipped Weapon display with stacked monsters */}
       <div className="mb-4 text-gray-800 dark:text-gray-100">
-        Equipped Weapon:{" "}
-        <EquippedWeapon
-          weapon={game.equippedWeapon}
-          monsters={game.monstersOnWeapon || []}
-        />
+        Equipped Weapon: <EquippedWeapon weapon={game.equippedWeapon} monsters={game.monstersOnWeapon || []} />
       </div>
       {/* Action buttons */}
       <ActionButtons
         game={game}
         onSkipRoom={() => {
-          if (
-            game.canDeferRoom &&
-            !game.lastActionWasDefer &&
-            game.currentRoom.cards.length === 4
-          ) {
+          if (game.canDeferRoom && !game.lastActionWasDefer && game.currentRoom.cards.length === 4) {
             setGame((prev: ScoundrelGameState) => avoidRoom(prev));
           }
         }}
@@ -80,24 +67,12 @@ export default function ScoundrelGame() {
         isOpen={!!game.pendingMonsterChoice}
         onBarehand={() => {
           if (game.pendingMonsterChoice) {
-            setGame((prev: ScoundrelGameState) =>
-              handleCardAction(
-                prev,
-                game.pendingMonsterChoice!.monster,
-                "barehanded",
-              ),
-            );
+            setGame((prev: ScoundrelGameState) => handleCardAction(prev, game.pendingMonsterChoice!.monster, "barehanded"));
           }
         }}
         onWeapon={() => {
           if (game.pendingMonsterChoice) {
-            setGame((prev: ScoundrelGameState) =>
-              handleCardAction(
-                prev,
-                game.pendingMonsterChoice!.monster,
-                "weapon",
-              ),
-            );
+            setGame((prev: ScoundrelGameState) => handleCardAction(prev, game.pendingMonsterChoice!.monster, "weapon"));
           }
         }}
         onClose={() => {
@@ -109,10 +84,7 @@ export default function ScoundrelGame() {
       />
 
       {/* Death modal when player is dead */}
-      <DeathModal
-        isOpen={!!game.gameOver}
-        onRestart={() => setGame(initGame())}
-      />
+      <DeathModal isOpen={!!game.gameOver} onRestart={() => setGame(initGame())} />
     </div>
   );
 }

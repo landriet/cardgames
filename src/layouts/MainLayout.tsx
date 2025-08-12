@@ -29,10 +29,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, sidebar }) => {
             {sidebar}
           </aside>
         )}
-        <main
-          className="flex-1 p-4 overflow-auto text-gray-900 dark:text-gray-100"
-          role="main"
-        >
+        <main className="flex-1 p-4 overflow-auto text-gray-900 dark:text-gray-100" role="main">
           {children}
         </main>
       </div>

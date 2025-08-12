@@ -1,16 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { vi } from "vitest";
 import { handleCardAction } from "../engine";
-import {
-  CardType,
-  DungeonCard,
-  Rank,
-  ScoundrelGameState,
-} from "../../../../types/scoundrel";
+import { CardType, DungeonCard, Rank, ScoundrelGameState } from "../../../../types/scoundrel";
 
-function getBaseState(
-  overrides: Partial<ScoundrelGameState> = {},
-): ScoundrelGameState {
+function getBaseState(overrides: Partial<ScoundrelGameState> = {}): ScoundrelGameState {
   return {
     deck: [],
     discard: [],

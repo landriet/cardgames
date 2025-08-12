@@ -42,11 +42,7 @@ export const RemoveCardFromRoom = () => {
       <div className="flex gap-2">
         {room.cards.map((card, idx) => (
           <div key={idx} className="flex flex-col items-center">
-            <Card
-              suit={card.suit as CardSuit}
-              rank={rankToString(card.rank)}
-              faceUp={true}
-            />
+            <Card suit={card.suit as CardSuit} rank={rankToString(card.rank)} faceUp={true} />
             <button
               className="mt-2 px-2 py-1 bg-red-500 text-white rounded hover:bg-red-700"
               onClick={() => handleRemove(idx)}
@@ -57,9 +53,7 @@ export const RemoveCardFromRoom = () => {
           </div>
         ))}
       </div>
-      {room.cards.length === 0 && (
-        <div className="text-gray-500">Room is empty</div>
-      )}
+      {room.cards.length === 0 && <div className="text-gray-500">Room is empty</div>}
     </div>
   );
 };

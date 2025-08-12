@@ -20,27 +20,13 @@ const DemoCards: React.FC = () => {
           Show Popup
         </button>
         <div className="flex flex-wrap gap-4">
-          {suits.map((suit) =>
-            ranks.map((rank) => (
-              <Card key={`${suit}-${rank}`} suit={suit} rank={rank} />
-            )),
-          )}
+          {suits.map((suit) => ranks.map((rank) => <Card key={`${suit}-${rank}`} suit={suit} rank={rank} />))}
           <Card suit="spades" rank="A" faceUp={false} />
         </div>
-        <Modal
-          isOpen={isModalOpen}
-          onClose={() => setModalOpen(false)}
-          ariaLabel="Demo Popup"
-        >
+        <Modal isOpen={isModalOpen} onClose={() => setModalOpen(false)} ariaLabel="Demo Popup">
           <h2 className="text-xl font-bold mb-2">Beautiful Popup</h2>
-          <p className="mb-4">
-            This is a demo popup for displaying actions or text on top of the
-            UI.
-          </p>
-          <button
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
-            onClick={() => setModalOpen(false)}
-          >
+          <p className="mb-4">This is a demo popup for displaying actions or text on top of the UI.</p>
+          <button className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition" onClick={() => setModalOpen(false)}>
             Close
           </button>
         </Modal>

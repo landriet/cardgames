@@ -1,12 +1,7 @@
 import { takePotion } from "../engine";
 import { beforeEach, describe, expect, it, test } from "vitest";
 import { vi } from "vitest";
-import {
-  CardType,
-  DungeonCard,
-  Rank,
-  ScoundrelGameState,
-} from "../../../../types/scoundrel";
+import { CardType, DungeonCard, Rank, ScoundrelGameState } from "../../../../types/scoundrel";
 import {
   avoidRoom,
   createScoundrelDeck,
@@ -207,9 +202,7 @@ describe("Scoundrel Engine Edge Cases", () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     const newState = removeCardFromCurrentRoom(state, card);
     expect(newState).toBe(state);
-    expect(spy).toHaveBeenCalledWith(
-      "[removeCardFromCurrentRoom] No current room or cards to remove from.",
-    );
+    expect(spy).toHaveBeenCalledWith("[removeCardFromCurrentRoom] No current room or cards to remove from.");
     spy.mockRestore();
   });
 });
@@ -516,9 +509,7 @@ describe("Scoundrel Engine", () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     const newState = fightMonster(state, monster, "weapon");
     expect(newState).toBe(state);
-    expect(spy).toHaveBeenCalledWith(
-      "[fightMonster] Weapon cannot be used on monster stronger than last defeated.",
-    );
+    expect(spy).toHaveBeenCalledWith("[fightMonster] Weapon cannot be used on monster stronger than last defeated.");
     spy.mockRestore();
   });
   it("creates a deck with only valid cards", () => {
@@ -526,10 +517,7 @@ describe("Scoundrel Engine", () => {
     expect(deck.length).toBeGreaterThan(0);
     deck.forEach((card) => {
       // No jokers, no red face cards, no red aces
-      if (
-        (card.suit === "hearts" || card.suit === "diamonds") &&
-        card.rank >= 11
-      ) {
+      if ((card.suit === "hearts" || card.suit === "diamonds") && card.rank >= 11) {
         expect(false).toBe(true);
       }
     });
@@ -539,8 +527,7 @@ describe("Scoundrel Engine", () => {
     const deck = createScoundrelDeck();
     const shuffled = shuffle(deck);
     // Not a perfect test, but should not be in the same order
-    const cardToString = (card: { suit: string; rank: number }) =>
-      `${card.suit}-${card.rank}`;
+    const cardToString = (card: { suit: string; rank: number }) => `${card.suit}-${card.rank}`;
     const deckStr = deck.map(cardToString).join(",");
     const shuffledStr = shuffled.map(cardToString).join(",");
     expect(shuffledStr).not.toEqual(deckStr);

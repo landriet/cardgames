@@ -12,21 +12,7 @@ const meta: Meta<typeof Card> = {
     },
     rank: {
       control: "select",
-      options: [
-        "A",
-        "2",
-        "3",
-        "4",
-        "5",
-        "6",
-        "7",
-        "8",
-        "9",
-        "10",
-        "J",
-        "Q",
-        "K",
-      ],
+      options: ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"],
     },
     faceUp: {
       control: "boolean",
@@ -63,23 +49,7 @@ export const AllSuits: Story = {
 export const AllRanks: Story = {
   render: (args) => (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-      {(
-        [
-          "A",
-          "2",
-          "3",
-          "4",
-          "5",
-          "6",
-          "7",
-          "8",
-          "9",
-          "10",
-          "J",
-          "Q",
-          "K",
-        ] as Rank[]
-      ).map((rank) => (
+      {(["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"] as Rank[]).map((rank) => (
         <Card key={rank} {...args} rank={rank} />
       ))}
     </div>

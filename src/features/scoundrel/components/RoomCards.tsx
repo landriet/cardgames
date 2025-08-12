@@ -24,15 +24,9 @@ export default function RoomCards({
             style={{ minWidth: "85px", minHeight: "128px" }}
           >
             {card ? (
-              <Card
-                suit={card.suit as any}
-                rank={rankToString(card.rank) as any}
-                faceUp={true}
-              />
+              <Card suit={card.suit as any} rank={rankToString(card.rank) as any} faceUp={true} />
             ) : (
-              <span className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                &nbsp;
-              </span>
+              <span className="text-xs text-gray-400 dark:text-gray-500 mt-1">&nbsp;</span>
             )}
           </div>
         );

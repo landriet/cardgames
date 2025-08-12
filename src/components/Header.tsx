@@ -6,26 +6,15 @@ const Header: React.FC<{
 }> = ({ dark, setDark }) => (
   <header className="bg-white dark:bg-gray-800 shadow-md" role="banner">
     <div className="max-w-7xl mx-auto flex justify-between items-center p-4">
-      <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-        CardGames
-      </span>
+      <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">CardGames</span>
       <nav aria-label="Main navigation" className="flex gap-4">
-        <a
-          href="/"
-          className="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
-        >
+        <a href="/" className="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 font-medium">
           Home
         </a>
-        <a
-          href="/demo-cards"
-          className="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
-        >
+        <a href="/demo-cards" className="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 font-medium">
           Demo Cards
         </a>
-        <a
-          href="/scoundrel"
-          className="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
-        >
+        <a href="/scoundrel" className="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 font-medium">
           Scoundrel
         </a>
       </nav>

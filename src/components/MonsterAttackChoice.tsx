@@ -6,10 +6,7 @@ interface MonsterAttackChoiceProps {
   onWeapon: () => void;
 }
 
-const MonsterAttackChoice: React.FC<MonsterAttackChoiceProps> = ({
-  onBarehand,
-  onWeapon,
-}) => {
+const MonsterAttackChoice: React.FC<MonsterAttackChoiceProps> = ({ onBarehand, onWeapon }) => {
   return (
     <div className="flex justify-center gap-8">
       <button

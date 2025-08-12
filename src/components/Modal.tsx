@@ -7,12 +7,7 @@ export interface ModalProps {
   ariaLabel?: string;
 }
 
-const Modal: React.FC<ModalProps> = ({
-  isOpen,
-  onClose,
-  children,
-  ariaLabel,
-}) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, ariaLabel }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
   // Focus trap for accessibility
