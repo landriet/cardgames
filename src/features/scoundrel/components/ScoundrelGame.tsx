@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { initGame, handleCardAction, avoidRoom } from '../logic/engine';
 import { ScoundrelGameState, DungeonCard } from '../../../types/scoundrel';
-import Card from '../../../components/Card';
-import Modal from '../../../components/Modal';
-import MonsterAttackChoice from '../../../components/MonsterAttackChoice';
+import DeckDisplay from './DeckDisplay';
+import RoomCards from './RoomCards';
+import EquippedWeapon from './EquippedWeapon';
+import ActionButtons from './ActionButtons';
+import DeathModal from './DeathModal';
+import MonsterAttackModal from './MonsterAttackModal';
+
 
 // Map numeric rank to string rank for Card component
 export const rankToString = (rank: number): string => {
@@ -39,111 +43,30 @@ export default function ScoundrelGame() {
       {/* Deck and Room side-by-side */}
       <div className="mb-4 flex flex-row items-center gap-8">
         {/* Deck pile display on the left */}
-        {game.deck.length > 0 && (
-          <div className="flex flex-col items-center">
-            <div className="">
-              {/* Show only one card if more than one remains */}
-              <div className="">
-                <Card suit={game.deck[0].suit as any} rank={rankToString(game.deck[0].rank) as any} faceUp={false} />
-              </div>
-            </div>
-            <div className="text-xs text-gray-800 dark:text-gray-200 mt-1">{game.deck.length} card{game.deck.length > 1 ? 's' : ''} left</div>
+          <DeckDisplay deck={game.deck} />
+          <div className="flex-1">
+            <RoomCards cards={game.currentRoom.cards} onCardClick={handleCardClick} />
           </div>
-        )}
-        {/* Room cards on the right */}
-        <div className="flex-1">
-          <div className="grid grid-cols-4 gap-2 mt-2">
-            {[0, 1, 2, 3].map((idx) => {
-              const card = game.currentRoom.cards[idx];
-              return (
-                <div
-                  key={idx}
-                  className="relative flex flex-col items-center justify-center h-32 w-20 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50 dark:bg-gray-800 transition-transform"
-                  tabIndex={card ? 0 : -1}
-                  role={card ? 'button' : undefined}
-                  aria-label={card ? `Interact with ${card.type}` : `Empty spot`}
-                  onClick={card ? () => handleCardClick(card) : undefined}
-                  style={{ minWidth: '85px', minHeight: '128px' }}
-                >
-                  {card ? (
-                    <>
-                      <Card
-                        suit={card.suit as any}
-                        rank={rankToString(card.rank) as any}
-                        faceUp={true}
-                      />
-                    </>
-                  ) : (
-                    <span className="text-xs text-gray-400 dark:text-gray-500 mt-1">&nbsp;</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
       </div>
       {/* Equipped Weapon display with stacked monsters */}
       <div className="mb-4 text-gray-800 dark:text-gray-100">
         Equipped Weapon:{' '}
-        {game.equippedWeapon ? (
-          <span className="relative inline-block ml-2" style={{ minWidth: '80px', minHeight: '120px' }}>
-            {/* Weapon card at base */}
-            <div className="absolute top-0 left-0 z-10">
-              <Card
-                suit={game.equippedWeapon.suit as any}
-                rank={rankToString(game.equippedWeapon.rank) as any}
-                faceUp={true}
-              />
-            </div>
-            {/* Stack monsters on weapon, each offset lower and right */}
-            {game.monstersOnWeapon && game.monstersOnWeapon.map((monster: DungeonCard, idx: number) => (
-              <div
-                key={idx}
-                className="absolute z-20"
-                style={{ top: `${(idx + 1) * 16}px`, left: `${(idx + 1) * 30}px` }}
-              >
-                <Card
-                  suit={monster.suit as any}
-                  rank={rankToString(monster.rank) as any}
-                  faceUp={true}
-                />
-              </div>
-            ))}
-          </span>
-        ) : (
-          <span className="font-mono">None</span>
-        )}
+          <EquippedWeapon weapon={game.equippedWeapon} monsters={game.monstersOnWeapon || []} />
       </div>
       {/* Action buttons */}
-      <div className="flex gap-4 mt-8">
-        <button
-          className={`px-4 py-2 rounded ${game.canDeferRoom && !game.lastActionWasDefer && game.currentRoom.cards.length === 4 ? 'bg-yellow-600 text-white hover:bg-yellow-700' : 'bg-gray-400 text-gray-200 cursor-not-allowed'}`}
-          onClick={() => {
+        <ActionButtons
+          game={game}
+          onSkipRoom={() => {
             if (game.canDeferRoom && !game.lastActionWasDefer && game.currentRoom.cards.length === 4) {
-          setGame((prev: ScoundrelGameState) => avoidRoom(prev));
+              setGame((prev: ScoundrelGameState) => avoidRoom(prev));
             }
           }}
-          disabled={!game.canDeferRoom || game.lastActionWasDefer || game.currentRoom.cards.length !== 4}
-        >
-          Skip Room
-        </button>
-        <button
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          onClick={() => setGame(initGame())}
-        >
-          Restart Game
-        </button>
-      </div>
+          onRestart={() => setGame(initGame())}
+        />
 
       {/* Monster attack choice modal */}
-      <Modal
-        isOpen={!!game.pendingMonsterChoice}
-        onClose={() => {
-          setGame((prev: ScoundrelGameState) => ({ ...prev, pendingMonsterChoice: undefined }));
-        }}
-        ariaLabel="Choose attack mode"
-      >
-        <MonsterAttackChoice
+        <MonsterAttackModal
+          isOpen={!!game.pendingMonsterChoice}
           onBarehand={() => {
             if (game.pendingMonsterChoice) {
               setGame((prev: ScoundrelGameState) => handleCardAction(prev, game.pendingMonsterChoice!.monster, 'barehanded'));
@@ -154,26 +77,13 @@ export default function ScoundrelGame() {
               setGame((prev: ScoundrelGameState) => handleCardAction(prev, game.pendingMonsterChoice!.monster, 'weapon'));
             }
           }}
+          onClose={() => {
+            setGame((prev: ScoundrelGameState) => ({ ...prev, pendingMonsterChoice: undefined }));
+          }}
         />
-      </Modal>
 
       {/* Death modal when player is dead */}
-      <Modal
-        isOpen={!!game.gameOver}
-        onClose={() => setGame(initGame())}
-        ariaLabel="Game Over"
-      >
-        <div className="flex flex-col items-center justify-center p-6">
-          <h2 className="text-xl font-bold mb-2 text-red-700 dark:text-red-400">You Died!</h2>
-          <p className="mb-4 text-gray-800 dark:text-gray-200">Your adventure ends here. Try again?</p>
-          <button
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            onClick={() => setGame(initGame())}
-          >
-            Restart Game
-          </button>
-        </div>
-      </Modal>
+        <DeathModal isOpen={!!game.gameOver} onRestart={() => setGame(initGame())} />
     </div>
   );
 }
