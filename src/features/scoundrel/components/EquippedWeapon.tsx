@@ -11,7 +11,7 @@ export default function EquippedWeapon({ weapon, monsters }: { weapon: DungeonCa
             <Card suit={weapon.suit as any} rank={rankToString(weapon.rank) as any} faceUp={true} />
           </div>
           {monsters && monsters.map((monster: DungeonCard, idx: number) => (
-            <div key={idx} className="absolute z-20" style={{ top: `${(idx + 1) * 16}px`, left: `${(idx + 1) * 30}px` }}>
+            <div key={idx} className="absolute z-20" style={{ top: `0px`, left: `${(idx + 1) * 34}px` }}>
               <Card suit={monster.suit as any} rank={rankToString(monster.rank) as any} faceUp={true} />
             </div>
           ))}
