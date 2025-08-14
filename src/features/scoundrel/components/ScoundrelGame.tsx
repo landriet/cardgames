@@ -79,6 +79,12 @@ export default function ScoundrelGame() {
             pendingMonsterChoice: undefined,
           }));
         }}
+        barehandDamage={game.pendingMonsterChoice ? game.pendingMonsterChoice.monster.rank : 0}
+        weaponDamage={
+          game.pendingMonsterChoice && game.equippedWeapon
+            ? Math.max(game.pendingMonsterChoice.monster.rank - game.equippedWeapon.rank, 0)
+            : 0
+        }
       />
 
       {/* Death modal when player is dead */}
