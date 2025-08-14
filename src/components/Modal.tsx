@@ -21,7 +21,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, ariaLabel }) =
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-gray-800 bg-opacity-50 transition-opacity duration-300 ease-out"
+      className="fixed inset-0 z-50 flex justify-center items-start pt-64 bg-black bg-opacity-50"
       role="dialog"
       aria-modal="true"
       aria-label={ariaLabel || "Popup"}
