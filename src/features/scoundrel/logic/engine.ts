@@ -1,11 +1,13 @@
-import { CardType, DungeonCard, Rank, Room, ScoundrelGameState, Suit } from "../../../types/scoundrel";
-
 /**
- * Unified handler for card actions (monster, weapon, potion).
- * Moves business logic out of UI layer.
- * Throws errors for invalid actions (e.g., weapon fight with no weapon).
+ * Internal helper to resolve a card action and return the resulting state.
+ * If isSimulate is true, skips UI-specific logic (pendingMonsterChoice).
  */
-export function handleCardAction(state: ScoundrelGameState, card: DungeonCard, mode?: "barehanded" | "weapon"): ScoundrelGameState {
+function _resolveCardAction(
+  state: ScoundrelGameState,
+  card: DungeonCard,
+  mode?: "barehanded" | "weapon",
+  isSimulate?: boolean,
+): ScoundrelGameState {
   // Prevent any action if game is over
   if (state.gameOver) {
     return state;
@@ -25,7 +27,7 @@ export function handleCardAction(state: ScoundrelGameState, card: DungeonCard, m
   if (card.type === "monster") {
     if (state.equippedWeapon && !mode) {
       // If called from UI, prompt for choice. If called from test/programmatic, default to weapon.
-      if (typeof window !== "undefined") {
+      if (!isSimulate && typeof window !== "undefined") {
         return {
           ...state,
           pendingMonsterChoice: { monster: card },
@@ -45,10 +47,8 @@ export function handleCardAction(state: ScoundrelGameState, card: DungeonCard, m
   } else if (card.type === "potion") {
     newState = takePotion(state, card);
   } else {
-    console.error("[handleCardAction] Unknown card type.");
     return state;
   }
-
   // After resolving a card, check if only one card remains in the room
   if (
     newState.currentRoom &&
@@ -74,6 +74,25 @@ export function handleCardAction(state: ScoundrelGameState, card: DungeonCard, m
     };
   }
   return { ...newState, pendingMonsterChoice: undefined };
+}
+import { CardType, DungeonCard, Rank, Room, ScoundrelGameState, Suit } from "../../../types/scoundrel";
+
+/**
+ * Simulate the result of a card action and return the resulting health (does not mutate state).
+ * Returns the health after the action, or the current health if the action is invalid.
+ */
+export function simulateCardActionHealth(state: ScoundrelGameState, card: DungeonCard, mode?: "barehanded" | "weapon"): number {
+  const simulatedState = _resolveCardAction(state, card, mode, true);
+  return Math.max(0, Math.min(simulatedState.health, simulatedState.maxHealth));
+}
+
+/**
+ * Unified handler for card actions (monster, weapon, potion).
+ * Moves business logic out of UI layer.
+ * Throws errors for invalid actions (e.g., weapon fight with no weapon).
+ */
+export function handleCardAction(state: ScoundrelGameState, card: DungeonCard, mode?: "barehanded" | "weapon"): ScoundrelGameState {
+  return _resolveCardAction(state, card, mode, false);
 }
 
 /**

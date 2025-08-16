@@ -1,3 +1,70 @@
+import { simulateCardActionHealth } from "../engine";
+describe("simulateCardActionHealth", () => {
+  it("simulates monster attack with weapon and barehanded", () => {
+    const monster: DungeonCard = { suit: "spades", rank: 5 as Rank, type: "monster" };
+    const weapon: DungeonCard = { suit: "diamonds", rank: 3 as Rank, type: "weapon" };
+    let state: ScoundrelGameState = {
+      deck: [],
+      discard: [],
+      currentRoom: { cards: [monster] },
+      nextRoomBase: null,
+      equippedWeapon: weapon,
+      lastMonsterDefeated: null,
+      monstersOnWeapon: [],
+      health: 10,
+      maxHealth: 20,
+      canDeferRoom: true,
+      lastActionWasDefer: false,
+      gameOver: false,
+      victory: false,
+    };
+    // Weapon mode: damage = monster.rank - weapon.rank = 2
+    expect(simulateCardActionHealth(state, monster, "weapon")).toBe(8);
+    // Barehanded: damage = monster.rank
+    expect(simulateCardActionHealth(state, monster, "barehanded")).toBe(5);
+  });
+
+  it("simulates potion healing and clamps to maxHealth", () => {
+    const potion: DungeonCard = { suit: "hearts", rank: 8 as Rank, type: "potion" };
+    let state: ScoundrelGameState = {
+      deck: [],
+      discard: [],
+      currentRoom: { cards: [potion] },
+      nextRoomBase: null,
+      equippedWeapon: null,
+      lastMonsterDefeated: null,
+      monstersOnWeapon: [],
+      health: 18,
+      maxHealth: 20,
+      canDeferRoom: true,
+      lastActionWasDefer: false,
+      gameOver: false,
+      victory: false,
+      potionTakenThisTurn: false,
+    };
+    expect(simulateCardActionHealth(state, potion)).toBe(20);
+  });
+
+  it("simulates weapon pickup (health unchanged)", () => {
+    const weapon: DungeonCard = { suit: "diamonds", rank: 8 as Rank, type: "weapon" };
+    let state: ScoundrelGameState = {
+      deck: [],
+      discard: [],
+      currentRoom: { cards: [weapon] },
+      nextRoomBase: null,
+      equippedWeapon: null,
+      lastMonsterDefeated: null,
+      monstersOnWeapon: [],
+      health: 10,
+      maxHealth: 20,
+      canDeferRoom: true,
+      lastActionWasDefer: false,
+      gameOver: false,
+      victory: false,
+    };
+    expect(simulateCardActionHealth(state, weapon)).toBe(10);
+  });
+});
 import { takePotion } from "../engine";
 import { beforeEach, describe, expect, it, test } from "vitest";
 import { vi } from "vitest";
