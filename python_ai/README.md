@@ -5,7 +5,6 @@ This folder contains the Python code for training a reinforcement learning agent
 ## Remaining Steps
 
 1. **Port Game Logic**
-   - Port essential Scoundrel game logic from TypeScript to Python, or expose it via an API for the environment to use.
    - Implement state transitions, action handling, and reward calculation in `scoundrel_env.py`.
 
 2. **Complete Environment Implementation**
