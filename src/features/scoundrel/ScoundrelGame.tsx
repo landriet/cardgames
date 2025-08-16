@@ -37,19 +37,28 @@ export default function ScoundrelGame() {
     simulatedHealth = simulateCardActionHealth(game, hoveredCard);
   }
 
+  // Calculate health percentage for the bar
+  const healthPercent = Math.max(0, Math.min(100, Math.round((game.health / game.maxHealth) * 100)));
+
   return (
     <div className="p-4 max-w-xl mx-auto">
       <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">Scoundrel</h1>
-      <div className="mb-3 text-gray-800 dark:text-gray-100 ">
-        Health:{" "}
-        <span className="font-semibold">
-          {game.health} / {game.maxHealth}
-        </span>
-        {simulatedHealth !== null && simulatedHealth !== game.health && (
-          <span className="ml-2 px-2 py-1 text-green-500 font-semibold">
-            {simulatedHealth} / {game.maxHealth}
+      <div className="mb-3 text-gray-800 dark:text-gray-100 flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <span>Health:</span>
+          {/* Health bar */}
+          <div className="w-32 h-4 bg-gray-300 dark:bg-gray-700 rounded overflow-hidden border border-gray-400 dark:border-gray-600">
+            <div className="h-full bg-red-500 transition-all duration-300" style={{ width: `${healthPercent}%` }}></div>
+          </div>
+          <span className="font-semibold">
+            {game.health} / {game.maxHealth}
           </span>
-        )}
+          {simulatedHealth !== null && simulatedHealth !== game.health && (
+            <span className="text-green-500 font-semibold">
+              {simulatedHealth} / {game.maxHealth}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Deck and Room side-by-side */}
