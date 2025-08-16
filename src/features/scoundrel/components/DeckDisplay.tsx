@@ -1,6 +1,6 @@
 import Card from "../../../components/Card";
 import { DungeonCard } from "../../../types/scoundrel";
-import { rankToString } from "./ScoundrelGame";
+import { rankToString } from "../ScoundrelGame";
 
 export default function DeckDisplay({ deck }: { deck: DungeonCard[] }) {
   if (deck.length === 0) return null;

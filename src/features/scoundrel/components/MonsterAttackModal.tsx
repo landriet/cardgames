@@ -1,5 +1,5 @@
 import Modal from "../../../components/Modal";
-import MonsterAttackChoice from "../../../components/MonsterAttackChoice";
+import MonsterAttackChoice from "./MonsterAttackChoice";
 
 interface MonsterAttackModalProps {
   isOpen: boolean;

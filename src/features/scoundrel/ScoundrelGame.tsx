@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { initGame, handleCardAction, avoidRoom } from "../logic/engine";
-import { ScoundrelGameState, DungeonCard } from "../../../types/scoundrel";
-import DeckDisplay from "./DeckDisplay";
-import RoomCards from "./RoomCards";
-import EquippedWeapon from "./EquippedWeapon";
-import ActionButtons from "./ActionButtons";
-import DeathModal from "./DeathModal";
-import MonsterAttackModal from "./MonsterAttackModal";
+import { DungeonCard, ScoundrelGameState } from "../../types/scoundrel";
+import { avoidRoom, handleCardAction, initGame } from "./logic/engine";
+import ActionButtons from "./components/ActionButtons";
+import EquippedWeapon from "./components/EquippedWeapon";
+import RoomCards from "./components/RoomCards";
+import DeckDisplay from "./components/DeckDisplay";
+import MonsterAttackModal from "./components/MonsterAttackModal";
+import DeathModal from "./components/DeathModal";
 
 // Map numeric rank to string rank for Card component
 export const rankToString = (rank: number): string => {
