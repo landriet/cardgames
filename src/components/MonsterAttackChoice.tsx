@@ -19,9 +19,8 @@ const MonsterAttackChoice: React.FC<MonsterAttackChoiceProps> = ({ onBarehand, o
         >
           <Hand size={32} className="text-gray-700" />
         </button>
-        <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-700 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-          Will take {barehandDamage} damage
-        </span>
+        {/* Tooltip removed as requested */}
+        <div className="mt-2 text-center text-lg text-gray-900 font-extrabold drop-shadow-sm">{barehandDamage}</div>
       </div>
       <div className="relative group">
         <button
@@ -31,9 +30,8 @@ const MonsterAttackChoice: React.FC<MonsterAttackChoiceProps> = ({ onBarehand, o
         >
           <Sword size={32} className="text-blue-700" />
         </button>
-        <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 text-xs text-white bg-blue-700 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-          Will take {weaponDamage} damage
-        </span>
+        {/* Tooltip removed as requested */}
+        <div className="mt-2 text-center text-lg text-blue-900 font-extrabold drop-shadow-sm">{weaponDamage}</div>
       </div>
     </div>
   );
