@@ -8,7 +8,7 @@ class ScoundrelEnv(gym.Env):
     """
     def __init__(self):
         super(ScoundrelEnv, self).__init__()
-        from python_ai.api_client import ScoundrelAPIClient
+        from api_client import ScoundrelAPIClient
         self.api = ScoundrelAPIClient()
         self.observation_space = spaces.Box(low=0, high=20, shape=(10,), dtype=np.float32)
         self.action_space = spaces.MultiDiscrete([2, 4, 2])
@@ -26,29 +26,35 @@ class ScoundrelEnv(gym.Env):
     def step(self, action):
         # Decode action: [room_choice, card_idx, mode]
         room_choice, card_idx, mode = action
-        # Interact with API
-        if room_choice == 0:
-            state = self.api.avoid_room()
-        else:
-            state = self.api.enter_room()
-        # Act on card
-        state = self.api.act_on_card(card_idx, "attack" if mode == 1 else None)
-        # Encode state
-        obs = self._encode_state(state)
-        # Reward logic
-        reward = 0.0
-        if state.get("victory"):
-            reward += 10.0
+        try:
+            # Interact with API
+            if room_choice == 0:
+                state = self.api.avoid_room()
+            else:
+                state = self.api.enter_room()
+            # Act on card
+            state = self.api.act_on_card(card_idx, "attack" if mode == 1 else None)
+            obs = self._encode_state(state)
+            reward = 0.0
+            if state.get("victory"):
+                reward += 10.0
+                self.done = True
+            elif state.get("gameOver"):
+                reward -= 10.0
+                self.done = True
+            else:
+                health = state["health"]
+                reward += health - self.last_health
+                self.last_health = health
+            info = {}
+        except Exception as e:
+            # Penalize invalid actions, end episode
+            obs = self.state
+            reward = -20.0
             self.done = True
-        elif state.get("gameOver"):
-            reward -= 10.0
-            self.done = True
-        else:
-            health = state["health"]
-            reward += health - self.last_health
-            self.last_health = health
-        info = {}
+            info = {"error": str(e)}
         return obs, reward, self.done, info
+    # ...existing code...
 
     def render(self, mode='human'):
         print(f"State: {self.state}")
