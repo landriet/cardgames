@@ -5,9 +5,13 @@ import { rankToString } from "../ScoundrelGame";
 export default function RoomCards({
   cards,
   onCardClick,
+  onCardHover,
+  onCardUnhover,
 }: {
   cards: (DungeonCard | undefined)[];
   onCardClick: (card: DungeonCard) => void;
+  onCardHover?: (card: DungeonCard) => void;
+  onCardUnhover?: () => void;
 }) {
   return (
     <div className="grid grid-cols-4 gap-2">
@@ -21,6 +25,8 @@ export default function RoomCards({
             role={card ? "button" : undefined}
             aria-label={card ? `Interact with ${card.type}` : `Empty spot`}
             onClick={card ? () => onCardClick(card) : undefined}
+            onMouseEnter={card && onCardHover ? () => onCardHover(card) : undefined}
+            onMouseLeave={card && onCardUnhover ? () => onCardUnhover() : undefined}
             style={{ minWidth: "85px", minHeight: "128px" }}
           >
             {card ? (

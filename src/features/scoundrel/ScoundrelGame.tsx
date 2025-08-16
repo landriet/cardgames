@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { DungeonCard, ScoundrelGameState } from "../../types/scoundrel";
 import { avoidRoom, handleCardAction, initGame } from "./logic/engine";
+import { simulateCardActionHealth } from "./logic/engine";
 import ActionButtons from "./components/ActionButtons";
 import EquippedWeapon from "./components/EquippedWeapon";
 import RoomCards from "./components/RoomCards";
@@ -19,6 +20,7 @@ export const rankToString = (rank: number): string => {
 
 export default function ScoundrelGame() {
   const [game, setGame] = useState<ScoundrelGameState>(initGame());
+  const [hoveredCard, setHoveredCard] = useState<DungeonCard | null>(null);
 
   // Unified handler for card click, always delegates to engine
   const handleCardClick = (card: DungeonCard) => {
@@ -29,21 +31,37 @@ export default function ScoundrelGame() {
     }
   };
 
+  // Compute simulated health if hovering a potion
+  let simulatedHealth: number | null = null;
+  if (hoveredCard && hoveredCard.type === "potion") {
+    simulatedHealth = simulateCardActionHealth(game, hoveredCard);
+  }
+
   return (
     <div className="p-4 max-w-xl mx-auto">
       <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">Scoundrel</h1>
-      <div className="mb-2 text-gray-800 dark:text-gray-100">
+      <div className="mb-2 text-gray-800 dark:text-gray-100 ">
         Health:{" "}
-        <span className="font-mono">
+        <span className="font-semibold">
           {game.health} / {game.maxHealth}
         </span>
+        {simulatedHealth !== null && simulatedHealth !== game.health && (
+          <span className="ml-2 px-2 py-1 text-green-500 font-semibold">
+            {simulatedHealth} / {game.maxHealth}
+          </span>
+        )}
       </div>
 
       {/* Deck and Room side-by-side */}
       <div className="mb-4 flex flex-row items-top gap-8">
         {/* Deck pile display on the left */}
         <DeckDisplay deck={game.deck} />
-        <RoomCards cards={game.currentRoom.cards} onCardClick={handleCardClick} />
+        <RoomCards
+          cards={game.currentRoom.cards}
+          onCardClick={handleCardClick}
+          onCardHover={setHoveredCard}
+          onCardUnhover={() => setHoveredCard(null)}
+        />
       </div>
       {/* Equipped Weapon display with stacked monsters */}
       <div className="mb-4 text-gray-800 dark:text-gray-100">
