@@ -1,13 +1,15 @@
+import * as ScoundrelTypes from "../../../types/scoundrel.ts";
+
 /**
  * Internal helper to resolve a card action and return the resulting state.
  * If isSimulate is true, skips UI-specific logic (pendingMonsterChoice).
  */
 function _resolveCardAction(
-  state: ScoundrelGameState,
-  card: DungeonCard,
+  state: ScoundrelTypes.ScoundrelGameState,
+  card: ScoundrelTypes.DungeonCard,
   mode?: "barehanded" | "weapon",
   isSimulate?: boolean,
-): ScoundrelGameState {
+): ScoundrelTypes.ScoundrelGameState {
   // Prevent any action if game is over
   if (state.gameOver) {
     return state;
@@ -23,7 +25,7 @@ function _resolveCardAction(
   ) {
     return state; // Do nothing, last card in room
   }
-  let newState: ScoundrelGameState;
+  let newState: ScoundrelTypes.ScoundrelGameState;
   if (card.type === "monster") {
     if (state.equippedWeapon && !mode) {
       // If called from UI, prompt for choice. If called from test/programmatic, default to weapon.
@@ -75,13 +77,15 @@ function _resolveCardAction(
   }
   return { ...newState, pendingMonsterChoice: undefined };
 }
-import { CardType, DungeonCard, Rank, Room, ScoundrelGameState, Suit } from "../../../types/scoundrel";
-
 /**
  * Simulate the result of a card action and return the resulting health (does not mutate state).
  * Returns the health after the action, or the current health if the action is invalid.
  */
-export function simulateCardActionHealth(state: ScoundrelGameState, card: DungeonCard, mode?: "barehanded" | "weapon"): number {
+export function simulateCardActionHealth(
+  state: ScoundrelTypes.ScoundrelGameState,
+  card: ScoundrelTypes.DungeonCard,
+  mode?: "barehanded" | "weapon",
+): number {
   const simulatedState = _resolveCardAction(state, card, mode, true);
   return Math.max(0, Math.min(simulatedState.health, simulatedState.maxHealth));
 }
@@ -91,7 +95,11 @@ export function simulateCardActionHealth(state: ScoundrelGameState, card: Dungeo
  * Moves business logic out of UI layer.
  * Throws errors for invalid actions (e.g., weapon fight with no weapon).
  */
-export function handleCardAction(state: ScoundrelGameState, card: DungeonCard, mode?: "barehanded" | "weapon"): ScoundrelGameState {
+export function handleCardAction(
+  state: ScoundrelTypes.ScoundrelGameState,
+  card: ScoundrelTypes.DungeonCard,
+  mode?: "barehanded" | "weapon",
+): ScoundrelTypes.ScoundrelGameState {
   return _resolveCardAction(state, card, mode, false);
 }
 
@@ -102,7 +110,7 @@ export function handleCardAction(state: ScoundrelGameState, card: DungeonCard, m
  * - Enforces health boundaries
  * - Add other per-turn rules here
  */
-export function applyTurnRules(state: ScoundrelGameState): ScoundrelGameState {
+export function applyTurnRules(state: ScoundrelTypes.ScoundrelGameState): ScoundrelTypes.ScoundrelGameState {
   let newState = { ...state };
   // Clamp health between 0 and maxHealth
   newState.health = Math.max(0, Math.min(newState.health, newState.maxHealth));
@@ -129,7 +137,10 @@ export function applyTurnRules(state: ScoundrelGameState): ScoundrelGameState {
  * If already taken, discards potion with no effect.
  * @throws Error if card is not a potion
  */
-export function takePotion(state: ScoundrelGameState, potion: DungeonCard): ScoundrelGameState {
+export function takePotion(
+  state: ScoundrelTypes.ScoundrelGameState,
+  potion: ScoundrelTypes.DungeonCard,
+): ScoundrelTypes.ScoundrelGameState {
   if (potion.type !== "potion") {
     console.error("[takePotion] Card is not a potion.");
     return state;
@@ -167,7 +178,10 @@ export function takePotion(state: ScoundrelGameState, potion: DungeonCard): Scou
  * @returns Updated game state with card removed from current room
  * @throws Error if current room/cards are missing or index is invalid
  */
-export function removeCardFromCurrentRoom(state: ScoundrelGameState, cardOrIndex: DungeonCard): ScoundrelGameState {
+export function removeCardFromCurrentRoom(
+  state: ScoundrelTypes.ScoundrelGameState,
+  cardOrIndex: ScoundrelTypes.DungeonCard,
+): ScoundrelTypes.ScoundrelGameState {
   if (!state.currentRoom || !Array.isArray(state.currentRoom.cards)) {
     console.error("[removeCardFromCurrentRoom] No current room or cards to remove from.");
     return state;
@@ -195,7 +209,10 @@ export function removeCardFromCurrentRoom(state: ScoundrelGameState, cardOrIndex
  * Removes the weapon from the current room if present.
  * @throws Error if card is not a weapon
  */
-export function takeWeapon(state: ScoundrelGameState, weapon: DungeonCard): ScoundrelGameState {
+export function takeWeapon(
+  state: ScoundrelTypes.ScoundrelGameState,
+  weapon: ScoundrelTypes.DungeonCard,
+): ScoundrelTypes.ScoundrelGameState {
   if (weapon.type !== "weapon") {
     console.error("[takeWeapon] Card is not a weapon.");
     return state;
@@ -226,7 +243,11 @@ export function takeWeapon(state: ScoundrelGameState, weapon: DungeonCard): Scou
  * Weapon mode enforces kill limit: can only be used on monsters <= last monster it killed (if any).
  * @throws Error if card is not a monster, or if weapon mode is selected but no weapon is equipped, or if kill limit is exceeded.
  */
-export function fightMonster(state: ScoundrelGameState, monster: DungeonCard, mode: "barehanded" | "weapon"): ScoundrelGameState {
+export function fightMonster(
+  state: ScoundrelTypes.ScoundrelGameState,
+  monster: ScoundrelTypes.DungeonCard,
+  mode: "barehanded" | "weapon",
+): ScoundrelTypes.ScoundrelGameState {
   if (monster.type !== "monster") {
     console.error("[fightMonster] Card is not a monster.");
     return state;
@@ -270,7 +291,10 @@ export function fightMonster(state: ScoundrelGameState, monster: DungeonCard, mo
  * Fight a monster barehanded: take full monster damage, discard monster.
  * @throws Error if card is not a monster
  */
-export function fightMonsterBarehanded(state: ScoundrelGameState, monster: DungeonCard): ScoundrelGameState {
+export function fightMonsterBarehanded(
+  state: ScoundrelTypes.ScoundrelGameState,
+  monster: ScoundrelTypes.DungeonCard,
+): ScoundrelTypes.ScoundrelGameState {
   if (monster.type !== "monster") {
     console.error("[fightMonsterBarehanded] Card is not a monster.");
     return state;
@@ -290,9 +314,9 @@ export function fightMonsterBarehanded(state: ScoundrelGameState, monster: Dunge
 }
 
 // Utility: Create a deck for Scoundrel
-export function createScoundrelDeck(): DungeonCard[] {
-  const suits: Suit[] = ["hearts", "diamonds", "clubs", "spades"];
-  const deck: DungeonCard[] = [];
+export function createScoundrelDeck(): ScoundrelTypes.DungeonCard[] {
+  const suits: ScoundrelTypes.Suit[] = ["hearts", "diamonds", "clubs", "spades"];
+  const deck: ScoundrelTypes.DungeonCard[] = [];
   for (const suit of suits) {
     for (let rank = 2; rank <= 14; rank++) {
       // Remove Jokers, red face cards, and red aces
@@ -300,11 +324,11 @@ export function createScoundrelDeck(): DungeonCard[] {
         continue;
       }
       if ((suit === "hearts" || suit === "diamonds") && rank === 14) continue; // Red aces
-      let type: CardType;
+      let type: ScoundrelTypes.CardType;
       if (suit === "hearts") type = "potion";
       else if (suit === "diamonds") type = "weapon";
       else type = "monster";
-      deck.push({ suit, rank: rank as Rank, type });
+      deck.push({ suit, rank: rank as ScoundrelTypes.Rank, type });
     }
   }
   return shuffle(deck);
@@ -320,8 +344,11 @@ export function shuffle<T>(array: T[]): T[] {
   return arr;
 }
 
-export function dealRoom(deck: DungeonCard[], nextRoomBase: DungeonCard | null): { room: Room; deck: DungeonCard[] } {
-  const cards: DungeonCard[] = [];
+export function dealRoom(
+  deck: ScoundrelTypes.DungeonCard[],
+  nextRoomBase: ScoundrelTypes.DungeonCard | null,
+): { room: ScoundrelTypes.Room; deck: ScoundrelTypes.DungeonCard[] } {
+  const cards: ScoundrelTypes.DungeonCard[] = [];
   let workingDeck = [...deck];
   if (nextRoomBase) {
     cards.push(nextRoomBase);
@@ -332,7 +359,7 @@ export function dealRoom(deck: DungeonCard[], nextRoomBase: DungeonCard | null):
   return { room: { cards }, deck: workingDeck };
 }
 
-export function initGame(): ScoundrelGameState {
+export function initGame(): ScoundrelTypes.ScoundrelGameState {
   const deck = createScoundrelDeck();
   const { room, deck: newDeck } = dealRoom(deck, null);
   return {
@@ -355,7 +382,7 @@ export function initGame(): ScoundrelGameState {
 // --- Room Entry/Avoid Logic ---
 
 // Avoid the current room: move all 4 cards to bottom of deck, enforce avoid rules
-export function avoidRoom(state: ScoundrelGameState): ScoundrelGameState {
+export function avoidRoom(state: ScoundrelTypes.ScoundrelGameState): ScoundrelTypes.ScoundrelGameState {
   if (!state.canDeferRoom || state.lastActionWasDefer) {
     console.error("Cannot avoid two rooms in a row.");
     return state;
@@ -376,7 +403,7 @@ export function avoidRoom(state: ScoundrelGameState): ScoundrelGameState {
 }
 
 // Enter the current room: player must face 3 of 4 cards, leave 4th for next room
-export function enterRoom(state: ScoundrelGameState): ScoundrelGameState {
+export function enterRoom(state: ScoundrelTypes.ScoundrelGameState): ScoundrelTypes.ScoundrelGameState {
   // After entering, player must resolve 3 of 4 cards, leave 4th as nextRoomBase
   // (actual card resolution handled elsewhere)
   // Reset potionTakenThisTurn at start of turn
@@ -396,7 +423,7 @@ export function enterRoom(state: ScoundrelGameState): ScoundrelGameState {
  * Finalize the room after 3 cards have been resolved: leave the 4th card as nextRoomBase
  * Should be called after the player has resolved 3 cards in the room
  */
-export function finalizeRoom(state: ScoundrelGameState): ScoundrelGameState {
+export function finalizeRoom(state: ScoundrelTypes.ScoundrelGameState): ScoundrelTypes.ScoundrelGameState {
   if (!state.currentRoom || !Array.isArray(state.currentRoom.cards)) {
     console.error("[finalizeRoom] No current room or cards.");
     return state;
