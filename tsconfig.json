@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "types": ["vitest"],
+    "types": ["vitest", "node"],
     "target": "ES2022",
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "module": "ESNext",
