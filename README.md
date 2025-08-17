@@ -1,5 +1,41 @@
 # React + TypeScript + Vite
 
+## Scoundrel AI: Monte Carlo Tree Search (MCTS)
+
+This project includes a reusable Monte Carlo Tree Search (MCTS) implementation for building AI agents in the Scoundrel card game.
+
+### How to Use MCTS for Scoundrel
+
+1. **Game Adapter**: The file `src/features/scoundrel/logic/ScoundrelMCTSGame.ts` adapts your game logic to the MCTS interface.
+2. **MCTS Implementation**: The core algorithm is in `src/features/scoundrel/logic/MCTS.ts`.
+3. **Integration Example**:
+
+```typescript
+import { MCTS } from "./src/features/scoundrel/logic/MCTS";
+import { ScoundrelMCTSGame } from "./src/features/scoundrel/logic/ScoundrelMCTSGame";
+import { initGame } from "./src/features/scoundrel/logic/engine";
+
+const initialState = initGame();
+const gameAdapter = new ScoundrelMCTSGame(initialState);
+const mcts = new MCTS(gameAdapter, 1000); // 1000 iterations
+
+// To get the AI's move:
+const aiMove = mcts.selectMove();
+// Apply the move to your game state as needed
+```
+
+### Customization
+
+- You can adjust the number of iterations for stronger/weaker AI.
+- The adapter can be extended for more advanced strategies or game rules.
+
+### References
+
+- [monte-carlo-tree-search-js (GitHub)](https://github.com/SethPipho/monte-carlo-tree-search-js)
+- [Implementing Monte Carlo Tree Search in Node.js (Medium)](https://medium.com/@quasimik/implementing-monte-carlo-tree-search-in-node-js-5f07595104df)
+
+---
+
 ## Storybook
 
 This project uses [Storybook](https://storybook.js.org/) for developing and testing UI components in isolation.
