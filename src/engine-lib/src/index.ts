@@ -249,13 +249,15 @@ export class Game {
     if (this.deck.length === 0 && this.currentRoom.cards.length === 0) {
       this.victory = true;
     }
-
     if (this.currentRoom.cards.length === 1 && this.deck.length > 0) {
       this.finalizeRoom();
       this.currentRoom = this.dealRoom();
       this.player.potionTakenThisTurn = false;
       this.canDeferRoom = true;
       this.lastActionWasDefer = false;
+    }
+    if (this.currentRoom.cards.length === 0) {
+      this.currentRoom = this.dealRoom();
     }
   }
 }
