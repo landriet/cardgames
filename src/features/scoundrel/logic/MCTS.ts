@@ -61,6 +61,14 @@ export class MCTS<State, Move> {
     this.game.setState(newState);
   }
 
+  /**
+   * Selects the best move from the current root node using Monte Carlo Tree Search (MCTS).
+   * Runs the search algorithm for a specified number of iterations, then chooses the child node
+   * with the highest visit count (robust child) as the best move.
+   *
+   * @returns {Move} The move associated with the most visited child node.
+   * @throws {Error} If no valid move is found among the root's children.
+   */
   selectMove(): Move {
     for (let i = 0; i < this.iterations; i++) {
       this.runSearch();
@@ -78,6 +86,17 @@ export class MCTS<State, Move> {
     return best.move;
   }
 
+  /**
+   * Executes a single iteration of the Monte Carlo Tree Search (MCTS) algorithm.
+   *
+   * The process consists of four main steps:
+   * 1. **Selection:** Traverses the tree from the root node, selecting child nodes using the Upper Confidence Bound (UCB) until a node with unexpanded moves or a terminal state is reached.
+   * 2. **Expansion:** If the selected node has unexpanded moves and is not a terminal state, expands the node by applying one of the unexpanded moves and adding the resulting child node to the tree.
+   * 3. **Simulation:** Simulates a random playout from the expanded node until a terminal state is reached, selecting moves randomly at each step.
+   * 4. **Backpropagation:** Propagates the simulation result (winner) back up the tree, updating the play and win statistics for each node along the path.
+   *
+   * This method is intended to be called repeatedly to build and refine the search tree.
+   */
   private runSearch() {
     // 1. Selection
     let node = this.root;
@@ -97,9 +116,11 @@ export class MCTS<State, Move> {
     while (!this.game.gameOver(simState)) {
       const moves = this.game.moves(simState);
       const move = moves[Math.floor(Math.random() * moves.length)];
+      console.log("Simulation selected move:", move);
       simState = this.game.playMove(simState, move);
     }
     const winner = this.game.winner(simState);
+    console.log("Simulation ended. Winner:", winner);
     // 4. Backpropagation
     let backNode: MCTSNode<State, Move> | null = node;
     while (backNode !== null) {
@@ -133,8 +154,3 @@ export class MCTS<State, Move> {
     return node.nWins / node.nPlays + this.exploration * Math.sqrt(Math.log(parentPlays) / node.nPlays);
   }
 }
-
-// Usage:
-// 1. Implement your game logic to match the Game interface.
-// 2. Instantiate MCTS with your game and call selectMove() to get the AI’s move.
-// 3. After making a move in the real game, call advanceRoot(move, newState) to update the tree.
