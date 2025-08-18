@@ -1,5 +1,43 @@
 import * as ScoundrelTypes from "../../../types/scoundrel.ts";
 
+export type ScoundrelActionType = "fightMonster" | "takePotion" | "takeWeapon";
+
+export interface ScoundrelPossibleAction {
+  card: ScoundrelTypes.DungeonCard;
+  mode?: "barehanded" | "weapon";
+}
+
+/**
+ * Returns all possible actions for the current state.
+ * Each action includes the card, actionType, and mode (if relevant).
+ */
+export function getPossibleActions(state: ScoundrelTypes.ScoundrelGameState): ScoundrelPossibleAction[] {
+  if (state.gameOver || !state.currentRoom || !Array.isArray(state.currentRoom.cards)) {
+    return [];
+  }
+  const actions: ScoundrelPossibleAction[] = [];
+  for (const card of state.currentRoom.cards) {
+    if (card.type === "monster") {
+      // Can always fight barehanded
+      actions.push({ card, mode: "barehanded" });
+      // If weapon equipped, check if weapon mode is allowed
+      if (state.equippedWeapon) {
+        // Weapon kill limit: can only use weapon on monsters <= lastMonsterDefeated (if any)
+        if (!state.lastMonsterDefeated || card.rank <= state.lastMonsterDefeated.rank) {
+          actions.push({ card, mode: "weapon" });
+        }
+      }
+    } else if (card.type === "potion") {
+      // Can take potion (even if already took one, but will have no effect)
+      actions.push({ card });
+    } else if (card.type === "weapon") {
+      // Can take weapon
+      actions.push({ card });
+    }
+  }
+  return actions;
+}
+
 /**
  * Internal helper to resolve a card action and return the resulting state.
  * If isSimulate is true, skips UI-specific logic (pendingMonsterChoice).

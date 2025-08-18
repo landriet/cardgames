@@ -1,5 +1,40 @@
-import { simulateCardActionHealth } from "../engine";
+import { simulateCardActionHealth, initGameWithStaticDeck, getPossibleActions } from "../engine";
 describe("simulateCardActionHealth", () => {
+  describe("getPossibleActions", () => {
+    it("returns correct actions for initial static deck state", () => {
+      const state = initGameWithStaticDeck();
+      const actions = getPossibleActions(state);
+      // Initial room: 4 cards
+      expect(actions.length).toBe(4);
+      // Should include takePotion, takeWeapon, fightMonster (barehanded and/or weapon)
+      const types = actions.map((a) => a.actionType);
+      expect(types).toContain("takePotion");
+      expect(types).toContain("takeWeapon");
+      expect(types).toContain("fightMonster");
+      // Monster actions should include barehanded
+      expect(actions.some((a) => a.actionType === "fightMonster" && a.mode === "barehanded")).toBe(true);
+    });
+
+    it("returns empty array if game is over", () => {
+      const state = initGameWithStaticDeck();
+      state.gameOver = true;
+      expect(getPossibleActions(state)).toEqual([]);
+    });
+
+    it("returns correct actions for room with only monsters and weapon equipped", () => {
+      const state = initGameWithStaticDeck();
+      state.currentRoom.cards = [
+        { type: "monster", suit: "clubs", rank: 3 },
+        { type: "monster", suit: "spades", rank: 9 },
+      ];
+      state.equippedWeapon = { type: "weapon", suit: "diamonds", rank: 7 };
+      state.lastMonsterDefeated = null;
+      const actions = getPossibleActions(state);
+      // Should include both barehanded and weapon for each monster
+      expect(actions.filter((a) => a.actionType === "fightMonster" && a.mode === "barehanded").length).toBe(2);
+      expect(actions.filter((a) => a.actionType === "fightMonster" && a.mode === "weapon").length).toBe(2);
+    });
+  });
   it("simulates monster attack with weapon and barehanded", () => {
     const monster: DungeonCard = { suit: "spades", rank: 5 as Rank, type: "monster" };
     const weapon: DungeonCard = { suit: "diamonds", rank: 3 as Rank, type: "weapon" };
