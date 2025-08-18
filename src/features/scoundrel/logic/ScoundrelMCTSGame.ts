@@ -28,7 +28,8 @@ export class ScoundrelMCTSGame implements Game<State, Move> {
   }
 
   moves(state: State): Move[] {
-    // Return only valid actions: simulate each move and include only those that change the state
+    // Prevent move generation if game is over
+    if (this.gameOver(state)) return [];
     if (!state.currentRoom || !state.currentRoom.cards) return [];
     const moves: Move[] = [];
     for (const card of state.currentRoom.cards) {
