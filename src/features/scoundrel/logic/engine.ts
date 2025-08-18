@@ -427,10 +427,8 @@ export function shuffle<T>(array: T[]): T[] {
   return arr;
 }
 
-export function dealRoom(
-  deck: ScoundrelTypes.DungeonCard[],
-): { room: ScoundrelTypes.Room; deck: ScoundrelTypes.DungeonCard[] } {
-  const cards: ScoundrelTypes.DungeonCard[] = ;
+export function dealRoom(deck: ScoundrelTypes.DungeonCard[]): { room: ScoundrelTypes.Room; deck: ScoundrelTypes.DungeonCard[] } {
+  const cards: ScoundrelTypes.DungeonCard[] = [];
   let workingDeck = [...deck];
   while (cards.length < 4 && workingDeck.length > 0) {
     cards.push(workingDeck.shift()!);
