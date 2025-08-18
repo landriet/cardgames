@@ -1,6 +1,6 @@
 # Scoundrel - Complete Rules
 
-_A Single Player Rogue-like Card Game by Zach Gage and Kurt Bieg_  
+_A Single Player Rogue-like Card Game by Zach Gage and Kurt Bieg_
 _Version 1.0 - August 15th, 2011_
 
 ## Setup
