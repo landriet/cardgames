@@ -15,9 +15,11 @@ function runAIGameDemo(iterations = 1000) {
     const move = mcts.selectMove();
     console.log(`Turn ${turn}: AI selected move`, move);
     console.log("Current state:", scoundrelGameStateToString(state));
-    state = gameAdapter.playMove(state, move);
-    console.log("New state:", scoundrelGameStateToString(state));
-    gameAdapter.setState(state);
+    const newState = gameAdapter.playMove(state, move);
+    console.log("New state:", scoundrelGameStateToString(newState));
+    gameAdapter.setState(newState);
+    mcts.advanceRoot(move, newState); // Advance MCTS tree to new state
+    state = newState;
     console.log(`Turn ${turn}: AI chose card ${move.card.type} (rank ${move.card.rank})${move.mode ? ", mode: " + move.mode : ""}`);
     if (state.gameOver) {
       console.log("Game Over! Score:", state.score);

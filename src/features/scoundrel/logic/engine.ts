@@ -10,9 +10,25 @@ function _resolveCardAction(
   mode?: "barehanded" | "weapon",
   isSimulate?: boolean,
 ): ScoundrelTypes.ScoundrelGameState {
+  // --- SANITY CHECKS ---
+  // Check state validity
+  if (!state || typeof state !== "object" || !("currentRoom" in state) || !("health" in state)) {
+    console.error("[_resolveCardAction] Invalid state object.", state);
+    throw new Error("Invalid game state object passed to _resolveCardAction.");
+  }
+  // Check card validity
+  if (!card || typeof card !== "object" || !("type" in card) || !("rank" in card)) {
+    console.error("[_resolveCardAction] Invalid card object.", card);
+    throw new Error("Invalid DungeonCard object passed to _resolveCardAction.");
+  }
+  // Check mode validity
+  if (mode && mode !== "barehanded" && mode !== "weapon") {
+    console.error("[_resolveCardAction] Invalid mode:", mode);
+    throw new Error(`Invalid mode: ${mode}. Must be 'barehanded' or 'weapon'.`);
+  }
   // Prevent any action if game is over
   if (state.gameOver) {
-    return state;
+    throw new Error("Cannot perform actions when game is over.");
   }
   // Prevent acting on the last card in the room only during the resolve 3 of 4 phase
   if (
@@ -23,10 +39,15 @@ function _resolveCardAction(
     state.nextRoomBase == null &&
     state.deck.length > 0
   ) {
+    console.warn("[_resolveCardAction] Attempted to act on last card in room during resolve phase.");
     return state; // Do nothing, last card in room
   }
+  // Check card is present in current room (unless simulating)
+  if (!isSimulate && state.currentRoom && Array.isArray(state.currentRoom.cards) && !state.currentRoom.cards.includes(card)) {
+    console.error("[_resolveCardAction] Card not present in current room.", card);
+    throw new Error("Card not present in current room.");
+  }
   let newState: ScoundrelTypes.ScoundrelGameState;
-  let discardCard: ScoundrelTypes.DungeonCard | null = null;
   if (card.type === "monster") {
     if (state.equippedWeapon && !mode) {
       // If called from UI, prompt for choice. If called from test/programmatic, default to weapon.

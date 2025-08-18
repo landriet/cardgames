@@ -43,6 +43,24 @@ export class MCTS<State, Move> {
     this.exploration = exploration;
   }
 
+  /**
+   * Call this after making a move in the real game to update the MCTS tree.
+   * If the move exists as a child, reuse the subtree. Otherwise, reinitialize root.
+   */
+  advanceRoot(move: Move, newState: State) {
+    const moveKey = JSON.stringify(move);
+    const child = this.root.children.get(moveKey);
+    if (child) {
+      // Reuse subtree
+      child.parent = null;
+      this.root = child;
+    } else {
+      // Reinitialize root
+      this.root = new MCTSNode(newState, null, null, this.game.moves(newState));
+    }
+    this.game.setState(newState);
+  }
+
   selectMove(): Move {
     for (let i = 0; i < this.iterations; i++) {
       this.runSearch();
@@ -83,15 +101,16 @@ export class MCTS<State, Move> {
     }
     const winner = this.game.winner(simState);
     // 4. Backpropagation
-    while (node !== null) {
-      node.nPlays++;
-      if (winner !== null && node.parent) {
+    let backNode: MCTSNode<State, Move> | null = node;
+    while (backNode !== null) {
+      backNode.nPlays++;
+      if (winner !== null && backNode.parent) {
         // Win for parent’s perspective
-        if (this.game.winner(node.parent.state) === winner) {
-          node.nWins++;
+        if (this.game.winner(backNode.parent.state) === winner) {
+          backNode.nWins++;
         }
       }
-      node = node.parent;
+      backNode = backNode.parent;
     }
   }
 
@@ -118,3 +137,4 @@ export class MCTS<State, Move> {
 // Usage:
 // 1. Implement your game logic to match the Game interface.
 // 2. Instantiate MCTS with your game and call selectMove() to get the AI’s move.
+// 3. After making a move in the real game, call advanceRoot(move, newState) to update the tree.

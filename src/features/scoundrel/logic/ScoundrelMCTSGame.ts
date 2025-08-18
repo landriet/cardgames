@@ -69,6 +69,7 @@ export class ScoundrelMCTSGame implements Game<State, Move> {
   }
 
   gameOver(state: State): boolean {
+    console.log("Checking game over:", state.gameOver, state.victory);
     return !!state.gameOver || !!state.victory;
   }
 
