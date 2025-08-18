@@ -16,9 +16,6 @@ function printState(state: ScoundrelGameState) {
   state.currentRoom.cards.forEach((card, i) => {
     console.log(`  [${i + 1}] ${card.type.toUpperCase()} (${card.suit} ${card.rank})`);
   });
-  if (state.nextRoomBase) {
-    console.log(`Next Room Base: ${state.nextRoomBase.type} (${state.nextRoomBase.suit} ${state.nextRoomBase.rank})`);
-  }
   console.log(`Deck: ${state.deck.length} cards left`);
 }
 

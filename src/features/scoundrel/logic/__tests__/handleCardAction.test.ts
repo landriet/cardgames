@@ -8,7 +8,6 @@ function getBaseState(overrides: Partial<ScoundrelGameState> = {}): ScoundrelGam
     deck: [],
     discard: [],
     currentRoom: { cards: [] },
-    nextRoomBase: null,
     equippedWeapon: null,
     lastMonsterDefeated: null,
     monstersOnWeapon: [],

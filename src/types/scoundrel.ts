@@ -22,7 +22,6 @@ export interface ScoundrelGameState {
   deck: DungeonCard[];
   discard: DungeonCard[];
   currentRoom: Room;
-  nextRoomBase: DungeonCard | null;
   equippedWeapon: DungeonCard | null;
   lastMonsterDefeated: DungeonCard | null;
   monstersOnWeapon: DungeonCard[]; // monsters stacked on equipped weapon

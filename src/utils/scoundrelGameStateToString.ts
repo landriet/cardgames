@@ -15,7 +15,6 @@ export function scoundrelGameStateToString(state: ScoundrelTypes.ScoundrelGameSt
     //`Deck: [${state.deck.map(cardToString).join(', ')}]`,
     // `Discard: [${state.discard.map(cardToString).join(', ')}]`,
     `Current Room: [${roomToString(state.currentRoom)}]`,
-    `Next Room Base: ${cardToString(state.nextRoomBase)}`,
     `Equipped Weapon: ${cardToString(state.equippedWeapon)}`,
     `Last Monster Defeated: ${cardToString(state.lastMonsterDefeated)}`,
     `Monsters on Weapon: [${state.monstersOnWeapon.map(cardToString).join(", ")}]`,

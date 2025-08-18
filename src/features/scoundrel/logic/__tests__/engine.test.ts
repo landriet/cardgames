@@ -42,7 +42,7 @@ describe("simulateCardActionHealth", () => {
       deck: [],
       discard: [],
       currentRoom: { cards: [monster] },
-      nextRoomBase: null,
+
       equippedWeapon: weapon,
       lastMonsterDefeated: null,
       monstersOnWeapon: [],
@@ -65,7 +65,7 @@ describe("simulateCardActionHealth", () => {
       deck: [],
       discard: [],
       currentRoom: { cards: [potion] },
-      nextRoomBase: null,
+
       equippedWeapon: null,
       lastMonsterDefeated: null,
       monstersOnWeapon: [],
@@ -86,7 +86,7 @@ describe("simulateCardActionHealth", () => {
       deck: [],
       discard: [],
       currentRoom: { cards: [weapon] },
-      nextRoomBase: null,
+
       equippedWeapon: null,
       lastMonsterDefeated: null,
       monstersOnWeapon: [],
@@ -134,7 +134,7 @@ describe("takePotion", () => {
       deck: [],
       discard: [],
       currentRoom: { cards: [potion1, potion2] },
-      nextRoomBase: null,
+
       equippedWeapon: null,
       lastMonsterDefeated: null,
       monstersOnWeapon: [],
@@ -168,7 +168,7 @@ describe("takePotion", () => {
       deck: [],
       discard: [],
       currentRoom: { cards: [potion] },
-      nextRoomBase: null,
+
       equippedWeapon: null,
       lastMonsterDefeated: null,
       monstersOnWeapon: [],
@@ -207,7 +207,7 @@ describe("Scoundrel Engine Edge Cases", () => {
       deck: [],
       discard: [],
       currentRoom: { cards: [card1, card2] },
-      nextRoomBase: null,
+
       equippedWeapon: null,
       lastMonsterDefeated: null,
       health: 20,
@@ -232,7 +232,7 @@ describe("Scoundrel Engine Edge Cases", () => {
       deck: [],
       discard: [],
       currentRoom: { cards: [] },
-      nextRoomBase: null,
+
       equippedWeapon: null,
       lastMonsterDefeated: null,
       monstersOnWeapon: [],
@@ -263,7 +263,7 @@ describe("Scoundrel Engine Edge Cases", () => {
       deck: [],
       discard: [],
       currentRoom: { cards: [monster] },
-      nextRoomBase: null,
+
       equippedWeapon: null,
       lastMonsterDefeated: null,
       health: 15,
@@ -290,7 +290,7 @@ describe("Scoundrel Engine Edge Cases", () => {
       deck: [],
       discard: [],
       currentRoom: null as any,
-      nextRoomBase: null,
+
       equippedWeapon: null,
       lastMonsterDefeated: null,
       health: 20,
@@ -329,7 +329,7 @@ describe("takeWeapon", () => {
       deck: [],
       discard: [],
       currentRoom: { cards: [newWeapon] },
-      nextRoomBase: null,
+
       equippedWeapon: prevWeapon,
       lastMonsterDefeated: { suit: "spades", rank: 7 as Rank, type: "monster" },
       monstersOnWeapon: prevMonsters,
@@ -360,7 +360,7 @@ describe("takeWeapon", () => {
       deck: [],
       discard: [],
       currentRoom: { cards: [newWeapon] },
-      nextRoomBase: null,
+
       equippedWeapon: null,
       lastMonsterDefeated: null,
       monstersOnWeapon: [],
@@ -383,33 +383,6 @@ describe("takeWeapon", () => {
 });
 
 describe("Scoundrel Engine - Room Entry/Avoid Logic", () => {
-  test("finalizeRoom leaves 4th card as nextRoomBase and empties room", () => {
-    // Setup: room with 1 card left after resolving 3
-    const lastCard: DungeonCard = {
-      suit: "spades",
-      rank: 7 as Rank,
-      type: "monster",
-    };
-    const state: ScoundrelGameState = {
-      deck: [],
-      discard: [],
-      currentRoom: { cards: [lastCard] },
-      nextRoomBase: null,
-      equippedWeapon: null,
-      lastMonsterDefeated: null,
-      monstersOnWeapon: [],
-      health: 10,
-      maxHealth: 20,
-      canDeferRoom: true,
-      lastActionWasDefer: false,
-      gameOver: false,
-      victory: false,
-      potionTakenThisTurn: false,
-    };
-    const newState = finalizeRoom(state);
-    expect(newState.nextRoomBase).toEqual(lastCard);
-    expect(newState.currentRoom.cards.length).toBe(0);
-  });
   let initialState: ScoundrelGameState;
 
   beforeEach(() => {
@@ -473,10 +446,9 @@ describe("Scoundrel Engine - Room Entry/Avoid Logic", () => {
     const carriedCard = state.currentRoom.cards[0];
     // Finalize room
     state = finalizeRoom(state);
-    expect(state.nextRoomBase).toEqual(carriedCard);
     expect(state.currentRoom.cards.length).toBe(0);
     // Deal next room
-    const { room, deck: newDeck } = dealRoom(state.deck, state.nextRoomBase);
+    const { room, deck: newDeck } = dealRoom(state.deck);
     // Room should contain carried card and 3 new cards
     expect(room.cards.length).toBe(4);
     expect(room.cards[0]).toEqual(carriedCard);
@@ -496,7 +468,7 @@ describe("Scoundrel Engine", () => {
       deck: [],
       discard: [],
       currentRoom: { cards: [monster] },
-      nextRoomBase: null,
+
       equippedWeapon: null,
       lastMonsterDefeated: null,
       health: 20,
@@ -524,7 +496,7 @@ describe("Scoundrel Engine", () => {
       deck: [],
       discard: [],
       currentRoom: { cards: [monster] },
-      nextRoomBase: null,
+
       equippedWeapon: null,
       lastMonsterDefeated: null,
       health: 15,
@@ -557,7 +529,7 @@ describe("Scoundrel Engine", () => {
       deck: [],
       discard: [],
       currentRoom: { cards: [monster] },
-      nextRoomBase: null,
+
       equippedWeapon: weapon,
       lastMonsterDefeated: null,
       health: 20,
@@ -597,7 +569,7 @@ describe("Scoundrel Engine", () => {
       deck: [],
       discard: [],
       currentRoom: { cards: [monster] },
-      nextRoomBase: null,
+
       equippedWeapon: weapon,
       lastMonsterDefeated: lastKilled,
       health: 20,
@@ -637,7 +609,7 @@ describe("Scoundrel Engine", () => {
 
   it("deals a room of 4 cards", () => {
     const deck = createScoundrelDeck();
-    const { room, deck: newDeck } = dealRoom(deck, null);
+    const { room, deck: newDeck } = dealRoom(deck);
     expect(room.cards.length).toBe(4);
     expect(newDeck.length).toBe(deck.length - 4);
   });

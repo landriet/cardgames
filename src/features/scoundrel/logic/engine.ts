@@ -80,7 +80,6 @@ function _resolveCardAction(
     Array.isArray(state.currentRoom.cards) &&
     state.currentRoom.cards.length === 1 &&
     state.currentRoom.cards[0] === card &&
-    state.nextRoomBase == null &&
     state.deck.length > 0
   ) {
     console.warn("[_resolveCardAction] Attempted to act on last card in room during resolve phase.");
@@ -128,18 +127,15 @@ function _resolveCardAction(
     newState.currentRoom &&
     Array.isArray(newState.currentRoom.cards) &&
     newState.currentRoom.cards.length === 1 &&
-    newState.nextRoomBase == null &&
     newState.deck.length > 0
   ) {
-    // Finalize the room: move the last card to nextRoomBase, clear currentRoom
     const finalizedState = finalizeRoom(newState);
     // Deal the next room automatically
-    const { room, deck: updatedDeck } = dealRoom(finalizedState.deck, finalizedState.nextRoomBase);
+    const { room, deck: updatedDeck } = dealRoom(finalizedState.deck);
     return {
       ...finalizedState,
       currentRoom: room,
       deck: updatedDeck,
-      nextRoomBase: null,
       // Reset per-turn flags as needed
       potionTakenThisTurn: false,
       canDeferRoom: true,
@@ -193,6 +189,7 @@ export function handleCardAction(
   card: ScoundrelTypes.DungeonCard,
   mode?: "barehanded" | "weapon",
 ): ScoundrelTypes.ScoundrelGameState {
+  console.log("[handleCardAction] Action:", { card, mode });
   return _resolveCardAction(state, card, mode, false);
 }
 
@@ -432,13 +429,9 @@ export function shuffle<T>(array: T[]): T[] {
 
 export function dealRoom(
   deck: ScoundrelTypes.DungeonCard[],
-  nextRoomBase: ScoundrelTypes.DungeonCard | null,
 ): { room: ScoundrelTypes.Room; deck: ScoundrelTypes.DungeonCard[] } {
-  const cards: ScoundrelTypes.DungeonCard[] = [];
+  const cards: ScoundrelTypes.DungeonCard[] = ;
   let workingDeck = [...deck];
-  if (nextRoomBase) {
-    cards.push(nextRoomBase);
-  }
   while (cards.length < 4 && workingDeck.length > 0) {
     cards.push(workingDeck.shift()!);
   }
@@ -451,28 +444,27 @@ export function initGameWithStaticDeck(): ScoundrelTypes.ScoundrelGameState {
     { type: "weapon", suit: "diamonds", rank: 7 },
     { type: "monster", suit: "clubs", rank: 3 },
     { type: "monster", suit: "spades", rank: 9 },
-    { type: "potion", suit: "hearts", rank: 9 },
-    { type: "monster", suit: "clubs", rank: 9 },
-    { type: "weapon", suit: "diamonds", rank: 2 },
-    { type: "monster", suit: "clubs", rank: 6 },
-    { type: "monster", suit: "spades", rank: 8 },
-    { type: "weapon", suit: "diamonds", rank: 3 },
-    { type: "monster", suit: "clubs", rank: 4 },
-    { type: "monster", suit: "spades", rank: 12 },
-    { type: "potion", suit: "hearts", rank: 4 },
-    { type: "weapon", suit: "diamonds", rank: 4 },
-    { type: "monster", suit: "clubs", rank: 14 },
-    { type: "monster", suit: "spades", rank: 11 },
-    { type: "potion", suit: "hearts", rank: 6 },
-    { type: "weapon", suit: "diamonds", rank: 5 },
-    { type: "monster", suit: "clubs", rank: 10 },
+    // { type: "potion", suit: "hearts", rank: 9 },
+    // { type: "monster", suit: "clubs", rank: 9 },
+    // { type: "weapon", suit: "diamonds", rank: 2 },
+    // { type: "monster", suit: "clubs", rank: 6 },
+    // { type: "monster", suit: "spades", rank: 8 },
+    // { type: "weapon", suit: "diamonds", rank: 3 },
+    // { type: "monster", suit: "clubs", rank: 4 },
+    // { type: "monster", suit: "spades", rank: 12 },
+    // { type: "potion", suit: "hearts", rank: 4 },
+    // { type: "weapon", suit: "diamonds", rank: 4 },
+    // { type: "monster", suit: "clubs", rank: 14 },
+    // { type: "monster", suit: "spades", rank: 11 },
+    // { type: "potion", suit: "hearts", rank: 6 },
+    // { type: "weapon", suit: "diamonds", rank: 5 },
+    // { type: "monster", suit: "clubs", rank: 10 },
   ];
-  const { room, deck: newDeck } = dealRoom(deck, null);
+  const { room, deck: newDeck } = dealRoom(deck);
   return {
     deck: newDeck,
     discard: [],
     currentRoom: room,
-    nextRoomBase: null,
     equippedWeapon: null,
     lastMonsterDefeated: null,
     monstersOnWeapon: [],
@@ -487,12 +479,11 @@ export function initGameWithStaticDeck(): ScoundrelTypes.ScoundrelGameState {
 
 export function initGame(): ScoundrelTypes.ScoundrelGameState {
   const deck = createScoundrelDeck();
-  const { room, deck: newDeck } = dealRoom(deck, null);
+  const { room, deck: newDeck } = dealRoom(deck);
   return {
     deck: newDeck,
     discard: [],
     currentRoom: room,
-    nextRoomBase: null,
     equippedWeapon: null,
     lastMonsterDefeated: null,
     monstersOnWeapon: [],
@@ -516,37 +507,27 @@ export function avoidRoom(state: ScoundrelTypes.ScoundrelGameState): ScoundrelTy
   // Move all 4 cards to bottom of deck
   const avoidedCards = [...state.currentRoom.cards];
   const newDeck = [...state.deck, ...avoidedCards];
-  // Deal new room (no nextRoomBase)
-  const { room, deck: updatedDeck } = dealRoom(newDeck, null);
   return {
     ...state,
-    deck: updatedDeck,
-    currentRoom: room,
-    nextRoomBase: null,
-    canDeferRoom: false, // cannot avoid two in a row
+    deck: newDeck,
+    currentRoom: { cards: [] },
+    canDeferRoom: false,
     lastActionWasDefer: true,
   };
 }
 
 // Enter the current room: player must face 3 of 4 cards, leave 4th for next room
 export function enterRoom(state: ScoundrelTypes.ScoundrelGameState): ScoundrelTypes.ScoundrelGameState {
-  // After entering, player must resolve 3 of 4 cards, leave 4th as nextRoomBase
-  // (actual card resolution handled elsewhere)
-  // Reset potionTakenThisTurn at start of turn
-  // If currentRoom has 4 cards, set nextRoomBase to the remaining card after 3 are resolved
-  // This function should be called at the start of entering a room, so we just set flags and leave nextRoomBase null for now
-  // The mechanic is enforced after 3 cards are resolved, so add a helper to finalize the room
   return {
     ...state,
-    canDeferRoom: true, // can avoid next room if desired
+    canDeferRoom: true,
     lastActionWasDefer: false,
     potionTakenThisTurn: false,
-    // nextRoomBase will be set after 3 cards are resolved
   };
 }
 
 /**
- * Finalize the room after 3 cards have been resolved: leave the 4th card as nextRoomBase
+ * Finalize the room after 3 cards have been resolved
  * Should be called after the player has resolved 3 cards in the room
  */
 export function finalizeRoom(state: ScoundrelTypes.ScoundrelGameState): ScoundrelTypes.ScoundrelGameState {
@@ -558,10 +539,8 @@ export function finalizeRoom(state: ScoundrelTypes.ScoundrelGameState): Scoundre
     console.error("[finalizeRoom] Room must have exactly 1 card left to finalize.");
     return state;
   }
-  // The remaining card becomes nextRoomBase
   return {
     ...state,
-    nextRoomBase: state.currentRoom.cards[0],
     currentRoom: { cards: [] },
   };
 }
