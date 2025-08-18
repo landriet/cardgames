@@ -11,7 +11,16 @@ export interface BruteForceResult {
  */
 function cloneGame(game: Game): Game {
   // Serialize and deserialize for deep copy
-  return Object.assign(Object.create(Object.getPrototypeOf(game)), JSON.parse(JSON.stringify(game)));
+  const cloned = Object.assign(Object.create(Object.getPrototypeOf(game)), JSON.parse(JSON.stringify(game)));
+  // Fix player prototype
+  if (cloned.player) {
+    cloned.player = Object.assign(Object.create(Object.getPrototypeOf(game.player)), cloned.player);
+  }
+  // Fix currentRoom prototype
+  if (cloned.currentRoom) {
+    cloned.currentRoom = Object.assign(Object.create(Object.getPrototypeOf(game.currentRoom)), cloned.currentRoom);
+  }
+  return cloned;
 }
 
 /**
