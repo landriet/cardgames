@@ -1,16 +1,16 @@
 // Utility to stringify ScoundrelGameState for debugging/logging
-import { ScoundrelGameState, DungeonCard, Room } from "../types/scoundrel";
+import * as ScoundrelTypes from "../types/scoundrel.ts";
 
-function cardToString(card: DungeonCard | null): string {
+function cardToString(card: ScoundrelTypes.DungeonCard | null): string {
   if (!card) return "null";
   return `${card.type}(${card.rank} of ${card.suit})`;
 }
 
-function roomToString(room: Room): string {
+function roomToString(room: ScoundrelTypes.Room): string {
   return room.cards.map(cardToString).join(", ");
 }
 
-export function scoundrelGameStateToString(state: ScoundrelGameState): string {
+export function scoundrelGameStateToString(state: ScoundrelTypes.ScoundrelGameState): string {
   return [
     //`Deck: [${state.deck.map(cardToString).join(', ')}]`,
     // `Discard: [${state.discard.map(cardToString).join(', ')}]`,
@@ -26,6 +26,6 @@ export function scoundrelGameStateToString(state: ScoundrelGameState): string {
     `Victory: ${state.victory}`,
     `Potion Taken This Turn: ${state.potionTakenThisTurn ?? "n/a"}`,
     `Score: ${state.score ?? "n/a"}`,
-    `Pending Monster Choice: ${state.pendingMonsterChoice ? cardToString(state.pendingMonsterChoice.monster) : "n/a"}`,
+    `Pending Monster Choice: ${state.pendingMonsterChoice ? cardToString(state.pendingMonsterChoice.monster) : "n/a\n\n"}`,
   ].join("\n");
 }
