@@ -401,6 +401,46 @@ export function dealRoom(
   return { room: { cards }, deck: workingDeck };
 }
 
+export function initGameWithStaticDeck(): ScoundrelTypes.ScoundrelGameState {
+  const deck: ScoundrelTypes.DungeonCard[] = [
+    { type: "potion", suit: "hearts", rank: 5 },
+    { type: "weapon", suit: "diamonds", rank: 7 },
+    { type: "monster", suit: "clubs", rank: 3 },
+    { type: "monster", suit: "spades", rank: 9 },
+    { type: "potion", suit: "hearts", rank: 9 },
+    { type: "monster", suit: "clubs", rank: 9 },
+    { type: "weapon", suit: "diamonds", rank: 2 },
+    { type: "monster", suit: "clubs", rank: 6 },
+    { type: "monster", suit: "spades", rank: 8 },
+    { type: "weapon", suit: "diamonds", rank: 3 },
+    { type: "monster", suit: "clubs", rank: 4 },
+    { type: "monster", suit: "spades", rank: 12 },
+    { type: "potion", suit: "hearts", rank: 4 },
+    { type: "weapon", suit: "diamonds", rank: 4 },
+    { type: "monster", suit: "clubs", rank: 14 },
+    { type: "monster", suit: "spades", rank: 11 },
+    { type: "potion", suit: "hearts", rank: 6 },
+    { type: "weapon", suit: "diamonds", rank: 5 },
+    { type: "monster", suit: "clubs", rank: 10 },
+  ];
+  const { room, deck: newDeck } = dealRoom(deck, null);
+  return {
+    deck: newDeck,
+    discard: [],
+    currentRoom: room,
+    nextRoomBase: null,
+    equippedWeapon: null,
+    lastMonsterDefeated: null,
+    monstersOnWeapon: [],
+    health: 20,
+    maxHealth: 20,
+    canDeferRoom: true,
+    lastActionWasDefer: false,
+    gameOver: false,
+    victory: false,
+  };
+}
+
 export function initGame(): ScoundrelTypes.ScoundrelGameState {
   const deck = createScoundrelDeck();
   const { room, deck: newDeck } = dealRoom(deck, null);

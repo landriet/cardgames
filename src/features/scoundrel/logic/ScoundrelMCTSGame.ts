@@ -70,7 +70,6 @@ export class ScoundrelMCTSGame implements Game<State, Move> {
   }
 
   gameOver(state: State): boolean {
-    console.log("Checking game over:", state.gameOver, state.victory);
     return !!state.gameOver || !!state.victory;
   }
 
@@ -78,5 +77,16 @@ export class ScoundrelMCTSGame implements Game<State, Move> {
     if (state.victory) return 1;
     if (state.gameOver) return -1;
     return null;
+  }
+
+  score(state: State): number {
+    // Use state.score if available, otherwise combine health and progress
+    if (typeof state.score === "number") return state.score;
+    let score = 0;
+    if (typeof state.health === "number") score += state.health;
+    if (typeof state.victory === "boolean" && state.victory) score += 1000; // Big bonus for victory
+    if (typeof state.gameOver === "boolean" && state.gameOver) score -= 1000; // Big penalty for game over
+    // Add more factors as needed
+    return score;
   }
 }

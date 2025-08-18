@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { DungeonCard, ScoundrelGameState } from "../../types/scoundrel";
-import { avoidRoom, handleCardAction, initGame, simulateCardActionHealth } from "./logic/engine";
+import { avoidRoom, handleCardAction, initGameWithStaticDeck, simulateCardActionHealth } from "./logic/engine";
 import ActionButtons from "./components/ActionButtons";
 import EquippedWeapon from "./components/EquippedWeapon";
 import RoomCards from "./components/RoomCards";
@@ -18,7 +18,7 @@ export const rankToString = (rank: number): string => {
 };
 
 export default function ScoundrelGame() {
-  const [game, setGame] = useState<ScoundrelGameState>(initGame());
+  const [game, setGame] = useState<ScoundrelGameState>(initGameWithStaticDeck());
   const [hoveredCard, setHoveredCard] = useState<DungeonCard | null>(null);
 
   // Unified handler for card click, always delegates to engine
@@ -83,7 +83,7 @@ export default function ScoundrelGame() {
             setGame((prev: ScoundrelGameState) => avoidRoom(prev));
           }
         }}
-        onRestart={() => setGame(initGame())}
+        onRestart={() => setGame(initGameWithStaticDeck())}
       />
 
       {/* Monster attack choice modal */}
@@ -114,7 +114,7 @@ export default function ScoundrelGame() {
       />
 
       {/* Death modal when player is dead */}
-      <DeathModal isOpen={!!game.gameOver} onRestart={() => setGame(initGame())} />
+      <DeathModal isOpen={!!game.gameOver} onRestart={() => setGame(initGameWithStaticDeck())} score={game.score} />
     </div>
   );
 }

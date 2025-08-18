@@ -1,3 +1,48 @@
+/**
+ * Pretty-print an MCTSNode for readable console logging.
+ */
+export function printMCTSNode<State, Move>(
+  node: MCTSNode<State, Move>,
+  options?: { showChildren?: boolean; maxChildren?: number; showState?: boolean },
+) {
+  const { showChildren = true, maxChildren = 5, showState = false } = options || {};
+  const summary: any = {
+    move: node.move,
+    nPlays: node.nPlays,
+    totalScore: node.totalScore,
+    averageScore: node.averageScore,
+    unexpandedMoves: node.unexpandedMoves.length,
+    children: node.children.size,
+  };
+  if (showState) {
+    summary.state = node.state;
+  }
+  if (showChildren && node.children.size > 0) {
+    summary.childMoves = Array.from(node.children.values())
+      .slice(0, maxChildren)
+      .map((child) => {
+        let moveStr: string;
+        try {
+          moveStr = JSON.stringify(child.move);
+        } catch {
+          moveStr = String(child.move);
+        }
+        // Truncate long move strings for readability
+        if (moveStr.length > 80) {
+          moveStr = moveStr.slice(0, 77) + "...";
+        }
+        return {
+          move: moveStr,
+          nPlays: child.nPlays,
+          averageScore: child.averageScore,
+        };
+      });
+    if (node.children.size > maxChildren) {
+      summary.childMoves.push({ more: `${node.children.size - maxChildren} more...` });
+    }
+  }
+  console.log("MCTSNode:", summary);
+}
 // MCTS.ts
 // Simple, reusable Monte Carlo Tree Search implementation for TypeScript
 // Integrate with your game logic by implementing the required Game interface
@@ -10,6 +55,7 @@ export interface Game<State, Move> {
   playMove(state: State, move: Move): State;
   gameOver(state: State): boolean;
   winner(state: State): number | null; // 1, -1, or 0 for draw
+  score(state: State): number; // Numeric evaluation of the state
 }
 
 export class MCTSNode<State, Move> {
@@ -19,6 +65,8 @@ export class MCTSNode<State, Move> {
   move: Move | null;
   nPlays = 0;
   nWins = 0;
+  totalScore = 0;
+  averageScore = 0;
   unexpandedMoves: Move[];
 
   constructor(state: State, parent: MCTSNode<State, Move> | null, move: Move | null, unexpandedMoves: Move[]) {
@@ -41,6 +89,13 @@ export class MCTS<State, Move> {
     this.root = new MCTSNode(state, null, null, game.moves(state));
     this.iterations = iterations;
     this.exploration = exploration;
+  }
+
+  /**
+   * Log the root node in a readable format.
+   */
+  logRoot(options?: { showChildren?: boolean; maxChildren?: number; showState?: boolean }) {
+    printMCTSNode(this.root, options);
   }
 
   /**
@@ -86,17 +141,6 @@ export class MCTS<State, Move> {
     return best.move;
   }
 
-  /**
-   * Executes a single iteration of the Monte Carlo Tree Search (MCTS) algorithm.
-   *
-   * The process consists of four main steps:
-   * 1. **Selection:** Traverses the tree from the root node, selecting child nodes using the Upper Confidence Bound (UCB) until a node with unexpanded moves or a terminal state is reached.
-   * 2. **Expansion:** If the selected node has unexpanded moves and is not a terminal state, expands the node by applying one of the unexpanded moves and adding the resulting child node to the tree.
-   * 3. **Simulation:** Simulates a random playout from the expanded node until a terminal state is reached, selecting moves randomly at each step.
-   * 4. **Backpropagation:** Propagates the simulation result (winner) back up the tree, updating the play and win statistics for each node along the path.
-   *
-   * This method is intended to be called repeatedly to build and refine the search tree.
-   */
   private runSearch() {
     // 1. Selection
     let node = this.root;
@@ -116,21 +160,15 @@ export class MCTS<State, Move> {
     while (!this.game.gameOver(simState)) {
       const moves = this.game.moves(simState);
       const move = moves[Math.floor(Math.random() * moves.length)];
-      console.log("Simulation selected move:", move);
       simState = this.game.playMove(simState, move);
     }
-    const winner = this.game.winner(simState);
-    console.log("Simulation ended. Winner:", winner);
+    const score = this.game.score(simState);
     // 4. Backpropagation
     let backNode: MCTSNode<State, Move> | null = node;
     while (backNode !== null) {
       backNode.nPlays++;
-      if (winner !== null && backNode.parent) {
-        // Win for parent’s perspective
-        if (this.game.winner(backNode.parent.state) === winner) {
-          backNode.nWins++;
-        }
-      }
+      backNode.totalScore += score;
+      backNode.averageScore = backNode.totalScore / backNode.nPlays;
       backNode = backNode.parent;
     }
   }
@@ -151,6 +189,6 @@ export class MCTS<State, Move> {
 
   private ucb1(node: MCTSNode<State, Move>, parentPlays: number): number {
     if (node.nPlays === 0) return Infinity;
-    return node.nWins / node.nPlays + this.exploration * Math.sqrt(Math.log(parentPlays) / node.nPlays);
+    return node.averageScore + this.exploration * Math.sqrt(Math.log(parentPlays) / node.nPlays);
   }
 }
