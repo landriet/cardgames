@@ -118,6 +118,7 @@ export class Game {
   gameOver: boolean = false;
   victory: boolean = false;
   score: number = 0;
+  roomBeingEntered: boolean = false;
 
   constructor(deck?: DungeonCard[], player?: Player) {
     this.deck = deck ?? Game.createDeck();
@@ -130,7 +131,7 @@ export class Game {
       return [];
     }
     const actions: Array<{ actionType: string; card?: DungeonCard; mode?: "barehanded" | "weapon" }> = [];
-    if (this.currentRoom && Array.isArray(this.currentRoom.cards) && this.currentRoom.cards.length === 4) {
+    if (this.roomBeingEntered) {
       actions.push({ actionType: "enterRoom" });
       if (this.canDeferRoom && !this.lastActionWasDefer) {
         actions.push({ actionType: "skipRoom" });
@@ -166,24 +167,6 @@ export class Game {
     return Math.max(0, Math.min(simPlayer.health, simPlayer.maxHealth));
   }
 
-  handleCardAction(card: DungeonCard, mode?: "barehanded" | "weapon"): void {
-    if (card.type === "monster") {
-      this.player.fightMonster(card as MonsterCard, mode ?? "barehanded");
-      this.currentRoom.removeCard(card);
-      this.discard.push(card);
-    } else if (card.type === "weapon") {
-      this.player.takeWeapon(card as WeaponCard);
-      this.currentRoom.removeCard(card);
-      this.discard.push(card);
-    } else if (card.type === "potion") {
-      this.player.takePotion(card as PotionCard);
-      this.currentRoom.removeCard(card);
-      this.discard.push(card);
-    }
-
-    this.applyTurnRules();
-  }
-
   static createDeck(): DungeonCard[] {
     const suits: Suit[] = ["hearts", "diamonds", "clubs", "spades"];
     const deck: DungeonCard[] = [];
@@ -216,12 +199,15 @@ export class Game {
       cards.push(this.deck.shift()!);
     }
     this.currentRoom = new Room(cards);
+    this.roomBeingEntered = false;
   }
 
   enterRoom(): void {
     this.canDeferRoom = true;
     this.lastActionWasDefer = false;
     this.player.potionTakenThisTurn = false;
+    this.roomBeingEntered = true;
+    this.applyTurnRules();
   }
 
   avoidRoom(): void {
@@ -230,6 +216,24 @@ export class Game {
     this.currentRoom.cards = [];
     this.canDeferRoom = false;
     this.lastActionWasDefer = true;
+    this.applyTurnRules();
+  }
+
+  handleCardAction(card: DungeonCard, mode?: "barehanded" | "weapon"): void {
+    if (card.type === "monster") {
+      this.player.fightMonster(card as MonsterCard, mode ?? "barehanded");
+      this.currentRoom.removeCard(card);
+      this.discard.push(card);
+    } else if (card.type === "weapon") {
+      this.player.takeWeapon(card as WeaponCard);
+      this.currentRoom.removeCard(card);
+      this.discard.push(card);
+    } else if (card.type === "potion") {
+      this.player.takePotion(card as PotionCard);
+      this.currentRoom.removeCard(card);
+      this.discard.push(card);
+    }
+    this.applyTurnRules();
   }
 
   applyTurnRules(): void {

@@ -24,29 +24,22 @@ function ask(question: string): Promise<string> {
 
 async function playGame() {
   const game = new Game();
-  let inRoom = false;
   while (!game.gameOver && !game.victory) {
     printState(game);
-    if (!inRoom) {
+    if (!game.roomBeingEntered) {
       let choice = await ask("Avoid room (a) or enter room (e)? ");
       if (choice.toLowerCase() === "a") {
         game.avoidRoom();
         continue;
       } else if (choice.toLowerCase() === "e") {
         game.enterRoom();
-        inRoom = true;
       } else {
         console.log("Invalid choice.");
         continue;
       }
-    }
-    let actions = 0;
-    while (game.currentRoom.cards.length > 1 && actions < 3) {
-      //check game state before acting
-      if (game.gameOver || game.victory) break;
-
-      printState(game);
+    } else {
       let idxStr = await ask(`Choose a card to act on: `);
+
       let idx = parseInt(idxStr) - 1;
       if (isNaN(idx) || idx < 0 || idx >= game.currentRoom.cards.length) {
         console.log("Invalid card index.");
@@ -68,9 +61,9 @@ async function playGame() {
         console.log("Unknown card type.");
         continue;
       }
-      actions++;
     }
   }
+
   printState(game);
   if (game.victory) {
     console.log("Congratulations! You won!");
