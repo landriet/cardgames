@@ -210,12 +210,12 @@ export class Game {
     return arr;
   }
 
-  dealRoom(): Room {
-    const cards: DungeonCard[] = [];
+  dealRoom(): void {
+    const cards: DungeonCard[] = this.currentRoom.cards.slice();
     while (cards.length < 4 && this.deck.length > 0) {
       cards.push(this.deck.shift()!);
     }
-    return new Room(cards);
+    this.currentRoom = new Room(cards);
   }
 
   enterRoom(): void {
@@ -232,12 +232,6 @@ export class Game {
     this.lastActionWasDefer = true;
   }
 
-  finalizeRoom(): void {
-    if (this.currentRoom.cards.length === 1) {
-      this.currentRoom.cards = [];
-    }
-  }
-
   applyTurnRules(): void {
     if (this.player.health <= 0) {
       this.gameOver = true;
@@ -249,15 +243,8 @@ export class Game {
     if (this.deck.length === 0 && this.currentRoom.cards.length === 0) {
       this.victory = true;
     }
-    if (this.currentRoom.cards.length === 1 && this.deck.length > 0) {
-      this.finalizeRoom();
-      this.currentRoom = this.dealRoom();
-      this.player.potionTakenThisTurn = false;
-      this.canDeferRoom = true;
-      this.lastActionWasDefer = false;
-    }
-    if (this.currentRoom.cards.length === 0) {
-      this.currentRoom = this.dealRoom();
+    if (this.currentRoom.cards.length <= 1 && this.deck.length > 0) {
+      this.dealRoom();
     }
   }
 }

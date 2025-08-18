@@ -42,6 +42,9 @@ async function playGame() {
     }
     let actions = 0;
     while (game.currentRoom.cards.length > 1 && actions < 3) {
+      //check game state before acting
+      if (game.gameOver || game.victory) break;
+
       printState(game);
       let idxStr = await ask(`Choose a card to act on: `);
       let idx = parseInt(idxStr) - 1;
