@@ -28,15 +28,33 @@ export class ScoundrelMCTSGame implements Game<State, Move> {
   }
 
   moves(state: State): Move[] {
-    // Return all possible actions: all cards in current room, with both modes for monsters
+    // Return only valid actions: simulate each move and include only those that change the state
     if (!state.currentRoom || !state.currentRoom.cards) return [];
     const moves: Move[] = [];
     for (const card of state.currentRoom.cards) {
       if (card.type === "monster") {
-        moves.push({ card, mode: "barehanded" });
-        if (state.equippedWeapon) moves.push({ card, mode: "weapon" });
+        // Barehanded
+        const barehandedState = handleCardAction(state, card, "barehanded");
+        if (JSON.stringify(barehandedState) !== JSON.stringify(state)) {
+          moves.push({ card, mode: "barehanded" });
+        }
+        // Weapon
+        if (
+          state.equippedWeapon &&
+          state.lastMonsterDefeated &&
+          typeof state.lastMonsterDefeated.rank !== "undefined" &&
+          state.lastMonsterDefeated.rank > card.rank
+        ) {
+          const weaponState = handleCardAction(state, card, "weapon");
+          if (JSON.stringify(weaponState) !== JSON.stringify(state)) {
+            moves.push({ card, mode: "weapon" });
+          }
+        }
       } else {
-        moves.push({ card });
+        const newState = handleCardAction(state, card);
+        if (JSON.stringify(newState) !== JSON.stringify(state)) {
+          moves.push({ card });
+        }
       }
     }
     return moves;

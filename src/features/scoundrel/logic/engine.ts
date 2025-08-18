@@ -26,6 +26,7 @@ function _resolveCardAction(
     return state; // Do nothing, last card in room
   }
   let newState: ScoundrelTypes.ScoundrelGameState;
+  let discardCard: ScoundrelTypes.DungeonCard | null = null;
   if (card.type === "monster") {
     if (state.equippedWeapon && !mode) {
       // If called from UI, prompt for choice. If called from test/programmatic, default to weapon.
@@ -49,8 +50,14 @@ function _resolveCardAction(
   } else if (card.type === "potion") {
     newState = takePotion(state, card);
   } else {
-    return state;
+    console.error("[_resolveCardAction] Unknown card type:", card.type);
+    throw new Error(`Unknown card type: ${card.type}`);
   }
+  // Handle discarding the card centrally
+  newState = {
+    ...newState,
+    discard: [...newState.discard, card],
+  };
   // After resolving a card, check if only one card remains in the room
   if (
     newState.currentRoom &&
@@ -77,10 +84,26 @@ function _resolveCardAction(
   }
   return { ...newState, pendingMonsterChoice: undefined };
 }
+
 /**
- * Simulate the result of a card action and return the resulting health (does not mutate state).
- * Returns the health after the action, or the current health if the action is invalid.
+ * Simulates the effect of playing a dungeon card on the player's health.
+ *
+ * This function resolves the card action without mutating the original game state,
+ * and returns the resulting health value, clamped between 0 and the player's maximum health.
+ *
+ * @param state - The current game state of the Scoundrel.
+ * @param card - The dungeon card to simulate.
+ * @param mode - (Optional) The mode of action, either "barehanded" or "weapon".
+ * @returns The simulated health value after the card action.
  */
+export function simulateCardAction(
+  state: ScoundrelTypes.ScoundrelGameState,
+  card: ScoundrelTypes.DungeonCard,
+  mode?: "barehanded" | "weapon",
+): ScoundrelTypes.ScoundrelGameState {
+  return _resolveCardAction(state, card, mode, true);
+}
+
 export function simulateCardActionHealth(
   state: ScoundrelTypes.ScoundrelGameState,
   card: ScoundrelTypes.DungeonCard,
@@ -91,9 +114,14 @@ export function simulateCardActionHealth(
 }
 
 /**
- * Unified handler for card actions (monster, weapon, potion).
- * Moves business logic out of UI layer.
- * Throws errors for invalid actions (e.g., weapon fight with no weapon).
+ * Handles the action of playing a dungeon card in the Scoundrel game.
+ *
+ * This function processes the given card action based on the current game state and the specified mode.
+ *
+ * @param state - The current state of the Scoundrel game.
+ * @param card - The dungeon card to be played.
+ * @param mode - Optional. Specifies the mode of action, either "barehanded" or "weapon".
+ * @returns The updated game state after resolving the card action.
  */
 export function handleCardAction(
   state: ScoundrelTypes.ScoundrelGameState,
@@ -152,7 +180,6 @@ export function takePotion(
     // Already took a potion this turn, discard with no effect
     newState = {
       ...stateAfterRemoval,
-      discard: [...stateAfterRemoval.discard, potion],
       potionTakenThisTurn: true,
     };
   } else {
@@ -161,7 +188,6 @@ export function takePotion(
     newState = {
       ...stateAfterRemoval,
       health: newHealth,
-      discard: [...stateAfterRemoval.discard, potion],
       potionTakenThisTurn: true,
     };
   }
@@ -233,7 +259,6 @@ export function takeWeapon(
     ...newState,
     equippedWeapon: weapon,
     monstersOnWeapon: [],
-    discard: newDiscard,
     lastMonsterDefeated: null, // reset kill limit
   };
   return applyTurnRules(updatedState);
@@ -274,15 +299,12 @@ export function fightMonster(
 
     // Remove monster from current room using utility
     const stateAfterRemoval = removeCardFromCurrentRoom(state, monster);
-    // Add monster to discard
-    const newDiscard = [...stateAfterRemoval.discard, monster];
     // Place monster on weapon (track in monstersOnWeapon)
     const updatedState = {
       ...stateAfterRemoval,
       health: state.health - damage,
       lastMonsterDefeated: monster,
       monstersOnWeapon: [...(state.monstersOnWeapon || []), monster],
-      discard: newDiscard,
     };
     return applyTurnRules(updatedState);
   }
@@ -308,7 +330,6 @@ export function fightMonsterBarehanded(
   const updatedState = {
     ...stateAfterRemoval,
     health: newHealth,
-    discard: [...stateAfterRemoval.discard, monster],
   };
   return applyTurnRules(updatedState);
 }

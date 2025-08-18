@@ -1,5 +1,6 @@
 // MCTS.test.ts
 // Simple test/demo for Scoundrel MCTS AI
+import { scoundrelGameStateToString } from "../../../utils/scoundrelGameStateToString.ts";
 import { MCTS } from "./MCTS.ts";
 import { ScoundrelMCTSGame } from "./ScoundrelMCTSGame.ts";
 import { initGame } from "./engine.ts";
@@ -12,7 +13,10 @@ function runAIGameDemo(iterations = 1000) {
   while (!gameAdapter.gameOver(state)) {
     turn++;
     const move = mcts.selectMove();
+    console.log(`Turn ${turn}: AI selected move`, move);
+    console.log("Current state:", scoundrelGameStateToString(state));
     state = gameAdapter.playMove(state, move);
+    console.log("New state:", scoundrelGameStateToString(state));
     gameAdapter.setState(state);
     console.log(`Turn ${turn}: AI chose card ${move.card.type} (rank ${move.card.rank})${move.mode ? ", mode: " + move.mode : ""}`);
     if (state.gameOver) {
