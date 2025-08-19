@@ -128,7 +128,6 @@ export class Game {
   lastActionWasDefer: boolean = false;
   gameOver: boolean = false;
   victory: boolean = false;
-  score: number = 0;
   roomBeingEntered: boolean = false;
 
   constructor(deck?: DungeonCard[], player?: Player) {
@@ -150,12 +149,12 @@ export class Game {
     } else {
       for (const card of this.currentRoom.cards) {
         if (card.type === "monster") {
-          actions.push({ actionType: "playCard", card, mode: "barehanded" });
           if (this.player.equippedWeapon) {
             if (!this.player.lastMonsterDefeated || card.rank <= this.player.lastMonsterDefeated.rank) {
               actions.push({ actionType: "playCard", card, mode: "weapon" });
             }
           }
+          actions.push({ actionType: "playCard", card, mode: "barehanded" });
         } else if (card.type === "potion") {
           actions.push({ actionType: "playCard", card });
         } else if (card.type === "weapon") {
@@ -250,9 +249,6 @@ export class Game {
   applyTurnRules(): void {
     if (this.player.health <= 0) {
       this.gameOver = true;
-      const monstersLeft = this.deck.filter((card) => card.type === "monster");
-      const monstersValue = monstersLeft.reduce((sum, card) => sum + card.rank, 0);
-      this.score = -monstersValue;
       return;
     }
     if (this.deck.length === 0 && this.currentRoom.cards.length === 0) {
@@ -261,5 +257,11 @@ export class Game {
     if (this.currentRoom.cards.length <= 1 && this.deck.length > 0) {
       this.dealRoom();
     }
+  }
+
+  calculateScore(): number {
+    const monstersLeft = this.deck.filter((card) => card.type === "monster");
+    const monstersValue = monstersLeft.reduce((sum, card) => sum + card.rank, 0);
+    return Math.max(0, this.player.health) - monstersValue;
   }
 }

@@ -24,26 +24,17 @@ export function bruteforce(game: Game, actionHistory: BruteForceResult["actions"
   // Use closure to persist best result
   let bestResult: BruteForceResult | null = null;
 
-  function recurse(currentGame: Game, currentHistory: BruteForceResult["actions"] = []) {
-    // const cardHistory = currentHistory
-    //   .filter((a) => a.actionType === "playCard" && a.card)
-    //   .map((a) => a.card?.rank)
-    //   .join(" > ");
-    // console.log("Current card history:", cardHistory);
-
+  function recurse(currentGame: Game, currentHistory: BruteForceResult["actions"] = []): BruteForceResult | null {
     const possibleActions = currentGame.getPossibleActions();
     if (currentGame.gameOver || currentGame.victory || possibleActions.length === 0) {
       const result: BruteForceResult = {
         victory: currentGame.victory,
-        score: Math.max(0, currentGame.score),
+        score: currentGame.calculateScore(),
         actions: currentHistory,
       };
-      if (
-        !bestResult ||
-        (result.victory && !bestResult.victory) ||
-        (result.victory === bestResult.victory && result.score < bestResult.score)
-      ) {
+      if (!bestResult || result.victory || result.score > bestResult.score) {
         bestResult = result;
+        console.log("DEBUG New best result found:", bestResult);
       }
       return result;
     }
@@ -57,10 +48,22 @@ export function bruteforce(game: Game, actionHistory: BruteForceResult["actions"
       } else if (action.actionType === "playCard" && action.card) {
         nextGame.handleCardAction(action.card, action.mode);
       }
-      recurse(nextGame, [...currentHistory, action]);
+      const result: BruteForceResult | null = recurse(nextGame, [...currentHistory, action]);
+      // If a victory is found in a branch, stop further exploration
+      if (result && result.victory) {
+        return result;
+      }
     }
     return bestResult!;
   }
 
-  return recurse(game, actionHistory);
+  const result = recurse(game, actionHistory);
+  if (result) {
+    return result;
+  }
+  return {
+    victory: false,
+    score: game.calculateScore(),
+    actions: actionHistory,
+  };
 }
