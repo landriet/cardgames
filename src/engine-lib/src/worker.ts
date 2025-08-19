@@ -1,31 +1,20 @@
-// ...existing code...
-import { DungeonCard, Game } from "./index";
+// worker.ts - The worker thread script
+import { parentPort } from "worker_threads";
+import { BruteForceResult } from "./ai";
+import { Game } from ".";
 
-export interface BruteForceResult {
-  victory: boolean;
-  score: number;
-  actions: Array<{ actionType: string; card?: DungeonCard; mode?: "barehanded" | "weapon" }>; // sequence of actions
-}
-
-/**
- * Deep clone a Game instance (naive, for brute-force only)
- */
-export function cloneGame(game: Game): Game {
+function cloneGame(game: Game): Game {
   // Use custom clone method for fast, prototype-preserving deep clone
   return game.clone();
 }
 
-/**
- * Recursively brute-force all possible action sequences from a given game state.
- * Returns the best result found (victory prioritized, then lowest score).
- */
-export function bruteforce(game: Game, actionHistory: BruteForceResult["actions"] = []): BruteForceResult {
+// This function will run in the worker thread
+function heavyTask(game: Game) {
   const possibleActions = game.getPossibleActions();
   if (game.gameOver || game.victory || possibleActions.length === 0) {
     return {
       victory: game.victory,
       score: game.calculateScore(),
-      actions: actionHistory,
     };
   }
 
@@ -41,10 +30,8 @@ export function bruteforce(game: Game, actionHistory: BruteForceResult["actions"
     filteredActions = possibleActions.filter((action) => action.mode !== "barehanded");
   }
 
-  const results: BruteForceResult[] = [];
-  for (const action of filteredActions) {
+  const tasks = filteredActions.map(async (action) => {
     const nextGame = cloneGame(game);
-    let nextHistory = [...actionHistory, action];
     if (action.actionType === "enterRoom") {
       nextGame.enterRoom();
     } else if (action.actionType === "skipRoom") {
@@ -52,9 +39,11 @@ export function bruteforce(game: Game, actionHistory: BruteForceResult["actions"
     } else if (action.actionType === "playCard" && action.card) {
       nextGame.handleCardAction(action.card, action.mode);
     }
-    // Recursively call bruteforce synchronously
-    results.push(bruteforce(nextGame, nextHistory));
-  }
+    // Call worker for this branch
+    return pool!.exec("bruteforceWorker", [nextGame, nextHistory]);
+  });
+
+  const results: BruteForceResult[] = await Promise.all(tasks);
 
   // Pick best result: prioritize victory, then highest score
   let bestResult = results[0];
@@ -67,3 +56,16 @@ export function bruteforce(game: Game, actionHistory: BruteForceResult["actions"
   }
   return bestResult;
 }
+
+// Listen for messages from the main thread
+parentPort?.on("message", (data) => {
+  try {
+    const result = heavyTask(data);
+    parentPort?.postMessage({ success: true, result });
+  } catch (error) {
+    parentPort?.postMessage({
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});

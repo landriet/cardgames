@@ -1,7 +1,6 @@
 import { Game, MonsterCard, WeaponCard, PotionCard, Suit, Rank } from "./src/index";
 import { bruteforce } from "./src/ai";
-import workerpool from "workerpool";
-import type { Pool } from "workerpool";
+// ...existing code...
 
 function buildStaticDeck(): Array<MonsterCard | WeaponCard | PotionCard> {
   // 7 monsters, 7 weapons, 6 potions
@@ -41,13 +40,13 @@ function buildStaticDeck(): Array<MonsterCard | WeaponCard | PotionCard> {
   return deck;
 }
 
-async function benchmarkAI(minSize = 7, maxSize = 20, pool: Pool) {
+function benchmarkAI(minSize = 7, maxSize = 20) {
   const deck = Game.createDeck();
   const results: Array<{ size: number; timeMs: number; result: any }> = [];
   for (let size = minSize; size <= maxSize; size++) {
     const game = new Game(deck.slice(0, size));
     const start = performance.now();
-    const result = await bruteforce(game, [], pool);
+    const result = bruteforce(game, []);
     const end = performance.now();
     results.push({ size, timeMs: end - start, result });
     console.log(`Deck size: ${size}, Time: ${(end - start).toFixed(2)}ms, Result:`, result);
@@ -55,24 +54,18 @@ async function benchmarkAI(minSize = 7, maxSize = 20, pool: Pool) {
   return results;
 }
 
-async function main() {
-  const cpuCount = require("os").cpus().length;
-  const pool: Pool = workerpool.pool(__dirname + "/dist/ai.worker.js", { minWorkers: cpuCount, maxWorkers: cpuCount });
-  await benchmarkAI(26, 26, pool);
-  await pool.terminate();
+function main() {
+  benchmarkAI(26, 26);
 }
 
 //try with static deck
-async function mainStaticDeck() {
-  const cpuCount = require("os").cpus().length;
-  const pool: Pool = workerpool.pool(__dirname + "/dist/ai.worker.js", { minWorkers: cpuCount, maxWorkers: cpuCount });
+function mainStaticDeck() {
   const deck = buildStaticDeck();
   const game = new Game(deck);
   const start = performance.now();
-  const result = await bruteforce(game, [], pool);
+  const result = bruteforce(game, []);
   const end = performance.now();
   console.log(`Static Deck Size: ${deck.length}, Time: ${(end - start).toFixed(2)}ms, Result:`, result);
-  await pool.terminate();
 }
 
 main();
