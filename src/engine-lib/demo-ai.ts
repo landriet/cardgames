@@ -6,8 +6,7 @@ function buildStaticDeck(): Array<MonsterCard | WeaponCard | PotionCard> {
   const deck = [
     new MonsterCard("clubs", 10),
     new MonsterCard("clubs", 10),
-    new MonsterCard("clubs", 2),
-    new MonsterCard("clubs", 2),
+    new MonsterCard("clubs", 10),
     new MonsterCard("clubs", 10),
     new WeaponCard("diamonds", 8),
     new MonsterCard("clubs", 3),
@@ -41,15 +40,15 @@ function benchmarkAI(minSize = 7, maxSize = 20) {
 }
 
 function main() {
-  benchmarkAI(18, 18);
+  // benchmarkAI(18, 18);
 
-  // const staticDeck = buildStaticDeck();
-  // const game = new Game(staticDeck);
-  // console.log("Starting game with static deck of size", staticDeck.length);
-  // const start = performance.now();
-  // const result = bruteforce(game);
-  // const end = performance.now();
-  // console.log(`Static deck size: ${staticDeck.length}, Time: ${(end - start).toFixed(2)}ms, Result:`, result);
+  const staticDeck = buildStaticDeck();
+  const game = new Game(staticDeck);
+  console.log("Starting game with static deck of size", staticDeck.length);
+  const start = performance.now();
+  const result = bruteforce(game);
+  const end = performance.now();
+  console.log(`Static deck size: ${staticDeck.length}, Time: ${(end - start).toFixed(2)}ms, Result:`, result);
 }
 
 main();

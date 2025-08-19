@@ -141,7 +141,7 @@ export class Game {
       return [];
     }
     const actions: Array<{ actionType: string; card?: DungeonCard; mode?: "barehanded" | "weapon" }> = [];
-    if (this.roomBeingEntered) {
+    if (!this.roomBeingEntered) {
       actions.push({ actionType: "enterRoom" });
       if (this.canDeferRoom && !this.lastActionWasDefer) {
         actions.push({ actionType: "skipRoom" });

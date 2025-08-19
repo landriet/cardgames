@@ -24,7 +24,7 @@ export function bruteforce(game: Game, actionHistory: BruteForceResult["actions"
   // Use closure to persist best result
   let bestResult: BruteForceResult | null = null;
 
-  function recurse(currentGame: Game, currentHistory: BruteForceResult["actions"] = []): BruteForceResult | null {
+  function recurse(currentGame: Game, currentHistory: BruteForceResult["actions"] = []) {
     const possibleActions = currentGame.getPossibleActions();
     if (currentGame.gameOver || currentGame.victory || possibleActions.length === 0) {
       const result: BruteForceResult = {
@@ -34,7 +34,7 @@ export function bruteforce(game: Game, actionHistory: BruteForceResult["actions"
       };
       if (!bestResult || result.victory || result.score > bestResult.score) {
         bestResult = result;
-        console.log("DEBUG New best result found:", bestResult);
+        console.log(`New best result: Victory=${result.victory}, Score=${result.score}, Actions=${JSON.stringify(result.actions)}`);
       }
       return result;
     }
@@ -48,22 +48,21 @@ export function bruteforce(game: Game, actionHistory: BruteForceResult["actions"
       } else if (action.actionType === "playCard" && action.card) {
         nextGame.handleCardAction(action.card, action.mode);
       }
-      const result: BruteForceResult | null = recurse(nextGame, [...currentHistory, action]);
-      // If a victory is found in a branch, stop further exploration
-      if (result && result.victory) {
-        return result;
+      recurse(nextGame, [...currentHistory, action]);
+
+      if (bestResult && bestResult.victory) {
+        return;
       }
     }
-    return bestResult!;
   }
 
-  const result = recurse(game, actionHistory);
-  if (result) {
-    return result;
-  }
-  return {
-    victory: false,
-    score: game.calculateScore(),
-    actions: actionHistory,
-  };
+  recurse(game, actionHistory);
+
+  return bestResult
+    ? bestResult
+    : {
+        victory: false,
+        score: game.calculateScore(),
+        actions: actionHistory,
+      };
 }
