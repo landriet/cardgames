@@ -47,6 +47,7 @@ describe("bruteforce", () => {
     game.currentRoom = room;
     game.applyTurnRules(); // triggers gameOver
     const result: BruteForceResult = bruteforce(game);
+    console.log("DEBUG bruteforce result (no possible actions):", result);
     expect(result.victory).toBe(false);
     expect(result.score).toBeGreaterThanOrEqual(0);
   });
