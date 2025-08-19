@@ -34,7 +34,6 @@ export function bruteforce(game: Game, actionHistory: BruteForceResult["actions"
       };
       if (!bestResult || result.victory || result.score > bestResult.score) {
         bestResult = result;
-        console.log(`New best result: Victory=${result.victory}, Score=${result.score}, Actions=${JSON.stringify(result.actions)}`);
       }
       return result;
     }
