@@ -21,12 +21,7 @@ export function cloneGame(game: Game): Game {
  * Recursively brute-force all possible action sequences from a given game state.
  * Returns the best result found (victory prioritized, then lowest score).
  */
-export async function bruteforce(
-  game: Game,
-  actionHistory: BruteForceResult["actions"] = [],
-  pool?: Pool,
-  isTopLevel: boolean = true,
-): Promise<BruteForceResult> {
+export async function bruteforce(game: Game, actionHistory: BruteForceResult["actions"] = [], pool?: Pool): Promise<BruteForceResult> {
   const possibleActions = game.getPossibleActions();
   if (game.gameOver || game.victory || possibleActions.length === 0) {
     return {
@@ -36,7 +31,19 @@ export async function bruteforce(
     };
   }
 
-  const tasks = possibleActions.map(async (action) => {
+  // Always skip room if total monster power in current room exceeds player's health plus potential potions
+  const monsterPower = game.currentRoom.cards.filter((card) => card.type === "monster").reduce((sum, card) => sum + card.rank, 0);
+  const potentialPotionHealth = game.currentRoom.cards.filter((card) => card.type === "potion").reduce((sum, card) => sum + card.rank, 0);
+  const potentialHealth = game.player.health + potentialPotionHealth;
+
+  let filteredActions = possibleActions;
+  if (monsterPower > potentialHealth) {
+    filteredActions = possibleActions.filter((action) => action.actionType === "skipRoom");
+  } else if (game.player.equippedWeapon) {
+    filteredActions = possibleActions.filter((action) => action.mode !== "barehanded");
+  }
+
+  const tasks = filteredActions.map(async (action) => {
     const nextGame = cloneGame(game);
     let nextHistory = [...actionHistory, action];
     if (action.actionType === "enterRoom") {

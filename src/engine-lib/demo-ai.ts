@@ -11,10 +11,21 @@ function buildStaticDeck(): Array<MonsterCard | WeaponCard | PotionCard> {
     new MonsterCard("clubs", 9),
     new MonsterCard("spades", 5),
     new MonsterCard("spades", 6),
-    new MonsterCard("spades", 9),
+    new PotionCard("hearts", 5),
     new WeaponCard("diamonds", 2),
     new MonsterCard("clubs", 11),
     new WeaponCard("diamonds", 3),
+    new MonsterCard("spades", 7),
+    new PotionCard("hearts", 2),
+    new MonsterCard("spades", 3),
+    new WeaponCard("diamonds", 5),
+    new MonsterCard("clubs", 4),
+    new MonsterCard("spades", 10),
+    new MonsterCard("spades", 7),
+    new PotionCard("hearts", 2),
+    new WeaponCard("diamonds", 5),
+    new MonsterCard("clubs", 3),
+    new MonsterCard("clubs", 7),
     new MonsterCard("spades", 7),
     new PotionCard("hearts", 2),
     new WeaponCard("diamonds", 5),
@@ -36,7 +47,7 @@ async function benchmarkAI(minSize = 7, maxSize = 20, pool: Pool) {
   for (let size = minSize; size <= maxSize; size++) {
     const game = new Game(deck.slice(0, size));
     const start = performance.now();
-    const result = await bruteforce(game, [], pool, false);
+    const result = await bruteforce(game, [], pool);
     const end = performance.now();
     results.push({ size, timeMs: end - start, result });
     console.log(`Deck size: ${size}, Time: ${(end - start).toFixed(2)}ms, Result:`, result);
@@ -47,7 +58,20 @@ async function benchmarkAI(minSize = 7, maxSize = 20, pool: Pool) {
 async function main() {
   const cpuCount = require("os").cpus().length;
   const pool: Pool = workerpool.pool(__dirname + "/dist/ai.worker.js", { minWorkers: cpuCount, maxWorkers: cpuCount });
-  await benchmarkAI(20, 20, pool);
+  await benchmarkAI(26, 26, pool);
+  await pool.terminate();
+}
+
+//try with static deck
+async function mainStaticDeck() {
+  const cpuCount = require("os").cpus().length;
+  const pool: Pool = workerpool.pool(__dirname + "/dist/ai.worker.js", { minWorkers: cpuCount, maxWorkers: cpuCount });
+  const deck = buildStaticDeck();
+  const game = new Game(deck);
+  const start = performance.now();
+  const result = await bruteforce(game, [], pool);
+  const end = performance.now();
+  console.log(`Static Deck Size: ${deck.length}, Time: ${(end - start).toFixed(2)}ms, Result:`, result);
   await pool.terminate();
 }
 
