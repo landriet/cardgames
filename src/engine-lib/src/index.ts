@@ -61,7 +61,18 @@ export class Room {
     this.cards = cards;
   }
   removeCard(card: DungeonCard): void {
-    this.cards = this.cards.filter((c) => c !== card);
+    const found = this.cards.some((c) => c.type === card.type && c.suit === card.suit && c.rank === card.rank);
+    if (!found) {
+      throw new Error("Card not found in room");
+    }
+    let removed = false;
+    this.cards = this.cards.filter((c) => {
+      if (!removed && c.type === card.type && c.suit === card.suit && c.rank === card.rank) {
+        removed = true;
+        return false;
+      }
+      return true;
+    });
   }
   isEmpty(): boolean {
     return this.cards.length === 0;
@@ -131,7 +142,6 @@ export class Game {
       return [];
     }
     const actions: Array<{ actionType: string; card?: DungeonCard; mode?: "barehanded" | "weapon" }> = [];
-    console.log("Current room cards:", this.currentRoom.cards);
     if (this.roomBeingEntered) {
       actions.push({ actionType: "enterRoom" });
       if (this.canDeferRoom && !this.lastActionWasDefer) {
@@ -242,7 +252,7 @@ export class Game {
       this.gameOver = true;
       const monstersLeft = this.deck.filter((card) => card.type === "monster");
       const monstersValue = monstersLeft.reduce((sum, card) => sum + card.rank, 0);
-      this.score = monstersValue;
+      this.score = -monstersValue;
       return;
     }
     if (this.deck.length === 0 && this.currentRoom.cards.length === 0) {

@@ -20,12 +20,18 @@ export function cloneGame(game: Game): Game {
  * Returns the best result found (victory prioritized, then lowest score).
  */
 export function bruteforce(game: Game, actionHistory: BruteForceResult["actions"] = []): BruteForceResult {
+  const cardHistory = actionHistory
+    .filter((a) => a.actionType === "playCard" && a.card)
+    .map((a) => a.card?.rank) // or a.card.id if you prefer
+    .join(" > ");
+  console.log("Current card history:", cardHistory);
+
   if (game.gameOver || game.victory) {
-    console.log("End state reached:", {
-      victory: game.victory,
-      score: game.score,
-      actions: actionHistory,
-    });
+    // console.log("End state reached:", {
+    //   victory: game.victory,
+    //   score: game.score,
+    //   actions: actionHistory,
+    // });
     return {
       victory: game.victory,
       score: game.score,
@@ -34,15 +40,15 @@ export function bruteforce(game: Game, actionHistory: BruteForceResult["actions"
   }
 
   const possibleActions = game.getPossibleActions();
-  console.log("Possible actions:", possibleActions, "History:", actionHistory);
+  //   console.log("Possible actions:", possibleActions, "History:", actionHistory);
   // Pause for debugging
-  if (typeof process !== "undefined" && process.stdin && process.stdin.isTTY) {
-    const prompt = require("readline-sync");
-    prompt.question("Press Enter to continue...");
-  }
+  //   if (typeof process !== "undefined" && process.stdin && process.stdin.isTTY) {
+  //     const prompt = require("readline-sync");
+  //     prompt.question("Press Enter to continue...");
+  //   }
   if (possibleActions.length === 0) {
     // No actions, just return current state
-    console.log("No possible actions, returning current state.");
+    // console.log("No possible actions, returning current state.");
     return {
       victory: game.victory,
       score: game.score,
@@ -53,7 +59,7 @@ export function bruteforce(game: Game, actionHistory: BruteForceResult["actions"
   let bestResult: BruteForceResult | null = null;
 
   for (const action of possibleActions) {
-    console.log("Trying action:", action);
+    // console.log("Trying action:", action);
     const nextGame = cloneGame(game);
     // Apply action
     if (action.actionType === "enterRoom") {
@@ -61,13 +67,11 @@ export function bruteforce(game: Game, actionHistory: BruteForceResult["actions"
     } else if (action.actionType === "skipRoom") {
       nextGame.avoidRoom();
     } else if (action.actionType === "playCard" && action.card) {
-      console.log(nextGame.currentRoom.cards);
       nextGame.handleCardAction(action.card, action.mode);
-      console.log(nextGame.currentRoom.cards);
     }
     // Recurse
     const result = bruteforce(nextGame, [...actionHistory, action]);
-    console.log("Result for action", action, ":", result);
+    // console.log("Result for action", action, ":", result);
     // Choose best: prioritize victory, then lowest score
     if (
       !bestResult ||
@@ -75,11 +79,11 @@ export function bruteforce(game: Game, actionHistory: BruteForceResult["actions"
       (result.victory === bestResult.victory && result.score < bestResult.score)
     ) {
       bestResult = result;
-      console.log("New best result:", bestResult);
+      //   console.log("New best result:", bestResult);
     }
   }
 
-  console.log("Returning best result:", bestResult);
+  //   console.log("Returning best result:", bestResult);
   return bestResult!;
 }
 
