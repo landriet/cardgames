@@ -25,11 +25,11 @@ export function bruteforce(game: Game, actionHistory: BruteForceResult["actions"
   let bestResult: BruteForceResult | null = null;
 
   function recurse(currentGame: Game, currentHistory: BruteForceResult["actions"] = []) {
-    const cardHistory = currentHistory
-      .filter((a) => a.actionType === "playCard" && a.card)
-      .map((a) => a.card?.rank)
-      .join(" > ");
-    console.log("Current card history:", cardHistory);
+    // const cardHistory = currentHistory
+    //   .filter((a) => a.actionType === "playCard" && a.card)
+    //   .map((a) => a.card?.rank)
+    //   .join(" > ");
+    // console.log("Current card history:", cardHistory);
 
     const possibleActions = currentGame.getPossibleActions();
     if (currentGame.gameOver || currentGame.victory || possibleActions.length === 0) {
