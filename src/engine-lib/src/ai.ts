@@ -1,4 +1,5 @@
 import workerpool from "workerpool";
+import type { Pool } from "workerpool";
 import { DungeonCard, Game } from "./index";
 import os from "os";
 
@@ -20,8 +21,12 @@ export function cloneGame(game: Game): Game {
  * Recursively brute-force all possible action sequences from a given game state.
  * Returns the best result found (victory prioritized, then lowest score).
  */
-
-export async function bruteforce(game: Game, actionHistory: BruteForceResult["actions"] = []): Promise<BruteForceResult> {
+export async function bruteforce(
+  game: Game,
+  actionHistory: BruteForceResult["actions"] = [],
+  pool?: Pool,
+  isTopLevel: boolean = true,
+): Promise<BruteForceResult> {
   const possibleActions = game.getPossibleActions();
   if (game.gameOver || game.victory || possibleActions.length === 0) {
     return {
@@ -31,9 +36,6 @@ export async function bruteforce(game: Game, actionHistory: BruteForceResult["ac
     };
   }
 
-  const cpuCount = os.cpus().length;
-  console.log("Worker pool size:", cpuCount);
-  const pool = workerpool.pool(__dirname + "/../dist/ai.worker.js", { minWorkers: cpuCount, maxWorkers: cpuCount });
   const tasks = possibleActions.map(async (action) => {
     const nextGame = cloneGame(game);
     let nextHistory = [...actionHistory, action];
@@ -45,11 +47,10 @@ export async function bruteforce(game: Game, actionHistory: BruteForceResult["ac
       nextGame.handleCardAction(action.card, action.mode);
     }
     // Call worker for this branch
-    return pool.exec("bruteforceWorker", [nextGame, nextHistory]);
+    return pool!.exec("bruteforceWorker", [nextGame, nextHistory]);
   });
 
   const results: BruteForceResult[] = await Promise.all(tasks);
-  await pool.terminate();
 
   // Pick best result: prioritize victory, then highest score
   let bestResult = results[0];

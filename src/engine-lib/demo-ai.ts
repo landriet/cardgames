@@ -1,5 +1,7 @@
 import { Game, MonsterCard, WeaponCard, PotionCard, Suit, Rank } from "./src/index";
 import { bruteforce } from "./src/ai";
+import workerpool from "workerpool";
+import type { Pool } from "workerpool";
 
 function buildStaticDeck(): Array<MonsterCard | WeaponCard | PotionCard> {
   // 7 monsters, 7 weapons, 6 potions
@@ -28,13 +30,13 @@ function buildStaticDeck(): Array<MonsterCard | WeaponCard | PotionCard> {
   return deck;
 }
 
-async function benchmarkAI(minSize = 7, maxSize = 20) {
+async function benchmarkAI(minSize = 7, maxSize = 20, pool: Pool) {
   const deck = Game.createDeck();
   const results: Array<{ size: number; timeMs: number; result: any }> = [];
   for (let size = minSize; size <= maxSize; size++) {
     const game = new Game(deck.slice(0, size));
     const start = performance.now();
-    const result = await bruteforce(game);
+    const result = await bruteforce(game, [], pool, false);
     const end = performance.now();
     results.push({ size, timeMs: end - start, result });
     console.log(`Deck size: ${size}, Time: ${(end - start).toFixed(2)}ms, Result:`, result);
@@ -43,7 +45,10 @@ async function benchmarkAI(minSize = 7, maxSize = 20) {
 }
 
 async function main() {
-  await benchmarkAI(18, 18);
+  const cpuCount = require("os").cpus().length;
+  const pool: Pool = workerpool.pool(__dirname + "/dist/ai.worker.js", { minWorkers: cpuCount, maxWorkers: cpuCount });
+  await benchmarkAI(20, 20, pool);
+  await pool.terminate();
 }
 
 main();
