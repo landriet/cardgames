@@ -28,13 +28,13 @@ function buildStaticDeck(): Array<MonsterCard | WeaponCard | PotionCard> {
   return deck;
 }
 
-function benchmarkAI(minSize = 7, maxSize = 20) {
+async function benchmarkAI(minSize = 7, maxSize = 20) {
   const deck = Game.createDeck();
   const results: Array<{ size: number; timeMs: number; result: any }> = [];
   for (let size = minSize; size <= maxSize; size++) {
     const game = new Game(deck.slice(0, size));
     const start = performance.now();
-    const result = bruteforce(game);
+    const result = await bruteforce(game);
     const end = performance.now();
     results.push({ size, timeMs: end - start, result });
     console.log(`Deck size: ${size}, Time: ${(end - start).toFixed(2)}ms, Result:`, result);
@@ -42,16 +42,8 @@ function benchmarkAI(minSize = 7, maxSize = 20) {
   return results;
 }
 
-function main() {
-  // benchmarkAI(18, 18);
-
-  const staticDeck = buildStaticDeck();
-  const game = new Game(staticDeck);
-  console.log("Starting game with static deck of size", staticDeck.length);
-  const start = performance.now();
-  const result = bruteforce(game);
-  const end = performance.now();
-  console.log(`Static deck size: ${staticDeck.length}, Time: ${(end - start).toFixed(2)}ms, Result:`, result);
+async function main() {
+  await benchmarkAI(18, 18);
 }
 
 main();

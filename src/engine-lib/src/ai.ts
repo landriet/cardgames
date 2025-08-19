@@ -1,5 +1,6 @@
-import cloneDeep from "lodash/cloneDeep";
+import workerpool from "workerpool";
 import { DungeonCard, Game } from "./index";
+import os from "os";
 
 export interface BruteForceResult {
   victory: boolean;
@@ -20,48 +21,44 @@ export function cloneGame(game: Game): Game {
  * Returns the best result found (victory prioritized, then lowest score).
  */
 
-export function bruteforce(game: Game, actionHistory: BruteForceResult["actions"] = []): BruteForceResult {
-  // Use closure to persist best result
-  let bestResult: BruteForceResult | null = null;
-
-  function recurse(currentGame: Game, currentHistory: BruteForceResult["actions"] = []) {
-    const possibleActions = currentGame.getPossibleActions();
-    if (currentGame.gameOver || currentGame.victory || possibleActions.length === 0) {
-      const result: BruteForceResult = {
-        victory: currentGame.victory,
-        score: currentGame.calculateScore(),
-        actions: currentHistory,
-      };
-      if (!bestResult || result.victory || result.score > bestResult.score) {
-        bestResult = result;
-      }
-      return result;
-    }
-
-    for (const action of possibleActions) {
-      const nextGame = cloneGame(currentGame);
-      if (action.actionType === "enterRoom") {
-        nextGame.enterRoom();
-      } else if (action.actionType === "skipRoom") {
-        nextGame.avoidRoom();
-      } else if (action.actionType === "playCard" && action.card) {
-        nextGame.handleCardAction(action.card, action.mode);
-      }
-      recurse(nextGame, [...currentHistory, action]);
-
-      if (bestResult && bestResult.victory) {
-        return;
-      }
-    }
+export async function bruteforce(game: Game, actionHistory: BruteForceResult["actions"] = []): Promise<BruteForceResult> {
+  const possibleActions = game.getPossibleActions();
+  if (game.gameOver || game.victory || possibleActions.length === 0) {
+    return {
+      victory: game.victory,
+      score: game.calculateScore(),
+      actions: actionHistory,
+    };
   }
 
-  recurse(game, actionHistory);
+  const cpuCount = os.cpus().length;
+  console.log("Worker pool size:", cpuCount);
+  const pool = workerpool.pool(__dirname + "/../dist/ai.worker.js", { minWorkers: cpuCount, maxWorkers: cpuCount });
+  const tasks = possibleActions.map(async (action) => {
+    const nextGame = cloneGame(game);
+    let nextHistory = [...actionHistory, action];
+    if (action.actionType === "enterRoom") {
+      nextGame.enterRoom();
+    } else if (action.actionType === "skipRoom") {
+      nextGame.avoidRoom();
+    } else if (action.actionType === "playCard" && action.card) {
+      nextGame.handleCardAction(action.card, action.mode);
+    }
+    // Call worker for this branch
+    return pool.exec("bruteforceWorker", [nextGame, nextHistory]);
+  });
 
-  return bestResult
-    ? bestResult
-    : {
-        victory: false,
-        score: Math.max(0, game.calculateScore()),
-        actions: actionHistory,
-      };
+  const results: BruteForceResult[] = await Promise.all(tasks);
+  await pool.terminate();
+
+  // Pick best result: prioritize victory, then highest score
+  let bestResult = results[0];
+  for (const result of results) {
+    if (result.victory && !bestResult.victory) {
+      bestResult = result;
+    } else if (result.victory === bestResult.victory && result.score > bestResult.score) {
+      bestResult = result;
+    }
+  }
+  return bestResult;
 }

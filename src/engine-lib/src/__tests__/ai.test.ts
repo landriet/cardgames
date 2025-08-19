@@ -26,27 +26,27 @@ describe("cloneGame", () => {
 });
 
 describe("bruteforce", () => {
-  it("finds a victory path and returns correct result", () => {
+  test("finds a victory path and returns correct result", async () => {
     // Setup: Room with no monsters, empty deck, player alive
     const player = new Player(10, 10);
     const room = new Room([]);
     const game = new Game([], player);
     game.currentRoom = room;
     // This should trigger victory according to engine logic
-    const result: BruteForceResult = bruteforce(game);
+    const result: BruteForceResult = await bruteforce(game);
     expect(result.victory).toBe(true);
     expect(result.score).toBeGreaterThanOrEqual(0);
     expect(Array.isArray(result.actions)).toBe(true);
   });
 
-  it("handles no possible actions gracefully", () => {
+  test("handles no possible actions gracefully", async () => {
     // Setup: Room with monsters, player dead
     const player = new Player(0, 10); // health = 0 triggers gameOver
     const room = new Room([new MonsterCard("spades", 5)]);
     const game = new Game([new MonsterCard("spades", 5)], player);
     game.currentRoom = room;
     game.applyTurnRules(); // triggers gameOver
-    const result: BruteForceResult = bruteforce(game);
+    const result: BruteForceResult = await bruteforce(game);
     console.log("DEBUG bruteforce result (no possible actions):", result);
     expect(result.victory).toBe(false);
     expect(result.score).toBeGreaterThanOrEqual(-5);

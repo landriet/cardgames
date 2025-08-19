@@ -106,6 +106,17 @@ export class Room {
 }
 
 export class Player {
+  static fromJSON(obj: any): Player {
+    const player = new Player(obj.health, obj.maxHealth);
+    player.equippedWeapon = obj.equippedWeapon ? new WeaponCard(obj.equippedWeapon.suit, obj.equippedWeapon.rank) : null;
+    player.monstersOnWeapon = obj.monstersOnWeapon ? obj.monstersOnWeapon.map((m: any) => new MonsterCard(m.suit, m.rank)) : [];
+    player.lastMonsterDefeated = obj.lastMonsterDefeated
+      ? new MonsterCard(obj.lastMonsterDefeated.suit, obj.lastMonsterDefeated.rank)
+      : null;
+    player.potionTakenThisTurn = obj.potionTakenThisTurn;
+    return player;
+  }
+
   health: number;
   maxHealth: number;
   equippedWeapon: WeaponCard | null = null;
@@ -155,6 +166,20 @@ export class Player {
 }
 
 export class Game {
+  static fromJSON(obj: any): Game {
+    const game = new Game();
+    game.deck = obj.deck.map((card: any) => new DungeonCard(card.type, card.suit, card.rank));
+    game.discard = obj.discard.map((card: any) => new DungeonCard(card.type, card.suit, card.rank));
+    game.currentRoom = new Room(obj.currentRoom.cards.map((card: any) => new DungeonCard(card.type, card.suit, card.rank)));
+    game.player = Player.fromJSON(obj.player);
+    game.canDeferRoom = obj.canDeferRoom;
+    game.lastActionWasDefer = obj.lastActionWasDefer;
+    game.gameOver = obj.gameOver;
+    game.victory = obj.victory;
+    game.roomBeingEntered = obj.roomBeingEntered;
+    return game;
+  }
+
   deck: DungeonCard[];
   discard: DungeonCard[] = [];
   currentRoom: Room = new Room([]);
