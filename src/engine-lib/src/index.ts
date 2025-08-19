@@ -35,11 +35,19 @@ export class DungeonCard {
     public suit: Suit,
     public rank: Rank,
   ) {}
+
+  clone(): DungeonCard {
+    return new DungeonCard(this.type, this.suit, this.rank);
+  }
 }
 
 export class MonsterCard extends DungeonCard {
   constructor(suit: Suit, rank: Rank) {
     super("monster", suit, rank);
+  }
+
+  clone(): MonsterCard {
+    return new MonsterCard(this.suit, this.rank);
   }
 }
 
@@ -47,11 +55,19 @@ export class WeaponCard extends DungeonCard {
   constructor(suit: Suit, rank: Rank) {
     super("weapon", suit, rank);
   }
+
+  clone(): WeaponCard {
+    return new WeaponCard(this.suit, this.rank);
+  }
 }
 
 export class PotionCard extends DungeonCard {
   constructor(suit: Suit, rank: Rank) {
     super("potion", suit, rank);
+  }
+
+  clone(): PotionCard {
+    return new PotionCard(this.suit, this.rank);
   }
 }
 
@@ -59,6 +75,16 @@ export class Room {
   cards: DungeonCard[];
   constructor(cards: DungeonCard[]) {
     this.cards = cards;
+  }
+  clone(): Room {
+    return new Room(
+      this.cards.map((card) => {
+        if (card instanceof MonsterCard) return card.clone();
+        if (card instanceof WeaponCard) return card.clone();
+        if (card instanceof PotionCard) return card.clone();
+        return card.clone();
+      }),
+    );
   }
   removeCard(card: DungeonCard): void {
     const found = this.cards.some((c) => c.type === card.type && c.suit === card.suit && c.rank === card.rank);
@@ -90,6 +116,15 @@ export class Player {
   constructor(health = 20, maxHealth = 20) {
     this.health = health;
     this.maxHealth = maxHealth;
+  }
+
+  clone(): Player {
+    const cloned = new Player(this.health, this.maxHealth);
+    cloned.equippedWeapon = this.equippedWeapon ? this.equippedWeapon.clone() : null;
+    cloned.monstersOnWeapon = this.monstersOnWeapon.map((m) => m.clone());
+    cloned.lastMonsterDefeated = this.lastMonsterDefeated ? this.lastMonsterDefeated.clone() : null;
+    cloned.potionTakenThisTurn = this.potionTakenThisTurn;
+    return cloned;
   }
 
   takePotion(card: PotionCard): void {
@@ -134,6 +169,30 @@ export class Game {
     this.deck = deck ?? Game.createDeck();
     this.player = player ?? new Player();
     this.applyTurnRules();
+  }
+
+  clone(): Game {
+    const cloned = new Game();
+    cloned.deck = this.deck.map((card) => {
+      if (card instanceof MonsterCard) return card.clone();
+      if (card instanceof WeaponCard) return card.clone();
+      if (card instanceof PotionCard) return card.clone();
+      return card.clone();
+    });
+    cloned.discard = this.discard.map((card) => {
+      if (card instanceof MonsterCard) return card.clone();
+      if (card instanceof WeaponCard) return card.clone();
+      if (card instanceof PotionCard) return card.clone();
+      return card.clone();
+    });
+    cloned.currentRoom = this.currentRoom.clone();
+    cloned.player = this.player.clone();
+    cloned.canDeferRoom = this.canDeferRoom;
+    cloned.lastActionWasDefer = this.lastActionWasDefer;
+    cloned.gameOver = this.gameOver;
+    cloned.victory = this.victory;
+    cloned.roomBeingEntered = this.roomBeingEntered;
+    return cloned;
   }
 
   getPossibleActions(): Array<{ actionType: string; card?: DungeonCard; mode?: "barehanded" | "weapon" }> {

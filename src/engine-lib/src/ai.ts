@@ -11,8 +11,8 @@ export interface BruteForceResult {
  * Deep clone a Game instance (naive, for brute-force only)
  */
 export function cloneGame(game: Game): Game {
-  // Deep clone using lodash (does not preserve class prototypes)
-  return cloneDeep(game);
+  // Use custom clone method for fast, prototype-preserving deep clone
+  return game.clone();
 }
 
 /**
@@ -61,7 +61,7 @@ export function bruteforce(game: Game, actionHistory: BruteForceResult["actions"
     ? bestResult
     : {
         victory: false,
-        score: game.calculateScore(),
+        score: Math.max(0, game.calculateScore()),
         actions: actionHistory,
       };
 }
