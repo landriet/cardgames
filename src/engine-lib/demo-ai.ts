@@ -68,4 +68,4 @@ function mainStaticDeck() {
   console.log(`Static Deck Size: ${deck.length}, Time: ${(end - start).toFixed(2)}ms, Result:`, result);
 }
 
-main();
+mainStaticDeck();

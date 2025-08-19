@@ -20,40 +20,49 @@ export function cloneGame(game: Game): Game {
  * Returns the best result found (victory prioritized, then lowest score).
  */
 export function bruteforce(game: Game, actionHistory: BruteForceResult["actions"] = []): BruteForceResult {
-  const possibleActions = game.getPossibleActions();
-  if (game.gameOver || game.victory || possibleActions.length === 0) {
-    return {
-      victory: game.victory,
-      score: game.calculateScore(),
-      actions: actionHistory,
-    };
-  }
-
-  // Always skip room if total monster power in current room exceeds player's health plus potential potions
-  const monsterPower = game.currentRoom.cards.filter((card) => card.type === "monster").reduce((sum, card) => sum + card.rank, 0);
-  const potentialPotionHealth = game.currentRoom.cards.filter((card) => card.type === "potion").reduce((sum, card) => sum + card.rank, 0);
-  const potentialHealth = game.player.health + potentialPotionHealth;
-
-  let filteredActions = possibleActions;
-  if (monsterPower > potentialHealth) {
-    filteredActions = possibleActions.filter((action) => action.actionType === "skipRoom");
-  } else if (game.player.equippedWeapon) {
-    filteredActions = possibleActions.filter((action) => action.mode !== "barehanded");
-  }
-
+  // Iterative DFS using explicit stack
+  type State = { game: Game; history: BruteForceResult["actions"] };
+  const stack: State[] = [{ game: cloneGame(game), history: [...actionHistory] }];
   const results: BruteForceResult[] = [];
-  for (const action of filteredActions) {
-    const nextGame = cloneGame(game);
-    let nextHistory = [...actionHistory, action];
-    if (action.actionType === "enterRoom") {
-      nextGame.enterRoom();
-    } else if (action.actionType === "skipRoom") {
-      nextGame.avoidRoom();
-    } else if (action.actionType === "playCard" && action.card) {
-      nextGame.handleCardAction(action.card, action.mode);
+
+  while (stack.length > 0) {
+    const { game: currentGame, history } = stack.pop()!;
+    const possibleActions = currentGame.getPossibleActions();
+    if (currentGame.gameOver || currentGame.victory || possibleActions.length === 0) {
+      results.push({
+        victory: currentGame.victory,
+        score: currentGame.calculateScore(),
+        actions: history,
+      });
+      continue;
     }
-    // Recursively call bruteforce synchronously
-    results.push(bruteforce(nextGame, nextHistory));
+
+    // Always skip room if total monster power in current room exceeds player's health plus potential potions
+    const monsterPower = currentGame.currentRoom.cards.filter((card) => card.type === "monster").reduce((sum, card) => sum + card.rank, 0);
+    const potentialPotionHealth = currentGame.currentRoom.cards
+      .filter((card) => card.type === "potion")
+      .reduce((sum, card) => sum + card.rank, 0);
+    const potentialHealth = currentGame.player.health + potentialPotionHealth;
+
+    let filteredActions = possibleActions;
+    if (monsterPower > potentialHealth) {
+      filteredActions = possibleActions.filter((action) => action.actionType === "skipRoom");
+    } else if (currentGame.player.equippedWeapon) {
+      filteredActions = possibleActions.filter((action) => action.mode !== "barehanded");
+    }
+
+    for (const action of filteredActions) {
+      const nextGame = cloneGame(currentGame);
+      let nextHistory = [...history, action];
+      if (action.actionType === "enterRoom") {
+        nextGame.enterRoom();
+      } else if (action.actionType === "skipRoom") {
+        nextGame.avoidRoom();
+      } else if (action.actionType === "playCard" && action.card) {
+        nextGame.handleCardAction(action.card, action.mode);
+      }
+      stack.push({ game: nextGame, history: nextHistory });
+    }
   }
 
   // Pick best result: prioritize victory, then highest score
