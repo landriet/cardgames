@@ -45,7 +45,7 @@ function benchmarkAI(minSize = 7, maxSize = 20) {
   for (let size = minSize; size <= maxSize; size++) {
     const game = new Game(deck.slice(0, size));
     const start = performance.now();
-    const result = bruteforce(game, []);
+    const result = bruteforce(game);
     const end = performance.now();
     results.push({ size, timeMs: end - start, result });
     console.log(`Deck size: ${size}, Time: ${(end - start).toFixed(2)}ms, Result:`, result);
@@ -62,7 +62,7 @@ function mainStaticDeck() {
   const deck = buildStaticDeck();
   const game = new Game(deck);
   const start = performance.now();
-  const result = bruteforce(game, []);
+  const result = bruteforce(game);
   const end = performance.now();
   console.log(`Static Deck Size: ${deck.length}, Time: ${(end - start).toFixed(2)}ms, Result:`, result);
 }

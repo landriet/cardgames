@@ -252,7 +252,7 @@ export class Game {
     const actions: Array<{ actionType: string; card?: DungeonCard; mode?: "barehanded" | "weapon" }> = [];
     if (!this.roomBeingEntered) {
       actions.push({ actionType: "enterRoom" });
-      if (this.canDeferRoom && !this.lastActionWasDefer) {
+      if (this.canDeferRoom && !this.lastActionWasDefer && this.deck.length > 0) {
         actions.push({ actionType: "skipRoom" });
       }
     } else {
@@ -313,7 +313,7 @@ export class Game {
   }
 
   avoidRoom(): void {
-    if (!this.canDeferRoom || this.lastActionWasDefer) return;
+    if (!this.canDeferRoom || this.lastActionWasDefer || this.deck.length === 0) return;
     this.deck.push(...this.currentRoom.cards);
     this.currentRoom.cards = [];
     this.canDeferRoom = false;
@@ -332,6 +332,12 @@ export class Game {
   }
 
   handleCardAction(card: DungeonCard, mode?: "barehanded" | "weapon"): void {
+    if (
+      !this.roomBeingEntered ||
+      !this.currentRoom.cards.some((c) => c.type === card.type && c.suit === card.suit && c.rank === card.rank)
+    ) {
+      throw new Error("Card not in current room");
+    }
     if (card.type === "monster") {
       this.player.fightMonster(card as MonsterCard, mode ?? "barehanded");
       this.currentRoom.removeCard(card);
