@@ -27,19 +27,25 @@ async function playGame() {
   while (!game.gameOver && !game.victory) {
     printState(game);
     if (!game.roomBeingEntered) {
-      let choice = await ask("Avoid room (a) or enter room (e)? ");
+      let choice = await ask("Avoid room (a), enter room (e), or undo (u)? ");
       if (choice.toLowerCase() === "a") {
         game.avoidRoom();
         continue;
       } else if (choice.toLowerCase() === "e") {
         game.enterRoom();
+      } else if (choice.toLowerCase() === "u") {
+        game.undoLastAction();
+        continue;
       } else {
         console.log("Invalid choice.");
         continue;
       }
     } else {
-      let idxStr = await ask(`Choose a card to act on: `);
-
+      let idxStr = await ask(`Choose a card to act on or undo (u): `);
+      if (idxStr.toLowerCase() === "u") {
+        game.undoLastAction();
+        continue;
+      }
       let idx = parseInt(idxStr) - 1;
       if (isNaN(idx) || idx < 0 || idx >= game.currentRoom.cards.length) {
         console.log("Invalid card index.");

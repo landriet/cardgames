@@ -305,9 +305,6 @@ export function takeWeapon(
     console.error("[takeWeapon] Card is not a weapon.");
     return state;
   }
-  if (state.gameOver) {
-    return state;
-  }
   let newDiscard = [...state.discard];
   if (state.equippedWeapon) {
     newDiscard.push(state.equippedWeapon);
