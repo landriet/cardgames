@@ -76,13 +76,11 @@ export function bruteforce(game: Game): BruteForceResult {
   // Pick best result: prioritize victory, then highest score
   let bestResult = results[0];
   for (const result of results) {
-    console.log("[AI] Evaluating result. Victory:", result.victory, "Score:", result.score);
     if (result.victory && !bestResult.victory) {
       bestResult = result;
     } else if (result.victory === bestResult.victory && result.score > bestResult.score) {
       bestResult = result;
     }
   }
-  console.log("[AI] Best result selected:", bestResult);
   return bestResult;
 }
