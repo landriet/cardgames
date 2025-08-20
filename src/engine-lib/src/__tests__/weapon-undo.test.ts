@@ -7,6 +7,7 @@ describe("Weapon Equip Undo Logic", () => {
     const room = new Room([weapon]);
     const game = new Game([], player);
     game.currentRoom = room;
+    game.roomBeingEntered = true;
     game.handleCardAction(weapon);
     expect(player.equippedWeapon).toEqual(weapon);
     expect(room.cards).not.toContain(weapon);
@@ -25,6 +26,7 @@ describe("Weapon Equip Undo Logic", () => {
     const game = new Game([], player);
     game.currentRoom = room;
 
+    game.roomBeingEntered = true;
     game.handleCardAction(newWeapon);
     expect(player.equippedWeapon).toEqual(newWeapon);
     expect(player.monstersOnWeapon).toEqual([]);

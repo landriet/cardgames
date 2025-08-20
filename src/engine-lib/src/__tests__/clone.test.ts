@@ -12,7 +12,8 @@ describe("Game.clone", () => {
     const deck = [new MonsterCard("hearts", 3), new WeaponCard(9), new PotionCard(4)];
     const discard = [new MonsterCard("diamonds", 6), new PotionCard(2)];
 
-    const game = new Game(deck, player);
+    const game = new Game([], player);
+    game.deck = deck;
     game.currentRoom = room;
     game.discard = discard;
     game.canDeferRoom = false;
@@ -67,7 +68,8 @@ describe("Game.clone", () => {
       deck.push(new MonsterCard("spades", ((i % 13) + 2) as import("../index").Rank));
     }
     const player = new Player(20, 20);
-    const game = new Game(deck, player);
+    const game = new Game([], player);
+    game.deck = deck;
 
     const start = performance.now();
     const clone = game.clone();
