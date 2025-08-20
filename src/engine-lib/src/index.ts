@@ -1,3 +1,5 @@
+import e from "express";
+
 // Types from original scoundrel.ts
 export interface ScoundrelGameState {
   deck: DungeonCard[];
@@ -150,15 +152,23 @@ export class Player {
     this.potionTakenThisTurn = false;
   }
 
-  takeWeapon(card: WeaponCard): DungeonCard[] {
-    const cardToDiscard: DungeonCard[] = [];
+  takeWeapon(card: WeaponCard): { previousWeapon: WeaponCard | undefined; previousMonsters: MonsterCard[] } {
+    const previousWeapon = this.equippedWeapon ? this.equippedWeapon : undefined;
+    const previousMonsters = [...this.monstersOnWeapon];
     if (this.equippedWeapon) {
-      cardToDiscard.push(...this.monstersOnWeapon, this.equippedWeapon);
       this.monstersOnWeapon = [];
     }
     this.equippedWeapon = card;
     this.lastMonsterDefeated = null;
-    return cardToDiscard;
+    return { previousWeapon, previousMonsters };
+  }
+
+  undoTakeWeapon(previousWeapon: WeaponCard | undefined, previousMonsters: MonsterCard[] | undefined): void {
+    this.equippedWeapon = previousWeapon ? previousWeapon : null;
+    if (previousMonsters) {
+      this.monstersOnWeapon = [...previousMonsters];
+      this.lastMonsterDefeated = previousMonsters.length > 0 ? previousMonsters[previousMonsters.length - 1] : null;
+    }
   }
 
   fightMonster(card: MonsterCard, mode: "barehanded" | "weapon"): void {
@@ -195,7 +205,13 @@ export class Game {
   gameOver: boolean = false;
   victory: boolean = false;
   roomBeingEntered: boolean = false;
-  lastAction: { actionType: string; card?: DungeonCard; mode?: "barehanded" | "weapon" } | null = null;
+  lastAction: {
+    actionType: string;
+    card?: DungeonCard;
+    mode?: "barehanded" | "weapon";
+    previousWeapon?: WeaponCard;
+    previousMonsters?: MonsterCard[];
+  } | null = null;
 
   constructor(deck?: DungeonCard[], player?: Player) {
     this.deck = deck ?? Game.createDeck();
@@ -320,17 +336,27 @@ export class Game {
       this.player.fightMonster(card as MonsterCard, mode ?? "barehanded");
       this.currentRoom.removeCard(card);
       this.discard.push(card);
+      this.lastAction = { actionType: "playCard", card, mode };
     } else if (card.type === "weapon") {
-      const cardToDiscard = this.player.takeWeapon(card as WeaponCard);
-      this.discard.push(...cardToDiscard);
+      const weaponResult = this.player.takeWeapon(card as WeaponCard);
+      if (weaponResult.previousWeapon) {
+        this.discard.push(weaponResult.previousWeapon);
+        this.discard.push(...weaponResult.previousMonsters);
+      }
       this.currentRoom.removeCard(card);
+      this.lastAction = {
+        actionType: "playCard",
+        card,
+        previousWeapon: weaponResult.previousWeapon,
+        previousMonsters: weaponResult.previousMonsters,
+      };
     } else if (card.type === "potion") {
       this.player.takePotion(card as PotionCard);
       this.currentRoom.removeCard(card);
       this.discard.push(card);
+      this.lastAction = { actionType: "playCard", card, mode };
     }
     this.applyTurnRules();
-    this.lastAction = { actionType: "playCard", card, mode };
   }
 
   undoHandleCardAction(): void {
@@ -346,6 +372,8 @@ export class Game {
         this.discard = this.discard.filter((c) => c !== card);
       }
     } else if (card.type === "weapon") {
+      this.player.undoTakeWeapon(this.lastAction.previousWeapon, this.lastAction.previousMonsters);
+      this.currentRoom.cards.push(card);
     } else if (card.type === "potion") {
       this.player.undoTakePotion(card as PotionCard);
       this.currentRoom.cards.push(card);
