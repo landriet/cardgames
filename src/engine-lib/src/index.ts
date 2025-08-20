@@ -41,6 +41,10 @@ export class DungeonCard {
   clone(): DungeonCard {
     return new DungeonCard(this.type, this.suit, this.rank);
   }
+
+  toString(): string {
+    return `${this.type}-${this.suit}-${this.rank}`;
+  }
 }
 
 export class MonsterCard extends DungeonCard {
@@ -72,6 +76,8 @@ export class PotionCard extends DungeonCard {
     return new PotionCard(this.rank);
   }
 }
+
+export type GameAction = { actionType: string; card?: DungeonCard; mode?: "barehanded" | "weapon" };
 
 export class Room {
   cards: DungeonCard[];
@@ -245,11 +251,11 @@ export class Game {
     return arr;
   }
 
-  getPossibleActions(): Array<{ actionType: string; card?: DungeonCard; mode?: "barehanded" | "weapon" }> {
+  getPossibleActions(): GameAction[] {
     if (this.gameOver || !this.currentRoom || !Array.isArray(this.currentRoom.cards)) {
       return [];
     }
-    const actions: Array<{ actionType: string; card?: DungeonCard; mode?: "barehanded" | "weapon" }> = [];
+    const actions: GameAction[] = [];
     if (!this.roomBeingEntered) {
       actions.push({ actionType: "enterRoom" });
       if (this.canDeferRoom && !this.lastActionWasDefer && this.deck.length > 0) {

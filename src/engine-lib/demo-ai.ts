@@ -8,16 +8,16 @@ function buildStaticDeck(): Array<MonsterCard | WeaponCard | PotionCard> {
     new MonsterCard("clubs", 10),
     new WeaponCard(8),
     new MonsterCard("clubs", 9),
-    new PotionCard(5),
-    new WeaponCard(2),
-    new WeaponCard(3),
-    new MonsterCard("spades", 7),
     new PotionCard(2),
     new MonsterCard("spades", 3),
     new MonsterCard("spades", 5),
     new MonsterCard("spades", 6),
-    // new WeaponCard(5),
-    // new MonsterCard("clubs", 4),
+    new PotionCard(5),
+    new WeaponCard(2),
+    new WeaponCard(3),
+    new MonsterCard("spades", 7),
+    new WeaponCard(5),
+    new MonsterCard("clubs", 4),
     // new MonsterCard("spades", 10),
     // new MonsterCard("spades", 7),
     // new PotionCard(2),
@@ -66,5 +66,5 @@ function mainStaticDeck() {
   const end = performance.now();
   console.log(`Static Deck Size: ${deck.length}, Time: ${(end - start).toFixed(2)}ms, Result:`, result);
 }
-
+console.debug = () => {};
 mainStaticDeck();

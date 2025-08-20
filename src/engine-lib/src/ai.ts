@@ -1,6 +1,5 @@
 // ...existing code...
-import { DungeonCard, Game } from "./index";
-console.log("[AI] ai.ts module loaded");
+import { DungeonCard, Game, Room } from "./index";
 
 export interface BruteForceResult {
   victory: boolean;
@@ -25,12 +24,30 @@ export function bruteforce(game: Game): BruteForceResult {
   type State = { game: Game; history: BruteForceResult["actions"] };
   const stack: State[] = [{ game: game, history: [] }];
   const results: BruteForceResult[] = [];
+  const visited = new Set<string>();
+  console.debug(`game.deck.length at start of bruteforce: ${game.deck.length}`);
+
+  // Helper to serialize game state for memoization
+  function serializeGameState(g: Game): string {
+    // Only serialize relevant properties for uniqueness
+    return JSON.stringify({
+      player: g.player,
+      currentRoom: g.currentRoom,
+      deck: g.deck,
+      gameOver: g.gameOver,
+      victory: g.victory,
+      roomBeingEntered: g.roomBeingEntered,
+    });
+  }
 
   while (stack.length > 0) {
+    console.debug(`Stack size: ${stack.length}, Visited states: ${visited.size}`);
     const { game: currentGame, history } = stack.pop()!;
-    const possibleActions = currentGame.getPossibleActions();
-
-    if (currentGame.gameOver || currentGame.victory || possibleActions.length === 0) {
+    console.debug(
+      `Current room: ${currentGame.currentRoom.cards.map((c) => `${c.type}-${c.rank}`).join(", ")}, Player health: ${currentGame.player.health}, Deck size: ${currentGame.deck.length}`,
+    );
+    if (currentGame.gameOver || currentGame.victory) {
+      console.debug("Game over or victory reached. Saving result.");
       results.push({
         victory: currentGame.victory,
         score: currentGame.calculateScore(),
@@ -38,7 +55,19 @@ export function bruteforce(game: Game): BruteForceResult {
       });
       continue;
     }
+    console.debug(`Current history: ${history.map((a) => a.actionType + (a.card ? `-${a.card.type}-${a.card.rank}` : "")).join(",")}`);
 
+    const possibleActions = currentGame.getPossibleActions();
+    console.debug(
+      `Possible actions: ${possibleActions.map((a) => a.actionType + (a.card ? `-${a.card.type}-${a.card.rank}` : "")).join(", ")}`,
+    );
+
+    const stateKey = serializeGameState(currentGame);
+    if (visited.has(stateKey)) {
+      console.debug("Skipping already visited state");
+      continue;
+    }
+    visited.add(stateKey);
     // Always skip room if total monster power in current room exceeds player's health plus potential potions
     // const monsterPower = currentGame.currentRoom.cards.filter((card) => card.type === "monster").reduce((sum, card) => sum + card.rank, 0);
     // const potentialPotionHealth = currentGame.currentRoom.cards
@@ -48,16 +77,17 @@ export function bruteforce(game: Game): BruteForceResult {
 
     // let filteredActions = possibleActions;
     // if (monsterPower > potentialHealth) {
-    //   console.log('[AI] Monster power exceeds potential health. Only skipping room. MonsterPower:', monsterPower, 'PotentialHealth:', potentialHealth);
+    //   console.debug('Monster power exceeds potential health. Only skipping room. MonsterPower:', monsterPower, 'PotentialHealth:', potentialHealth);
     //   filteredActions = possibleActions.filter((action) => action.actionType === "skipRoom");
     // } else if (currentGame.player.equippedWeapon) {
-    //   console.log('[AI] Player has equipped weapon. Filtering out barehanded actions.');
+    //   console.debug('Player has equipped weapon. Filtering out barehanded actions.');
     //   filteredActions = possibleActions.filter((action) => action.mode !== "barehanded");
     // }
 
     for (const action of possibleActions) {
       const nextGame = cloneGame(currentGame);
-      let nextHistory = [...history, action];
+      const nextHistory = [...history, action];
+      console.debug(`Processing action: ${action.actionType}${action.card ? `-${action.card.type}-${action.card.rank}` : ""}`);
       try {
         if (action.actionType === "enterRoom") {
           nextGame.enterRoom();
