@@ -106,7 +106,6 @@ export class Room {
 }
 
 export class Player {
-  numberOfMonstersDiscarded: number;
   static fromJSON(obj: any): Player {
     const player = new Player(obj.health, obj.maxHealth);
     player.equippedWeapon = obj.equippedWeapon ? new WeaponCard(obj.equippedWeapon.suit, obj.equippedWeapon.rank) : null;
@@ -197,7 +196,6 @@ export class Game {
   victory: boolean = false;
   roomBeingEntered: boolean = false;
   lastAction: { actionType: string; card?: DungeonCard; mode?: "barehanded" | "weapon" } | null = null;
-  nbOfCardsDiscarded: number;
 
   constructor(deck?: DungeonCard[], player?: Player) {
     this.deck = deck ?? Game.createDeck();
