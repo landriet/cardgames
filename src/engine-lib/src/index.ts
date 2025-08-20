@@ -54,22 +54,22 @@ export class MonsterCard extends DungeonCard {
 }
 
 export class WeaponCard extends DungeonCard {
-  constructor(suit: Suit, rank: Rank) {
-    super("weapon", suit, rank);
+  constructor(rank: Rank) {
+    super("weapon", "diamonds", rank);
   }
 
   clone(): WeaponCard {
-    return new WeaponCard(this.suit, this.rank);
+    return new WeaponCard(this.rank);
   }
 }
 
 export class PotionCard extends DungeonCard {
-  constructor(suit: Suit, rank: Rank) {
-    super("potion", suit, rank);
+  constructor(rank: Rank) {
+    super("potion", "hearts", rank);
   }
 
   clone(): PotionCard {
-    return new PotionCard(this.suit, this.rank);
+    return new PotionCard(this.rank);
   }
 }
 
@@ -110,7 +110,7 @@ export class Room {
 export class Player {
   static fromJSON(obj: any): Player {
     const player = new Player(obj.health, obj.maxHealth);
-    player.equippedWeapon = obj.equippedWeapon ? new WeaponCard(obj.equippedWeapon.suit, obj.equippedWeapon.rank) : null;
+    player.equippedWeapon = obj.equippedWeapon ? new WeaponCard(obj.equippedWeapon.rank) : null;
     player.monstersOnWeapon = obj.monstersOnWeapon ? obj.monstersOnWeapon.map((m: any) => new MonsterCard(m.suit, m.rank)) : [];
     player.lastMonsterDefeated = obj.lastMonsterDefeated
       ? new MonsterCard(obj.lastMonsterDefeated.suit, obj.lastMonsterDefeated.rank)
@@ -227,8 +227,8 @@ export class Game {
         if ((suit === "hearts" || suit === "diamonds") && (rank === 11 || rank === 12 || rank === 13 || rank === 14)) continue;
         if ((suit === "hearts" || suit === "diamonds") && rank === 14) continue;
         let card: DungeonCard;
-        if (suit === "hearts") card = new PotionCard(suit, rank as Rank);
-        else if (suit === "diamonds") card = new WeaponCard(suit, rank as Rank);
+        if (suit === "hearts") card = new PotionCard(rank as Rank);
+        else if (suit === "diamonds") card = new WeaponCard(rank as Rank);
         else card = new MonsterCard(suit, rank as Rank);
         deck.push(card);
       }

@@ -3,7 +3,7 @@ import { Game, Player, Room, WeaponCard, MonsterCard } from "../index";
 describe("Weapon Equip Undo Logic", () => {
   it("undoes weapon equip with no previous weapon", () => {
     const player = new Player(10, 10);
-    const weapon = new WeaponCard("diamonds", 7);
+    const weapon = new WeaponCard(7);
     const room = new Room([weapon]);
     const game = new Game([], player);
     game.currentRoom = room;
@@ -17,8 +17,8 @@ describe("Weapon Equip Undo Logic", () => {
 
   it("undoes weapon equip with previous weapon and monsters", () => {
     const player = new Player(10, 10);
-    const oldWeapon = new WeaponCard("diamonds", 5);
-    const newWeapon = new WeaponCard("diamonds", 7);
+    const oldWeapon = new WeaponCard(5);
+    const newWeapon = new WeaponCard(7);
     player.equippedWeapon = oldWeapon;
     player.monstersOnWeapon = [new MonsterCard("spades", 3), new MonsterCard("spades", 2)];
     const room = new Room([newWeapon]);

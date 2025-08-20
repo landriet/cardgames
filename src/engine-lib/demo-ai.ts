@@ -1,4 +1,4 @@
-import { Game, MonsterCard, WeaponCard, PotionCard, Suit, Rank } from "./src/index";
+import { Game, MonsterCard, WeaponCard, PotionCard } from "./src/index";
 import { bruteforce } from "./src/ai";
 // ...existing code...
 
@@ -6,36 +6,35 @@ function buildStaticDeck(): Array<MonsterCard | WeaponCard | PotionCard> {
   // 7 monsters, 7 weapons, 6 potions
   const deck = [
     new MonsterCard("clubs", 10),
-    new WeaponCard("diamonds", 8),
+    new WeaponCard(8),
     new MonsterCard("clubs", 9),
     new MonsterCard("spades", 5),
     new MonsterCard("spades", 6),
-    new PotionCard("hearts", 5),
-    new WeaponCard("diamonds", 2),
-    new MonsterCard("clubs", 11),
-    new WeaponCard("diamonds", 3),
+    new PotionCard(5),
+    new WeaponCard(2),
+    new WeaponCard(3),
     new MonsterCard("spades", 7),
-    new PotionCard("hearts", 2),
+    new PotionCard(2),
     new MonsterCard("spades", 3),
-    new WeaponCard("diamonds", 5),
+    new WeaponCard(5),
     new MonsterCard("clubs", 4),
     new MonsterCard("spades", 10),
     new MonsterCard("spades", 7),
-    new PotionCard("hearts", 2),
-    new WeaponCard("diamonds", 5),
+    new PotionCard(2),
+    new WeaponCard(5),
     new MonsterCard("clubs", 3),
     new MonsterCard("clubs", 7),
     new MonsterCard("spades", 7),
-    new PotionCard("hearts", 2),
-    new WeaponCard("diamonds", 5),
-    new MonsterCard("clubs", 4),
-    new WeaponCard("diamonds", 6),
-    new MonsterCard("spades", 6),
-    new PotionCard("hearts", 3),
-    new MonsterCard("clubs", 2),
-    new PotionCard("hearts", 4),
-    new MonsterCard("clubs", 3),
-    new MonsterCard("clubs", 7),
+    new PotionCard(2),
+    // new WeaponCard(5),
+    // new MonsterCard("clubs", 4),
+    // new WeaponCard(6),
+    // new MonsterCard("spades", 6),
+    // new PotionCard(3),
+    // new MonsterCard("clubs", 2),
+    // new PotionCard(4),
+    // new MonsterCard("clubs", 3),
+    // new MonsterCard("clubs", 7),
   ];
   return deck;
 }
