@@ -432,15 +432,9 @@ export class Game {
   clone(): Game {
     const cloned = new Game();
     cloned.deck = this.deck.map((card) => {
-      if (card instanceof MonsterCard) return card.clone();
-      if (card instanceof WeaponCard) return card.clone();
-      if (card instanceof PotionCard) return card.clone();
       return card.clone();
     });
     cloned.discard = this.discard.map((card) => {
-      if (card instanceof MonsterCard) return card.clone();
-      if (card instanceof WeaponCard) return card.clone();
-      if (card instanceof PotionCard) return card.clone();
       return card.clone();
     });
     cloned.currentRoom = this.currentRoom.clone();
@@ -450,6 +444,7 @@ export class Game {
     cloned.gameOver = this.gameOver;
     cloned.victory = this.victory;
     cloned.roomBeingEntered = this.roomBeingEntered;
+    cloned.lastAction = this.lastAction ? { ...this.lastAction } : null;
     return cloned;
   }
 
