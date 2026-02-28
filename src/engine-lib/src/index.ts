@@ -1,5 +1,3 @@
-import e from "express";
-
 // Types from original scoundrel.ts
 export interface ScoundrelGameState {
   deck: DungeonCard[];
@@ -79,6 +77,24 @@ export class PotionCard extends DungeonCard {
 
 export type GameAction = { actionType: string; card?: DungeonCard; mode?: "barehanded" | "weapon" };
 
+export interface RuleConfig {
+  startingHealth?: number;
+  maxHealth?: number;
+  potionsPerRoom?: number;
+  canSkipRooms?: boolean;
+  canSkipConsecutive?: boolean;
+  weaponKillLimit?: boolean;
+}
+
+const DEFAULT_RULES: Required<RuleConfig> = {
+  startingHealth: 20,
+  maxHealth: 20,
+  potionsPerRoom: 1,
+  canSkipRooms: true,
+  canSkipConsecutive: false,
+  weaponKillLimit: true,
+};
+
 export class Room {
   cards: DungeonCard[];
   constructor(cards: DungeonCard[]) {
@@ -131,6 +147,7 @@ export class Player {
   monstersOnWeapon: MonsterCard[] = [];
   lastMonsterDefeated: MonsterCard | null = null;
   potionTakenThisTurn: boolean = false;
+  potionsTakenThisTurn: number = 0;
 
   constructor(health = 20, maxHealth = 20) {
     this.health = health;
@@ -143,19 +160,22 @@ export class Player {
     cloned.monstersOnWeapon = this.monstersOnWeapon.map((m) => m.clone());
     cloned.lastMonsterDefeated = this.lastMonsterDefeated ? this.lastMonsterDefeated.clone() : null;
     cloned.potionTakenThisTurn = this.potionTakenThisTurn;
+    cloned.potionsTakenThisTurn = this.potionsTakenThisTurn;
     return cloned;
   }
 
-  takePotion(card: PotionCard): void {
-    if (this.potionTakenThisTurn) return;
+  takePotion(card: PotionCard, potionsPerRoom: number = 1): void {
+    if (this.potionsTakenThisTurn >= potionsPerRoom) return;
     this.health = Math.min(this.health + card.rank, this.maxHealth);
-    this.potionTakenThisTurn = true;
+    this.potionsTakenThisTurn++;
+    this.potionTakenThisTurn = this.potionsTakenThisTurn >= potionsPerRoom;
   }
 
   undoTakePotion(card: PotionCard): void {
-    if (!this.potionTakenThisTurn) return;
+    if (this.potionsTakenThisTurn <= 0) return;
     this.health = Math.max(this.health - card.rank, 0);
-    this.potionTakenThisTurn = false;
+    this.potionsTakenThisTurn--;
+    this.potionTakenThisTurn = this.potionsTakenThisTurn > 0;
   }
 
   takeWeapon(card: WeaponCard): { previousWeapon: WeaponCard | undefined; previousMonsters: MonsterCard[] } {
@@ -177,11 +197,11 @@ export class Player {
     }
   }
 
-  fightMonster(card: MonsterCard, mode: "barehanded" | "weapon"): void {
+  fightMonster(card: MonsterCard, mode: "barehanded" | "weapon", weaponKillLimit: boolean = true): void {
     if (mode === "barehanded") {
       this.health -= card.rank;
     } else if (this.equippedWeapon) {
-      if (this.lastMonsterDefeated && card.rank > this.lastMonsterDefeated.rank) return;
+      if (weaponKillLimit && this.lastMonsterDefeated && card.rank > this.lastMonsterDefeated.rank) return;
       const damage = Math.max(card.rank - this.equippedWeapon.rank, 0);
       this.health -= damage;
       this.lastMonsterDefeated = card;
@@ -193,7 +213,7 @@ export class Player {
     if (mode === "barehanded") {
       this.health += card.rank;
     } else {
-      const damage = Math.max(this.equippedWeapon!.rank - card.rank, 0);
+      const damage = Math.max(card.rank - this.equippedWeapon!.rank, 0);
       this.health += damage;
       this.monstersOnWeapon = this.monstersOnWeapon.filter((m) => m.suit !== card.suit || m.rank !== card.rank);
       this.lastMonsterDefeated = this.monstersOnWeapon.length > 0 ? this.monstersOnWeapon[this.monstersOnWeapon.length - 1] : null;
@@ -206,6 +226,7 @@ export class Game {
   discard: DungeonCard[] = [];
   currentRoom: Room = new Room([]);
   player: Player;
+  rules: Required<RuleConfig>;
   canDeferRoom: boolean = true;
   lastActionWasDefer: boolean = false;
   gameOver: boolean = false;
@@ -217,11 +238,25 @@ export class Game {
     mode?: "barehanded" | "weapon";
     previousWeapon?: WeaponCard;
     previousMonsters?: MonsterCard[];
+    _previousLastAction?: Game["lastAction"];
+    _savedCanDeferRoom?: boolean;
+    _savedLastActionWasDefer?: boolean;
+    _savedPotionTakenThisTurn?: boolean;
+    _savedPotionsTakenThisTurn?: number;
+    _savedRoom?: DungeonCard[];
+    _savedDeckLength?: number;
+    _dealtCards?: DungeonCard[];
+    _dealHappened?: boolean;
+    _roomCardsBeforeDeal?: DungeonCard[];
+    _savedGameOver?: boolean;
+    _savedVictory?: boolean;
+    _savedRoomBeingEntered?: boolean;
   } | null = null;
 
-  constructor(deck?: DungeonCard[], player?: Player) {
+  constructor(deck?: DungeonCard[], player?: Player, rules?: RuleConfig) {
+    this.rules = { ...DEFAULT_RULES, ...rules };
     this.deck = deck ?? Game.createDeck();
-    this.player = player ?? new Player();
+    this.player = player ?? new Player(this.rules.startingHealth, this.rules.maxHealth);
     this.applyTurnRules();
   }
 
@@ -258,14 +293,16 @@ export class Game {
     const actions: GameAction[] = [];
     if (!this.roomBeingEntered) {
       actions.push({ actionType: "enterRoom" });
-      if (this.canDeferRoom && !this.lastActionWasDefer && this.deck.length > 0) {
-        actions.push({ actionType: "skipRoom" });
+      if (this.rules.canSkipRooms && this.canDeferRoom && this.deck.length > 0) {
+        if (this.rules.canSkipConsecutive || !this.lastActionWasDefer) {
+          actions.push({ actionType: "skipRoom" });
+        }
       }
     } else {
       for (const card of this.currentRoom.cards) {
         if (card.type === "monster") {
           if (this.player.equippedWeapon) {
-            if (!this.player.lastMonsterDefeated || card.rank <= this.player.lastMonsterDefeated.rank) {
+            if (!this.rules.weaponKillLimit || !this.player.lastMonsterDefeated || card.rank <= this.player.lastMonsterDefeated.rank) {
               actions.push({ actionType: "playCard", card, mode: "weapon" });
             }
           }
@@ -302,39 +339,79 @@ export class Game {
   }
 
   enterRoom(): void {
+    const prevLastAction = this.lastAction;
+    const savedCanDeferRoom = this.canDeferRoom;
+    const savedLastActionWasDefer = this.lastActionWasDefer;
+    const savedPotionTakenThisTurn = this.player.potionTakenThisTurn;
+    const savedPotionsTakenThisTurn = this.player.potionsTakenThisTurn;
     this.canDeferRoom = true;
     this.lastActionWasDefer = false;
     this.player.potionTakenThisTurn = false;
+    this.player.potionsTakenThisTurn = 0;
     this.roomBeingEntered = true;
-    this.lastAction = { actionType: "enterRoom" };
+    this.lastAction = {
+      actionType: "enterRoom",
+      _previousLastAction: prevLastAction,
+      _savedCanDeferRoom: savedCanDeferRoom,
+      _savedLastActionWasDefer: savedLastActionWasDefer,
+      _savedPotionTakenThisTurn: savedPotionTakenThisTurn,
+      _savedPotionsTakenThisTurn: savedPotionsTakenThisTurn,
+    };
   }
 
   undoEnterRoom(): void {
     if (!this.roomBeingEntered) return;
+    const saved = this.lastAction;
     this.roomBeingEntered = false;
-    this.canDeferRoom = true;
-    this.lastActionWasDefer = false;
-    this.player.potionTakenThisTurn = false;
-    this.lastAction = { actionType: "enterRoom" };
+    this.canDeferRoom = saved?._savedCanDeferRoom ?? true;
+    this.lastActionWasDefer = saved?._savedLastActionWasDefer ?? false;
+    this.player.potionTakenThisTurn = saved?._savedPotionTakenThisTurn ?? false;
+    this.player.potionsTakenThisTurn = saved?._savedPotionsTakenThisTurn ?? 0;
+    this.lastAction = saved?._previousLastAction ?? null;
   }
 
   avoidRoom(): void {
     if (!this.canDeferRoom || this.lastActionWasDefer || this.deck.length === 0) return;
+    const prevLastAction = this.lastAction;
+    const savedRoom = this.currentRoom.cards.slice();
+    const savedDeckLength = this.deck.length;
     this.deck.push(...this.currentRoom.cards);
     this.currentRoom.cards = [];
     this.canDeferRoom = false;
     this.lastActionWasDefer = true;
     this.applyTurnRules();
-    this.lastAction = { actionType: "skipRoom" };
+    this.lastAction = {
+      actionType: "skipRoom",
+      _previousLastAction: prevLastAction,
+      _savedRoom: savedRoom,
+      _savedDeckLength: savedDeckLength,
+      _dealtCards: this.currentRoom.cards.slice(),
+    };
   }
 
   undoAvoidRoom(): void {
     if (this.lastAction?.actionType !== "skipRoom") return;
+    const saved = this.lastAction;
+    // Reverse the deal: put dealt cards back at front of deck
+    if (saved._dealtCards && saved._dealtCards.length > 0) {
+      // The dealt cards came from the front of the deck after avoid.
+      // Remove them from room and put back at the front of deck.
+      this.currentRoom.cards = [];
+      this.deck.unshift(...saved._dealtCards);
+    }
+    // Restore original room cards
+    if (saved._savedRoom) {
+      // The original room cards were pushed to deck bottom during avoid.
+      // Remove them from deck bottom.
+      this.deck.splice(saved._savedDeckLength!, saved._savedRoom.length);
+      this.currentRoom = new Room(saved._savedRoom);
+    }
     this.canDeferRoom = true;
     this.lastActionWasDefer = false;
-    this.deck = [...this.currentRoom.cards, ...this.deck];
-    this.currentRoom.cards = [...this.deck.splice(-4)];
-    this.lastAction = { actionType: "skipRoom" };
+    this.roomBeingEntered = false;
+    this.gameOver = false;
+    this.victory = false;
+    this.lastAction = saved._previousLastAction ?? null;
   }
 
   handleCardAction(card: DungeonCard, mode?: "barehanded" | "weapon"): void {
@@ -344,53 +421,96 @@ export class Game {
     ) {
       throw new Error("Card not in current room");
     }
+    const prevLastAction = this.lastAction;
+    const savedGameOver = this.gameOver;
+    const savedVictory = this.victory;
+    const savedRoomBeingEntered = this.roomBeingEntered;
+
+    let previousWeapon: WeaponCard | undefined;
+    let previousMonsters: MonsterCard[] | undefined;
+
     if (card.type === "monster") {
-      this.player.fightMonster(card as MonsterCard, mode ?? "barehanded");
+      this.player.fightMonster(card as MonsterCard, mode ?? "barehanded", this.rules.weaponKillLimit);
       this.currentRoom.removeCard(card);
       this.discard.push(card);
-      this.lastAction = { actionType: "playCard", card, mode };
     } else if (card.type === "weapon") {
       const weaponResult = this.player.takeWeapon(card as WeaponCard);
+      previousWeapon = weaponResult.previousWeapon;
+      previousMonsters = weaponResult.previousMonsters;
       if (weaponResult.previousWeapon) {
         this.discard.push(weaponResult.previousWeapon);
         this.discard.push(...weaponResult.previousMonsters);
       }
       this.currentRoom.removeCard(card);
-      this.lastAction = {
-        actionType: "playCard",
-        card,
-        previousWeapon: weaponResult.previousWeapon,
-        previousMonsters: weaponResult.previousMonsters,
-      };
     } else if (card.type === "potion") {
-      this.player.takePotion(card as PotionCard);
+      this.player.takePotion(card as PotionCard, this.rules.potionsPerRoom);
       this.currentRoom.removeCard(card);
       this.discard.push(card);
-      this.lastAction = { actionType: "playCard", card, mode };
     }
+
+    // Snapshot room cards before applyTurnRules (needed to reverse deal)
+    const roomCardsBeforeDeal = this.currentRoom.cards.slice();
+
     this.applyTurnRules();
+
+    // Detect if a deal happened
+    const dealHappened = this.currentRoom.cards.length > roomCardsBeforeDeal.length;
+
+    this.lastAction = {
+      actionType: "playCard",
+      card,
+      mode,
+      previousWeapon,
+      previousMonsters,
+      _previousLastAction: prevLastAction,
+      _savedGameOver: savedGameOver,
+      _savedVictory: savedVictory,
+      _savedRoomBeingEntered: savedRoomBeingEntered,
+      _dealHappened: dealHappened,
+      _roomCardsBeforeDeal: dealHappened ? roomCardsBeforeDeal : undefined,
+    };
   }
 
   undoHandleCardAction(): void {
     if (this.lastAction?.actionType !== "playCard") {
       return;
     }
-    const { card, mode } = this.lastAction;
+    const saved = this.lastAction;
+    const { card, mode } = saved;
     if (!card) return;
+
+    // Reverse deal first if one happened
+    if (saved._dealHappened && saved._roomCardsBeforeDeal) {
+      const carryCount = saved._roomCardsBeforeDeal.length;
+      const fromDeck = this.currentRoom.cards.slice(carryCount);
+      this.deck.unshift(...fromDeck);
+      this.currentRoom = new Room(saved._roomCardsBeforeDeal);
+      this.roomBeingEntered = saved._savedRoomBeingEntered ?? true;
+    }
+
+    // Restore gameOver/victory
+    this.gameOver = saved._savedGameOver ?? false;
+    this.victory = saved._savedVictory ?? false;
+
+    // Undo the card action itself
     if (card.type === "monster") {
       this.player.undoFightMonster(card as MonsterCard, mode ?? "barehanded");
       this.currentRoom.cards.push(card);
-      if (mode === "barehanded") {
-        this.discard = this.discard.filter((c) => c !== card);
-      }
+      this.discard = this.discard.filter((c) => c !== card);
     } else if (card.type === "weapon") {
-      this.player.undoTakeWeapon(this.lastAction.previousWeapon, this.lastAction.previousMonsters);
+      if (saved.previousWeapon) {
+        this.discard = this.discard.filter((c) => c !== saved.previousWeapon && !saved.previousMonsters?.includes(c));
+      }
+      this.player.undoTakeWeapon(saved.previousWeapon, saved.previousMonsters);
       this.currentRoom.cards.push(card);
     } else if (card.type === "potion") {
       this.player.undoTakePotion(card as PotionCard);
       this.currentRoom.cards.push(card);
       this.discard = this.discard.filter((c) => c !== card);
     }
+
+    // Restore lastAction chain
+    this.lastAction = saved._previousLastAction ?? null;
   }
 
   undoLastAction(): void {
@@ -436,13 +556,10 @@ export class Game {
   }
 
   clone(): Game {
-    const cloned = new Game();
-    cloned.deck = this.deck.map((card) => {
-      return card.clone();
-    });
-    cloned.discard = this.discard.map((card) => {
-      return card.clone();
-    });
+    const cloned = Object.create(Game.prototype) as Game;
+    cloned.rules = { ...this.rules };
+    cloned.deck = this.deck.map((card) => card.clone());
+    cloned.discard = this.discard.map((card) => card.clone());
     cloned.currentRoom = this.currentRoom.clone();
     cloned.player = this.player.clone();
     cloned.canDeferRoom = this.canDeferRoom;
@@ -450,7 +567,16 @@ export class Game {
     cloned.gameOver = this.gameOver;
     cloned.victory = this.victory;
     cloned.roomBeingEntered = this.roomBeingEntered;
-    cloned.lastAction = this.lastAction ? { ...this.lastAction } : null;
+    if (this.lastAction) {
+      cloned.lastAction = {
+        ...this.lastAction,
+        card: this.lastAction.card ? this.lastAction.card.clone() : undefined,
+        previousWeapon: this.lastAction.previousWeapon ? this.lastAction.previousWeapon.clone() : undefined,
+        previousMonsters: this.lastAction.previousMonsters ? this.lastAction.previousMonsters.map((m) => m.clone()) : undefined,
+      };
+    } else {
+      cloned.lastAction = null;
+    }
     return cloned;
   }
 
