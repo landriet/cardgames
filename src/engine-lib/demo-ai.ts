@@ -1,6 +1,5 @@
 import { Game, MonsterCard, WeaponCard, PotionCard } from "./src/index";
-import { bruteforce } from "./src/ai";
-// ...existing code...
+import { solve } from "./src/solver";
 
 function buildStaticDeck(): Array<MonsterCard | WeaponCard | PotionCard> {
   // 7 monsters, 7 weapons, 6 potions
@@ -18,23 +17,11 @@ function buildStaticDeck(): Array<MonsterCard | WeaponCard | PotionCard> {
     new MonsterCard("spades", 7),
     new WeaponCard(5),
     new MonsterCard("clubs", 4),
-    // new MonsterCard("spades", 10),
-    // new MonsterCard("spades", 7),
-    // new PotionCard(2),
-    // new WeaponCard(5),
-    // new MonsterCard("clubs", 3),
-    // new MonsterCard("clubs", 7),
-    // new MonsterCard("spades", 7),
-    // new PotionCard(2),
-    // new WeaponCard(5),
-    // new MonsterCard("clubs", 4),
-    // new WeaponCard(6),
-    // new MonsterCard("spades", 6),
-    // new PotionCard(3),
-    // new MonsterCard("clubs", 2),
-    // new PotionCard(4),
-    // new MonsterCard("clubs", 3),
-    // new MonsterCard("clubs", 7),
+    new MonsterCard("spades", 10),
+    new MonsterCard("spades", 7),
+    new PotionCard(2),
+    new WeaponCard(5),
+    new MonsterCard("clubs", 3),
   ];
   return deck;
 }
@@ -43,9 +30,10 @@ function benchmarkAI(minSize = 7, maxSize = 20) {
   const deck = Game.createDeck();
   const results: Array<{ size: number; timeMs: number; result: any }> = [];
   for (let size = minSize; size <= maxSize; size++) {
-    const game = new Game(deck.slice(0, size));
+    const slicedDeck = deck.slice(0, size);
+    const game = new Game(slicedDeck);
     const start = performance.now();
-    const result = bruteforce(game);
+    const result = solve(game, slicedDeck);
     const end = performance.now();
     results.push({ size, timeMs: end - start, result });
     console.log(`Deck size: ${size}, Time: ${(end - start).toFixed(2)}ms, Result:`, result);
@@ -62,9 +50,12 @@ function mainStaticDeck() {
   const deck = buildStaticDeck();
   const game = new Game(deck);
   const start = performance.now();
-  const result = bruteforce(game);
+  const result = solve(game, deck);
   const end = performance.now();
-  console.log(`Static Deck Size: ${deck.length}, Time: ${(end - start).toFixed(2)}ms, Result:`, result);
+  console.log(`Static Deck Size: ${deck.length}, Time: ${(end - start).toFixed(2)}ms`);
+  console.log("Victory:", result.victory);
+  console.log("Score:", result.score);
+  console.log("Nodes explored:", result.nodesExplored);
 }
 console.debug = () => {};
 mainStaticDeck();
