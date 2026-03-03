@@ -18,6 +18,7 @@ describe("engineAdapter", () => {
       { type: "monster", suit: "clubs", rank: 3 },
       { type: "monster", suit: "spades", rank: 9 },
     ]);
+    expect(state.deck.length).toBeGreaterThan(0);
     expect(state.health).toBe(20);
     expect(state.gameOver).toBe(false);
   });

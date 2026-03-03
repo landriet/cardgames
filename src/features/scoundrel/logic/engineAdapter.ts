@@ -23,6 +23,21 @@ const STATIC_DECK: DungeonCard[] = [
   { type: "weapon", suit: "diamonds", rank: 7 },
   { type: "monster", suit: "clubs", rank: 3 },
   { type: "monster", suit: "spades", rank: 9 },
+  { type: "potion", suit: "hearts", rank: 9 },
+  { type: "monster", suit: "clubs", rank: 9 },
+  { type: "weapon", suit: "diamonds", rank: 2 },
+  { type: "monster", suit: "clubs", rank: 6 },
+  { type: "monster", suit: "spades", rank: 8 },
+  { type: "weapon", suit: "diamonds", rank: 3 },
+  { type: "monster", suit: "clubs", rank: 4 },
+  { type: "monster", suit: "spades", rank: 12 },
+  { type: "potion", suit: "hearts", rank: 4 },
+  { type: "weapon", suit: "diamonds", rank: 4 },
+  { type: "monster", suit: "clubs", rank: 14 },
+  { type: "monster", suit: "spades", rank: 11 },
+  { type: "potion", suit: "hearts", rank: 6 },
+  { type: "weapon", suit: "diamonds", rank: 5 },
+  { type: "monster", suit: "clubs", rank: 10 },
 ];
 
 function toEngineCard(card: DungeonCard): EngineDungeonCard {
