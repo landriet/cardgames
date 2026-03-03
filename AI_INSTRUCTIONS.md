@@ -49,7 +49,7 @@ The codebase contains two engine layers:
 - OOP with `Game`, `Player`, `Room`, `DungeonCard`, `MonsterCard`, `WeaponCard`, `PotionCard` classes
 - Supports undo operations (`undoEnterRoom`, `undoAvoidRoom`, `undoHandleCardAction`)
 - Has its own `package.json`, Jest test suite, and TypeScript config (`CommonJS`, emits to `dist/`)
-- Also includes solver/simulation modules (`src/engine-lib/src/solver.ts`, `src/engine-lib/src/simulation.ts`)
+- Also includes solver/simulation/PIMC modules (`src/engine-lib/src/solver.ts`, `src/engine-lib/src/simulation.ts`, `src/engine-lib/src/pimc.ts`)
 
 **Legacy functional engine** (`src/features/scoundrel/logic/engine.ts`)
 
@@ -64,7 +64,9 @@ The codebase contains two engine layers:
 | `src/features/scoundrel/logic/ScoundrelMCTSGame.ts` | Scoundrel adapter for the MCTS `Game<State, Move>` interface             |
 | `src/engine-lib/src/solver.ts`                      | Exact search/DP solver with transposition-table memoization              |
 | `src/engine-lib/src/simulation.ts`                  | Monte Carlo simulation utilities built on the class-based engine         |
+| `src/engine-lib/src/pimc.ts`                        | Perfect Information Monte Carlo — samples deck orderings, uses oracle solver per action |
 | `src/engine-lib/demo-ai.ts`                         | CLI/demo entry point using solver output                                 |
+| `src/engine-lib/demo-pimc.ts`                       | CLI entry point for PIMC benchmarks (`npx tsx src/engine-lib/demo-pimc.ts <games> <samples>`) |
 | `src/trainAI.ts`                                    | Tabular Q-learning experimentation against frontend state                 |
 | `python_ai/`                                        | Python PPO (TensorFlow) + OpenAI Gym environment                         |
 
