@@ -1,0 +1,165 @@
+version: 1
+game: scoundrel
+source_of_truth:
+  rules_doc: src/engine-lib/README.md
+  engine_impl: src/engine-lib/src/index.ts
+  date: 2026-02-28
+
+objective:
+  terminal_conditions:
+    victory: deck_count == 0 and room_cards_count == 0
+    death: health <= 0
+  optimization_target: maximize_terminal_score
+
+deck_model:
+  total_cards: 44
+  monsters:
+    suits: [clubs, spades]
+    ranks: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+  weapons:
+    suits: [diamonds]
+    ranks: [2, 3, 4, 5, 6, 7, 8, 9, 10]
+  potions:
+    suits: [hearts]
+    ranks: [2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+state_schema:
+  health: int # clamped [0, max_health]
+  max_health: int # default 20
+  deck: DungeonCard[]
+  discard: DungeonCard[]
+  current_room_cards: DungeonCard[] # 0..4
+  equipped_weapon_rank: int_or_null
+  last_monster_defeated_rank: int_or_null
+  monsters_on_weapon: DungeonCard[]
+  can_defer_room: bool
+  last_action_was_defer: bool
+  room_being_entered: bool
+  potions_taken_this_turn: int
+  game_over: bool
+  victory: bool
+
+default_rules:
+  starting_health: 20
+  max_health: 20
+  potions_per_room: 1
+  can_skip_rooms: true
+  can_skip_consecutive: false
+  weapon_kill_limit: true
+
+turn_model:
+  room_target_size: 4
+  room_refill_rule: >
+    when current_room_cards_count <= 1 and deck_count > 0,
+    deal until room has up to 4 cards by preserving carry card then drawing from deck front.
+  room_flow:
+    - choose enterRoom or skipRoom when room_being_entered == false
+    - if enterRoom: set room_being_entered = true, reset per-room potion counter
+    - resolve exactly 3 cards from the 4-card room
+    - unresolved card becomes carry card for next room
+
+legal_actions:
+  when_terminal:
+    allowed: []
+  when_room_being_entered_false:
+    allowed:
+      - enterRoom
+      - skipRoom # only if can_skip predicate true
+    can_skip_predicate: >
+      rules.can_skip_rooms
+      and can_defer_room
+      and deck_count > 0
+      and (rules.can_skip_consecutive or not last_action_was_defer)
+  when_room_being_entered_true:
+    allowed:
+      - playCard(card, mode?) for each card in current_room_cards
+    constraints:
+      monster:
+        barehanded: always legal
+        weapon_mode: >
+          requires equipped weapon;
+          if rules.weapon_kill_limit and last_monster_defeated exists,
+          then monster_rank must be <= last_monster_defeated_rank
+      potion: always legal; may heal only if potions_taken_this_turn < rules.potions_per_room
+      weapon: always legal
+
+transition_rules:
+  play_monster_barehanded:
+    health_delta: -monster_rank
+    discard: add monster
+    room: remove monster
+  play_monster_weapon:
+    requires: equipped_weapon
+    damage: max(monster_rank - equipped_weapon_rank, 0)
+    health_delta: -damage
+    weapon_state:
+      last_monster_defeated_rank: monster_rank
+      monsters_on_weapon: append monster
+    discard: add monster
+    room: remove monster
+  play_weapon:
+    equip: weapon_card
+    if_prev_weapon:
+      discard: [prev_weapon, all_prev_monsters_on_weapon]
+    reset_last_monster_defeated: true
+    room: remove weapon
+  play_potion:
+    if_potion_quota_available:
+      health_delta: +potion_rank (clamp to max_health)
+      increment_potions_taken_this_turn: true
+    else:
+      heal: 0
+    discard: add potion
+    room: remove potion
+
+post_action_rules:
+  health_clamp: [0, max_health]
+  death: if health <= 0 => game_over = true
+  victory: if deck_count == 0 and current_room_cards_count == 0 => victory = true
+  room_deal: if current_room_cards_count <= 1 and deck_count > 0 => dealRoom()
+
+scoring:
+  engine_formula: max(0, health) - sum(rank of monster cards remaining in deck)
+  notes:
+    - "On death, health is 0 after clamp, so score is non-positive."
+    - "2011 paper rules include an optional full-health last-potion bonus; not present in current engine scoring."
+
+action_encoding:
+  description: deterministic discrete action layout for RL/policy nets
+  index_space:
+    - 0: enterRoom
+    - 1: skipRoom
+    - 2..5: play slot 0..3 barehanded_or_nonmonster
+    - 6..9: play slot 0..3 weapon_mode
+  slot_mapping:
+    source: current_room_cards array order
+    semantics:
+      - "slots beyond room size are invalid"
+      - "for non-monster cards, only barehanded_or_nonmonster lane is meaningful"
+      - "for monster cards, both lanes may be valid depending on weapon constraints"
+
+action_mask_spec:
+  shape: [10]
+  type: int8
+  values: { 0: illegal, 1: legal }
+  algorithm:
+    - "initialize mask = [0]*10"
+    - "if game_over or victory: return mask"
+    - "if not room_being_entered:"
+    - "  if enterRoom legal: mask[0] = 1"
+    - "  if skipRoom legal by predicate: mask[1] = 1"
+    - "  return mask"
+    - "for i in 0..3:"
+    - "  if i >= len(current_room_cards): continue"
+    - "  c = current_room_cards[i]"
+    - "  if c.type in {weapon, potion}: mask[2+i] = 1"
+    - "  if c.type == monster:"
+    - "    mask[2+i] = 1 # barehanded lane"
+    - "    if weapon-mode legal by constraints: mask[6+i] = 1"
+    - "return mask"
+
+invariants:
+  - health in [0, max_health]
+  - current_room_cards_count in [0, 4]
+  - if room_being_entered == false, room is decision phase
+  - if room_being_entered == true, only playCard actions are legal
