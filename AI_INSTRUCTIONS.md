@@ -58,17 +58,17 @@ The codebase contains two engine layers:
 
 ### AI Implementations
 
-| File                                                | Approach                                                                  |
-| --------------------------------------------------- | ------------------------------------------------------------------------- |
-| `src/features/scoundrel/logic/MCTS.ts`              | Generic Monte Carlo Tree Search (UCB1) infrastructure                    |
-| `src/features/scoundrel/logic/ScoundrelMCTSGame.ts` | Scoundrel adapter for the MCTS `Game<State, Move>` interface             |
-| `src/engine-lib/src/solver.ts`                      | Exact search/DP solver with transposition-table memoization              |
-| `src/engine-lib/src/simulation.ts`                  | Monte Carlo simulation utilities built on the class-based engine         |
-| `src/engine-lib/src/pimc.ts`                        | Perfect Information Monte Carlo — samples deck orderings, uses oracle solver per action |
-| `src/engine-lib/demo-ai.ts`                         | CLI/demo entry point using solver output                                 |
+| File                                                | Approach                                                                                      |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `src/features/scoundrel/logic/MCTS.ts`              | Generic Monte Carlo Tree Search (UCB1) infrastructure                                         |
+| `src/features/scoundrel/logic/ScoundrelMCTSGame.ts` | Scoundrel adapter for the MCTS `Game<State, Move>` interface                                  |
+| `src/engine-lib/src/solver.ts`                      | Exact search/DP solver with transposition-table memoization                                   |
+| `src/engine-lib/src/simulation.ts`                  | Monte Carlo simulation utilities built on the class-based engine                              |
+| `src/engine-lib/src/pimc.ts`                        | Perfect Information Monte Carlo — samples deck orderings, uses oracle solver per action       |
+| `src/engine-lib/demo-ai.ts`                         | CLI/demo entry point using solver output                                                      |
 | `src/engine-lib/demo-pimc.ts`                       | CLI entry point for PIMC benchmarks (`npx tsx src/engine-lib/demo-pimc.ts <games> <samples>`) |
-| `src/trainAI.ts`                                    | Tabular Q-learning experimentation against frontend state                 |
-| `python_ai/`                                        | Python PPO (TensorFlow) + OpenAI Gym environment                         |
+| `src/trainAI.ts`                                    | Tabular Q-learning experimentation against frontend state                                     |
+| `python_ai/`                                        | Python PPO (TensorFlow) + OpenAI Gym environment                                              |
 
 ### Express API Server
 
