@@ -1,4 +1,5 @@
-import { DungeonCard, Game } from "./index";
+import { DungeonCard, Game, GameAction } from "./index";
+import { solve } from "./solver";
 
 function cardKey(card: DungeonCard): string {
   return `${card.type}-${card.suit}-${card.rank}`;
@@ -64,4 +65,90 @@ export function shuffle<T>(array: T[]): T[] {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
+}
+
+export interface ActionStats {
+  action: GameAction;
+  avgScore: number;
+  wins: number;
+  scores: number[];
+}
+
+export interface PimcResult {
+  bestAction: GameAction;
+  stats: ActionStats[];
+}
+
+export function pimcBestAction(game: Game, numSamples: number): PimcResult {
+  const actions = game.getPossibleActions();
+
+  if (actions.length === 0) {
+    return { bestAction: { actionType: "enterRoom" }, stats: [] };
+  }
+
+  if (actions.length === 1) {
+    return {
+      bestAction: actions[0],
+      stats: [{ action: actions[0], avgScore: 0, wins: 0, scores: [] }],
+    };
+  }
+
+  const unseen = getUnseenCards(game);
+
+  // Initialize per-action score accumulators
+  const actionScores: number[][] = actions.map(() => []);
+  const actionWins: number[] = actions.map(() => 0);
+
+  for (let s = 0; s < numSamples; s++) {
+    const sampledDeck = shuffle(unseen.map((c) => c.clone()));
+
+    for (let a = 0; a < actions.length; a++) {
+      const clone = game.clone();
+      clone.deck = sampledDeck.map((c) => c.clone());
+
+      // Build the full "original deck" for the solver's card index:
+      // all cards in the game (room + discard + weapon + monstersOnWeapon + sampled deck)
+      const allCards = [
+        ...clone.currentRoom.cards,
+        ...clone.discard,
+        ...(clone.player.equippedWeapon ? [clone.player.equippedWeapon] : []),
+        ...clone.player.monstersOnWeapon,
+        ...clone.deck,
+      ];
+
+      // Apply the candidate action
+      doAction(clone, actions[a]);
+
+      const result = solve(clone, allCards);
+      actionScores[a].push(result.score);
+      if (result.victory) actionWins[a]++;
+    }
+  }
+
+  // Build stats and find best
+  const stats: ActionStats[] = actions.map((action, i) => ({
+    action,
+    avgScore: actionScores[i].reduce((sum, s) => sum + s, 0) / numSamples,
+    wins: actionWins[i],
+    scores: actionScores[i],
+  }));
+
+  let bestIdx = 0;
+  for (let i = 1; i < stats.length; i++) {
+    if (stats[i].avgScore > stats[bestIdx].avgScore) {
+      bestIdx = i;
+    }
+  }
+
+  return { bestAction: actions[bestIdx], stats };
+}
+
+function doAction(game: Game, action: GameAction): void {
+  if (action.actionType === "enterRoom") {
+    game.enterRoom();
+  } else if (action.actionType === "skipRoom") {
+    game.avoidRoom();
+  } else if (action.actionType === "playCard" && action.card) {
+    game.handleCardAction(action.card, action.mode);
+  }
 }

@@ -1,5 +1,5 @@
 import { Game, Player, Room, MonsterCard, WeaponCard, PotionCard, DungeonCard, RuleConfig } from "../index";
-import { getUnseenCards } from "../pimc";
+import { getUnseenCards, pimcBestAction } from "../pimc";
 
 const DEFAULT_RULES: Required<RuleConfig> = {
   startingHealth: 20,
@@ -95,5 +95,68 @@ describe("getUnseenCards", () => {
     // With only 4 cards in room and nothing else, there are 40 unseen cards.
     const unseen = getUnseenCards(game);
     expect(unseen.length).toBe(40);
+  });
+});
+
+describe("pimcBestAction", () => {
+  it("returns the only action when there is exactly one", () => {
+    // Game with only enterRoom available (room dealt, not entered yet)
+    const deck = [new MonsterCard("clubs", 14), new MonsterCard("spades", 14), new MonsterCard("clubs", 13), new MonsterCard("spades", 13)];
+    const game = createGameWithState({
+      deck: [],
+      room: deck,
+      player: new Player(20, 20),
+      roomBeingEntered: false,
+    });
+    // canDeferRoom is true but deck is empty, so skipRoom is unavailable
+    // Only enterRoom is possible
+
+    const result = pimcBestAction(game, 5);
+    expect(result.bestAction.actionType).toBe("enterRoom");
+    expect(result.stats.length).toBe(1);
+  });
+
+  it("prefers weapon over barehanded for a fully-visible game", () => {
+    // Put all 44 cards into visible locations so unseen = 0 (fully deterministic).
+    // Room: one weak monster (clubs 2). Player has weapon (diamonds 10).
+    // Remaining 42 cards go to discard.
+    const fullDeck = Game.createDeck();
+    const roomMonster = new MonsterCard("clubs", 2);
+    const weapon = new WeaponCard(10);
+
+    // Filter out the room monster and weapon from the full deck for discard
+    const discardCards = fullDeck.filter(
+      (c) =>
+        !(c.type === "monster" && c.suit === "clubs" && c.rank === 2) && !(c.type === "weapon" && c.suit === "diamonds" && c.rank === 10),
+    );
+
+    const player = new Player(20, 20);
+    player.equippedWeapon = weapon;
+
+    const game = createGameWithState({
+      deck: [],
+      room: [roomMonster],
+      player,
+      discard: discardCards,
+      roomBeingEntered: true,
+    });
+
+    // Weapon kill = 0 damage (score 20), barehanded = 2 damage (score 18)
+    const result = pimcBestAction(game, 10);
+    expect(result.bestAction.actionType).toBe("playCard");
+    expect(result.bestAction.mode).toBe("weapon");
+  });
+
+  it("returns empty stats when no actions available", () => {
+    const player = new Player(0, 20);
+    const game = createGameWithState({
+      deck: [],
+      room: [],
+      player,
+    });
+    game.gameOver = true;
+
+    const result = pimcBestAction(game, 5);
+    expect(result.stats.length).toBe(0);
   });
 });
