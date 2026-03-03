@@ -1,4 +1,5 @@
 import { DungeonCard, Game, GameAction, RuleConfig } from "./index";
+import { SimulationResult } from "./simulation";
 import { solve } from "./solver";
 
 function cardKey(card: DungeonCard): string {
@@ -177,5 +178,30 @@ export function runPimcGame(numSamples: number, rules?: RuleConfig): PimcGameRes
     score: game.calculateScore(),
     health: game.player.health,
     moves,
+  };
+}
+
+export function runPimcSimulation(numGames: number, numSamples: number, rules?: RuleConfig): SimulationResult {
+  const scores: number[] = [];
+  let wins = 0;
+
+  for (let i = 0; i < numGames; i++) {
+    const result = runPimcGame(numSamples, rules);
+    scores.push(result.score);
+    if (result.victory) wins++;
+  }
+
+  scores.sort((a, b) => a - b);
+
+  const avgScore = scores.reduce((sum, s) => sum + s, 0) / numGames;
+  const medianScore = numGames % 2 === 0 ? (scores[numGames / 2 - 1] + scores[numGames / 2]) / 2 : scores[Math.floor(numGames / 2)];
+
+  return {
+    winRate: (wins / numGames) * 100,
+    avgScore,
+    medianScore,
+    scoreDistribution: scores,
+    totalGames: numGames,
+    avgNodesExplored: 0, // Not tracked for PIMC
   };
 }

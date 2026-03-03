@@ -1,5 +1,5 @@
 import { Game, Player, Room, MonsterCard, WeaponCard, PotionCard, DungeonCard, RuleConfig } from "../index";
-import { getUnseenCards, pimcBestAction, runPimcGame } from "../pimc";
+import { getUnseenCards, pimcBestAction, runPimcGame, runPimcSimulation } from "../pimc";
 
 const DEFAULT_RULES: Required<RuleConfig> = {
   startingHealth: 20,
@@ -174,4 +174,17 @@ describe("runPimcGame", () => {
     const result = runPimcGame(5);
     expect(result.victory || result.health <= 0 || result.score !== undefined).toBe(true);
   }, 60000);
+});
+
+describe("runPimcSimulation", () => {
+  it("runs multiple games and returns aggregated stats", () => {
+    const result = runPimcSimulation(3, 5); // 3 games, 5 samples each
+    expect(result.totalGames).toBe(3);
+    expect(typeof result.winRate).toBe("number");
+    expect(typeof result.avgScore).toBe("number");
+    expect(typeof result.medianScore).toBe("number");
+    expect(result.scoreDistribution.length).toBe(3);
+    expect(result.winRate).toBeGreaterThanOrEqual(0);
+    expect(result.winRate).toBeLessThanOrEqual(100);
+  }, 120000);
 });
