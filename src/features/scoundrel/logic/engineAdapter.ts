@@ -175,6 +175,14 @@ export function avoidRoom(state: ScoundrelGameState): ScoundrelGameState {
 }
 
 export function simulateCardActionHealth(state: ScoundrelGameState, card: DungeonCard, mode?: "barehanded" | "weapon"): number {
+  const isCardInCurrentRoom = state.currentRoom.cards.some(
+    (roomCard) => roomCard.type === card.type && roomCard.suit === card.suit && roomCard.rank === card.rank,
+  );
+  if (!isCardInCurrentRoom) {
+    // Hovered cards can become stale after room transitions; keep render-safe behavior.
+    return state.health;
+  }
+
   const game = toEngineGame(state);
   const resolvedCard = resolveCardFromRoom(game, card);
   const resolvedMode = mode ?? (card.type === "monster" && state.equippedWeapon ? "weapon" : "barehanded");

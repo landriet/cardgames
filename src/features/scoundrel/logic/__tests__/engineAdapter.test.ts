@@ -55,4 +55,11 @@ describe("engineAdapter", () => {
     expect(next.canDeferRoom).toBe(true);
     expect(next.lastActionWasDefer).toBe(false);
   });
+
+  it("does not throw if simulateCardActionHealth receives a stale hovered card", () => {
+    const state = initGameWithStaticDeck();
+    const staleCard: DungeonCard = { type: "potion", suit: "hearts", rank: 2 };
+    expect(() => simulateCardActionHealth(state, staleCard)).not.toThrow();
+    expect(simulateCardActionHealth(state, staleCard)).toBe(state.health);
+  });
 });
