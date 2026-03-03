@@ -146,6 +146,13 @@ export function handleCardAction(state: ScoundrelGameState, card: DungeonCard, m
     };
   }
 
+  if (card.type === "monster" && mode === "weapon" && state.lastMonsterDefeated && card.rank > state.lastMonsterDefeated.rank) {
+    return {
+      ...state,
+      pendingMonsterChoice: { monster: card },
+    };
+  }
+
   const game = toEngineGame(state);
   const resolvedCard = resolveCardFromRoom(game, card);
   game.handleCardAction(resolvedCard, mode);

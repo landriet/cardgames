@@ -8,6 +8,7 @@ interface MonsterAttackModalProps {
   onClose: () => void;
   barehandDamage: number;
   weaponDamage: number;
+  canUseWeapon: boolean;
 }
 
 export default function MonsterAttackModal({
@@ -17,10 +18,17 @@ export default function MonsterAttackModal({
   onClose,
   barehandDamage,
   weaponDamage,
+  canUseWeapon,
 }: MonsterAttackModalProps) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} ariaLabel="Choose attack mode">
-      <MonsterAttackChoice onBarehand={onBarehand} onWeapon={onWeapon} barehandDamage={barehandDamage} weaponDamage={weaponDamage} />
+      <MonsterAttackChoice
+        onBarehand={onBarehand}
+        onWeapon={onWeapon}
+        barehandDamage={barehandDamage}
+        weaponDamage={weaponDamage}
+        canUseWeapon={canUseWeapon}
+      />
     </Modal>
   );
 }

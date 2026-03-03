@@ -35,6 +35,11 @@ export default function ScoundrelGame() {
   if (hoveredCard && hoveredCard.type === "potion") {
     simulatedHealth = simulateCardActionHealth(game, hoveredCard);
   }
+  const canUseWeaponOnPendingMonster = !!(
+    game.pendingMonsterChoice &&
+    game.equippedWeapon &&
+    (!game.lastMonsterDefeated || game.pendingMonsterChoice.monster.rank <= game.lastMonsterDefeated.rank)
+  );
 
   // Calculate health percentage for the bar
   const healthPercent = Math.max(0, Math.min(100, Math.round((game.health / game.maxHealth) * 100)));
@@ -95,7 +100,7 @@ export default function ScoundrelGame() {
           }
         }}
         onWeapon={() => {
-          if (game.pendingMonsterChoice) {
+          if (game.pendingMonsterChoice && canUseWeaponOnPendingMonster) {
             setGame((prev: ScoundrelGameState) => handleCardAction(prev, game.pendingMonsterChoice!.monster, "weapon"));
           }
         }}
@@ -111,6 +116,7 @@ export default function ScoundrelGame() {
             ? Math.max(game.pendingMonsterChoice.monster.rank - game.equippedWeapon.rank, 0)
             : 0
         }
+        canUseWeapon={canUseWeaponOnPendingMonster}
       />
 
       {/* Death modal when player is dead */}

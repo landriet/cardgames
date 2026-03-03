@@ -6,9 +6,16 @@ interface MonsterAttackChoiceProps {
   onWeapon: () => void;
   barehandDamage: number;
   weaponDamage: number;
+  canUseWeapon?: boolean;
 }
 
-const MonsterAttackChoice: React.FC<MonsterAttackChoiceProps> = ({ onBarehand, onWeapon, barehandDamage, weaponDamage }) => {
+const MonsterAttackChoice: React.FC<MonsterAttackChoiceProps> = ({
+  onBarehand,
+  onWeapon,
+  barehandDamage,
+  weaponDamage,
+  canUseWeapon = true,
+}) => {
   return (
     <div className="flex justify-center gap-8">
       <div className="relative group">
@@ -26,9 +33,12 @@ const MonsterAttackChoice: React.FC<MonsterAttackChoiceProps> = ({ onBarehand, o
         <button
           onClick={onWeapon}
           aria-label="Fight with weapon"
-          className="rounded-full bg-blue-200 hover:bg-blue-300 focus:bg-blue-400 p-4 shadow transition-colors duration-150 focus:outline-none"
+          disabled={!canUseWeapon}
+          className={`rounded-full p-4 shadow transition-colors duration-150 focus:outline-none ${
+            canUseWeapon ? "bg-blue-200 hover:bg-blue-300 focus:bg-blue-400" : "bg-gray-300 text-gray-500 cursor-not-allowed"
+          }`}
         >
-          <Sword size={32} className="text-blue-700" />
+          <Sword size={32} className={canUseWeapon ? "text-blue-700" : "text-gray-500"} />
         </button>
         {/* Tooltip removed as requested */}
         <div className="mt-2 text-center text-lg text-blue-900 font-extrabold drop-shadow-sm">{weaponDamage}</div>

@@ -62,4 +62,19 @@ describe("engineAdapter", () => {
     expect(() => simulateCardActionHealth(state, staleCard)).not.toThrow();
     expect(simulateCardActionHealth(state, staleCard)).toBe(state.health);
   });
+
+  it("does not allow weapon mode on monster stronger than last weapon kill", () => {
+    const strongMonster: DungeonCard = { type: "monster", suit: "spades", rank: 9 };
+    const state = withOverrides({
+      health: 20,
+      equippedWeapon: { type: "weapon", suit: "diamonds", rank: 7 },
+      lastMonsterDefeated: { type: "monster", suit: "clubs", rank: 4 },
+      currentRoom: { cards: [strongMonster] },
+    });
+
+    const next = handleCardAction(state, strongMonster, "weapon");
+    expect(next.health).toBe(20);
+    expect(next.currentRoom.cards).toContainEqual(strongMonster);
+    expect(next.discard).toEqual([]);
+  });
 });
