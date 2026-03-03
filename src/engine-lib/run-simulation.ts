@@ -13,9 +13,12 @@ function parseArgs(argv: string[]): { configs: Array<{ name: string; rules: Rule
       case "--games":
         games = parseInt(args[++i], 10);
         break;
-      case "--health":
-        rules.startingHealth = parseInt(args[++i], 10);
+      case "--health": {
+        const hp = parseInt(args[++i], 10);
+        rules.startingHealth = hp;
+        if (rules.maxHealth === undefined) rules.maxHealth = hp;
         break;
+      }
       case "--max-health":
         rules.maxHealth = parseInt(args[++i], 10);
         break;
