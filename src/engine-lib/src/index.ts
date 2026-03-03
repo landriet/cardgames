@@ -138,6 +138,7 @@ export class Player {
       ? new MonsterCard(obj.lastMonsterDefeated.suit, obj.lastMonsterDefeated.rank)
       : null;
     player.potionTakenThisTurn = obj.potionTakenThisTurn;
+    player.potionsTakenThisTurn = obj.potionsTakenThisTurn ?? 0;
     return player;
   }
 
@@ -164,16 +165,18 @@ export class Player {
     return cloned;
   }
 
-  takePotion(card: PotionCard, potionsPerRoom: number = 1): void {
-    if (this.potionsTakenThisTurn >= potionsPerRoom) return;
+  takePotion(card: PotionCard, potionsPerRoom: number = 1): number {
+    if (this.potionsTakenThisTurn >= potionsPerRoom) return 0;
+    const prevHealth = this.health;
     this.health = Math.min(this.health + card.rank, this.maxHealth);
     this.potionsTakenThisTurn++;
     this.potionTakenThisTurn = this.potionsTakenThisTurn >= potionsPerRoom;
+    return this.health - prevHealth;
   }
 
-  undoTakePotion(card: PotionCard): void {
+  undoTakePotion(actualHealAmount: number): void {
     if (this.potionsTakenThisTurn <= 0) return;
-    this.health = Math.max(this.health - card.rank, 0);
+    this.health = Math.max(this.health - actualHealAmount, 0);
     this.potionsTakenThisTurn--;
     this.potionTakenThisTurn = this.potionsTakenThisTurn > 0;
   }
@@ -201,7 +204,7 @@ export class Player {
     if (mode === "barehanded") {
       this.health -= card.rank;
     } else if (this.equippedWeapon) {
-      if (weaponKillLimit && this.lastMonsterDefeated && card.rank >= this.lastMonsterDefeated.rank) return;
+      if (weaponKillLimit && this.lastMonsterDefeated && card.rank > this.lastMonsterDefeated.rank) return;
       const damage = Math.max(card.rank - this.equippedWeapon.rank, 0);
       this.health -= damage;
       this.lastMonsterDefeated = card;
@@ -232,6 +235,9 @@ export class Game {
   gameOver: boolean = false;
   victory: boolean = false;
   roomBeingEntered: boolean = false;
+  cardsResolvedThisTurn: number = 0;
+  lastResolvedCardType: CardType | null = null;
+  lastResolvedPotionValue: number | null = null;
   lastAction: {
     actionType: string;
     card?: DungeonCard;
@@ -251,6 +257,10 @@ export class Game {
     _savedGameOver?: boolean;
     _savedVictory?: boolean;
     _savedRoomBeingEntered?: boolean;
+    _savedCardsResolvedThisTurn?: number;
+    _savedLastResolvedCardType?: CardType | null;
+    _savedLastResolvedPotionValue?: number | null;
+    _savedActualHealAmount?: number;
   } | null = null;
 
   constructor(deck?: DungeonCard[], player?: Player, rules?: RuleConfig) {
@@ -266,7 +276,6 @@ export class Game {
     for (const suit of suits) {
       for (let rank = 2; rank <= 14; rank++) {
         if ((suit === "hearts" || suit === "diamonds") && (rank === 11 || rank === 12 || rank === 13 || rank === 14)) continue;
-        if ((suit === "hearts" || suit === "diamonds") && rank === 14) continue;
         let card: DungeonCard;
         if (suit === "hearts") card = new PotionCard(rank as Rank);
         else if (suit === "diamonds") card = new WeaponCard(rank as Rank);
@@ -287,13 +296,13 @@ export class Game {
   }
 
   getPossibleActions(): GameAction[] {
-    if (this.gameOver || !this.currentRoom || !Array.isArray(this.currentRoom.cards)) {
+    if (this.gameOver || this.victory || !this.currentRoom || !Array.isArray(this.currentRoom.cards)) {
       return [];
     }
     const actions: GameAction[] = [];
     if (!this.roomBeingEntered) {
       actions.push({ actionType: "enterRoom" });
-      if (this.rules.canSkipRooms && this.canDeferRoom && this.deck.length > 0) {
+      if (this.rules.canSkipRooms && this.canDeferRoom && this.currentRoom.cards.length > 0) {
         if (this.rules.canSkipConsecutive || !this.lastActionWasDefer) {
           actions.push({ actionType: "skipRoom" });
         }
@@ -302,7 +311,7 @@ export class Game {
       for (const card of this.currentRoom.cards) {
         if (card.type === "monster") {
           if (this.player.equippedWeapon) {
-            if (!this.rules.weaponKillLimit || !this.player.lastMonsterDefeated || card.rank < this.player.lastMonsterDefeated.rank) {
+            if (!this.rules.weaponKillLimit || !this.player.lastMonsterDefeated || card.rank <= this.player.lastMonsterDefeated.rank) {
               actions.push({ actionType: "playCard", card, mode: "weapon" });
             }
           }
@@ -318,13 +327,13 @@ export class Game {
   }
 
   simulateCardAction(card: DungeonCard, mode?: "barehanded" | "weapon"): number {
-    const simPlayer = Object.assign(Object.create(Object.getPrototypeOf(this.player)), this.player);
+    const simPlayer = this.player.clone();
     if (card.type === "monster") {
-      simPlayer.fightMonster(card as MonsterCard, mode ?? "barehanded");
+      simPlayer.fightMonster(card as MonsterCard, mode ?? "barehanded", this.rules.weaponKillLimit);
     } else if (card.type === "weapon") {
       simPlayer.takeWeapon(card as WeaponCard);
     } else if (card.type === "potion") {
-      simPlayer.takePotion(card as PotionCard);
+      simPlayer.takePotion(card as PotionCard, this.rules.potionsPerRoom);
     }
     return Math.max(0, Math.min(simPlayer.health, simPlayer.maxHealth));
   }
@@ -344,11 +353,13 @@ export class Game {
     const savedLastActionWasDefer = this.lastActionWasDefer;
     const savedPotionTakenThisTurn = this.player.potionTakenThisTurn;
     const savedPotionsTakenThisTurn = this.player.potionsTakenThisTurn;
+    const savedCardsResolvedThisTurn = this.cardsResolvedThisTurn;
     this.canDeferRoom = true;
     this.lastActionWasDefer = false;
     this.player.potionTakenThisTurn = false;
     this.player.potionsTakenThisTurn = 0;
     this.roomBeingEntered = true;
+    this.cardsResolvedThisTurn = 0;
     this.lastAction = {
       actionType: "enterRoom",
       _previousLastAction: prevLastAction,
@@ -356,6 +367,7 @@ export class Game {
       _savedLastActionWasDefer: savedLastActionWasDefer,
       _savedPotionTakenThisTurn: savedPotionTakenThisTurn,
       _savedPotionsTakenThisTurn: savedPotionsTakenThisTurn,
+      _savedCardsResolvedThisTurn: savedCardsResolvedThisTurn,
     };
   }
 
@@ -367,11 +379,12 @@ export class Game {
     this.lastActionWasDefer = saved?._savedLastActionWasDefer ?? false;
     this.player.potionTakenThisTurn = saved?._savedPotionTakenThisTurn ?? false;
     this.player.potionsTakenThisTurn = saved?._savedPotionsTakenThisTurn ?? 0;
+    this.cardsResolvedThisTurn = saved?._savedCardsResolvedThisTurn ?? 0;
     this.lastAction = saved?._previousLastAction ?? null;
   }
 
   avoidRoom(): void {
-    if (!this.canDeferRoom || this.lastActionWasDefer || this.deck.length === 0) return;
+    if (!this.canDeferRoom || this.lastActionWasDefer || this.currentRoom.cards.length === 0) return;
     const prevLastAction = this.lastAction;
     const savedRoom = this.currentRoom.cards.slice();
     const savedDeckLength = this.deck.length;
@@ -379,6 +392,7 @@ export class Game {
     this.currentRoom.cards = [];
     this.canDeferRoom = false;
     this.lastActionWasDefer = true;
+    this.roomBeingEntered = false;
     this.applyTurnRules();
     this.lastAction = {
       actionType: "skipRoom",
@@ -425,14 +439,30 @@ export class Game {
     const savedGameOver = this.gameOver;
     const savedVictory = this.victory;
     const savedRoomBeingEntered = this.roomBeingEntered;
+    const savedCardsResolvedThisTurn = this.cardsResolvedThisTurn;
+    const savedLastResolvedCardType = this.lastResolvedCardType;
+    const savedLastResolvedPotionValue = this.lastResolvedPotionValue;
 
     let previousWeapon: WeaponCard | undefined;
     let previousMonsters: MonsterCard[] | undefined;
+    let actualHealAmount = 0;
 
     if (card.type === "monster") {
+      if (mode === "weapon") {
+        if (!this.player.equippedWeapon) {
+          throw new Error("Cannot fight with weapon when no weapon is equipped");
+        }
+        if (this.rules.weaponKillLimit && this.player.lastMonsterDefeated && card.rank > this.player.lastMonsterDefeated.rank) {
+          throw new Error("Illegal weapon action: monster exceeds weapon lock");
+        }
+      }
       this.player.fightMonster(card as MonsterCard, mode ?? "barehanded", this.rules.weaponKillLimit);
       this.currentRoom.removeCard(card);
-      this.discard.push(card);
+      if (mode === "weapon") {
+        // Monster remains stacked on weapon until the weapon is replaced.
+      } else {
+        this.discard.push(card);
+      }
     } else if (card.type === "weapon") {
       const weaponResult = this.player.takeWeapon(card as WeaponCard);
       previousWeapon = weaponResult.previousWeapon;
@@ -443,9 +473,17 @@ export class Game {
       }
       this.currentRoom.removeCard(card);
     } else if (card.type === "potion") {
-      this.player.takePotion(card as PotionCard, this.rules.potionsPerRoom);
+      actualHealAmount = this.player.takePotion(card as PotionCard, this.rules.potionsPerRoom);
       this.currentRoom.removeCard(card);
       this.discard.push(card);
+    }
+
+    this.lastResolvedCardType = card.type;
+    this.lastResolvedPotionValue = card.type === "potion" ? card.rank : null;
+    this.cardsResolvedThisTurn++;
+    if (this.cardsResolvedThisTurn >= 3 || this.currentRoom.cards.length === 0) {
+      this.roomBeingEntered = false;
+      this.cardsResolvedThisTurn = 0;
     }
 
     // Snapshot room cards before applyTurnRules (needed to reverse deal)
@@ -466,8 +504,12 @@ export class Game {
       _savedGameOver: savedGameOver,
       _savedVictory: savedVictory,
       _savedRoomBeingEntered: savedRoomBeingEntered,
+      _savedCardsResolvedThisTurn: savedCardsResolvedThisTurn,
+      _savedLastResolvedCardType: savedLastResolvedCardType,
+      _savedLastResolvedPotionValue: savedLastResolvedPotionValue,
       _dealHappened: dealHappened,
       _roomCardsBeforeDeal: dealHappened ? roomCardsBeforeDeal : undefined,
+      _savedActualHealAmount: actualHealAmount,
     };
   }
 
@@ -485,12 +527,15 @@ export class Game {
       const fromDeck = this.currentRoom.cards.slice(carryCount);
       this.deck.unshift(...fromDeck);
       this.currentRoom = new Room(saved._roomCardsBeforeDeal);
-      this.roomBeingEntered = saved._savedRoomBeingEntered ?? true;
     }
 
     // Restore gameOver/victory
     this.gameOver = saved._savedGameOver ?? false;
     this.victory = saved._savedVictory ?? false;
+    this.roomBeingEntered = saved._savedRoomBeingEntered ?? false;
+    this.cardsResolvedThisTurn = saved._savedCardsResolvedThisTurn ?? 0;
+    this.lastResolvedCardType = saved._savedLastResolvedCardType ?? null;
+    this.lastResolvedPotionValue = saved._savedLastResolvedPotionValue ?? null;
 
     // Undo the card action itself
     if (card.type === "monster") {
@@ -504,7 +549,7 @@ export class Game {
       this.player.undoTakeWeapon(saved.previousWeapon, saved.previousMonsters);
       this.currentRoom.cards.push(card);
     } else if (card.type === "potion") {
-      this.player.undoTakePotion(card as PotionCard);
+      this.player.undoTakePotion(saved._savedActualHealAmount ?? card.rank);
       this.currentRoom.cards.push(card);
       this.discard = this.discard.filter((c) => c !== card);
     }
@@ -533,7 +578,7 @@ export class Game {
       this.victory = true;
       return;
     }
-    if (this.currentRoom.cards.length <= 1 && this.deck.length > 0) {
+    if (!this.roomBeingEntered && this.currentRoom.cards.length <= 1 && this.deck.length > 0) {
       this.dealRoom();
     }
   }
@@ -552,7 +597,14 @@ export class Game {
   calculateScore(): number {
     const monstersLeft = this.deck.filter((card) => card.type === "monster");
     const monstersValue = monstersLeft.reduce((sum, card) => sum + card.rank, 0);
-    return Math.max(0, this.player.health) - monstersValue;
+    if (this.victory) {
+      let score = this.player.health;
+      if (this.player.health === 20 && this.lastResolvedCardType === "potion" && this.lastResolvedPotionValue !== null) {
+        score += this.lastResolvedPotionValue;
+      }
+      return score;
+    }
+    return this.player.health - monstersValue;
   }
 
   clone(): Game {
@@ -567,7 +619,13 @@ export class Game {
     cloned.gameOver = this.gameOver;
     cloned.victory = this.victory;
     cloned.roomBeingEntered = this.roomBeingEntered;
+    cloned.cardsResolvedThisTurn = this.cardsResolvedThisTurn;
+    cloned.lastResolvedCardType = this.lastResolvedCardType;
+    cloned.lastResolvedPotionValue = this.lastResolvedPotionValue;
     if (this.lastAction) {
+      // Note: _previousLastAction chain is shared with the original game.
+      // Only the most recent undo step is clone-isolated. Multi-step undo on
+      // a clone may reference (but not mutate) the original's action history.
       cloned.lastAction = {
         ...this.lastAction,
         card: this.lastAction.card ? this.lastAction.card.clone() : undefined,
@@ -581,7 +639,7 @@ export class Game {
   }
 
   static fromJSON(obj: any): Game {
-    const game = new Game();
+    const game = new Game(undefined, undefined, obj.rules);
     game.deck = obj.deck.map((card: any) => new DungeonCard(card.type, card.suit, card.rank));
     game.discard = obj.discard.map((card: any) => new DungeonCard(card.type, card.suit, card.rank));
     game.currentRoom = new Room(obj.currentRoom.cards.map((card: any) => new DungeonCard(card.type, card.suit, card.rank)));
@@ -591,6 +649,9 @@ export class Game {
     game.gameOver = obj.gameOver;
     game.victory = obj.victory;
     game.roomBeingEntered = obj.roomBeingEntered;
+    game.cardsResolvedThisTurn = obj.cardsResolvedThisTurn ?? 0;
+    game.lastResolvedCardType = obj.lastResolvedCardType ?? null;
+    game.lastResolvedPotionValue = obj.lastResolvedPotionValue ?? null;
     return game;
   }
 }

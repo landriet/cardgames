@@ -16,17 +16,21 @@ function createGameWithState(opts: {
   player: Player;
   discard?: DungeonCard[];
   roomBeingEntered?: boolean;
+  canDeferRoom?: boolean;
 }): Game {
   const game = Object.create(Game.prototype) as Game;
   game.rules = { ...DEFAULT_RULES };
   game.deck = opts.deck;
   game.currentRoom = new Room(opts.room);
   game.player = opts.player;
-  game.canDeferRoom = true;
+  game.canDeferRoom = opts.canDeferRoom ?? true;
   game.lastActionWasDefer = false;
   game.gameOver = false;
   game.victory = false;
   game.roomBeingEntered = opts.roomBeingEntered ?? false;
+  game.cardsResolvedThisTurn = 0;
+  game.lastResolvedCardType = null;
+  game.lastResolvedPotionValue = null;
   game.lastAction = null;
   game.discard = opts.discard ?? [];
   return game;
@@ -107,8 +111,9 @@ describe("pimcBestAction", () => {
       room: deck,
       player: new Player(20, 20),
       roomBeingEntered: false,
+      canDeferRoom: false,
     });
-    // canDeferRoom is true but deck is empty, so skipRoom is unavailable
+    // canDeferRoom is false, so skipRoom is unavailable
     // Only enterRoom is possible
 
     const result = pimcBestAction(game, 5);
