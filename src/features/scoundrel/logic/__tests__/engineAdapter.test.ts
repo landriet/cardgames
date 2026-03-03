@@ -52,8 +52,8 @@ describe("engineAdapter", () => {
     const state = initGameWithStaticDeck();
     const next = avoidRoom(state);
     expect(next.currentRoom.cards.length).toBe(4);
-    expect(next.canDeferRoom).toBe(true);
-    expect(next.lastActionWasDefer).toBe(false);
+    expect(next.canDeferRoom).toBe(false);
+    expect(next.lastActionWasDefer).toBe(true);
   });
 
   it("does not throw if simulateCardActionHealth receives a stale hovered card", () => {

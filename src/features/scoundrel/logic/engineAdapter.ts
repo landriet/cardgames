@@ -164,10 +164,6 @@ export function avoidRoom(state: ScoundrelGameState): ScoundrelGameState {
   const game = toEngineGame(state);
   game.avoidRoom();
 
-  if (!game.gameOver && !game.victory && !game.roomBeingEntered && game.currentRoom.cards.length > 0) {
-    game.enterRoom();
-  }
-
   return {
     ...fromEngineGame(game),
     pendingMonsterChoice: undefined,
