@@ -32,6 +32,9 @@ function createGameWithState(opts: {
   game.gameOver = false;
   game.victory = false;
   game.roomBeingEntered = opts.roomBeingEntered ?? false;
+  game.cardsResolvedThisTurn = 0;
+  game.lastResolvedCardType = null;
+  game.lastResolvedPotionValue = null;
   game.lastAction = null;
   game.discard = opts.discard ?? [];
   return game;
@@ -343,8 +346,8 @@ describe("Bug 2f: lastAction restoration chain", () => {
   });
 });
 
-describe("undoHandleCardAction removes monster from discard in weapon mode", () => {
-  it("removes fought monster from discard on undo", () => {
+describe("undoHandleCardAction keeps weapon-fought monster out of discard", () => {
+  it("does not add fought monster to discard, and undo preserves that", () => {
     const player = new Player(20, 20);
     player.equippedWeapon = new WeaponCard(10);
     const monster = new MonsterCard("clubs", 5);
@@ -357,9 +360,33 @@ describe("undoHandleCardAction removes monster from discard in weapon mode", () 
     });
 
     game.handleCardAction(monster, "weapon");
-    expect(game.discard.some((c) => c.type === "monster" && c.suit === "clubs" && c.rank === 5)).toBe(true);
+    expect(game.discard.some((c) => c.type === "monster" && c.suit === "clubs" && c.rank === 5)).toBe(false);
 
     game.undoHandleCardAction();
     expect(game.discard.some((c) => c.type === "monster" && c.suit === "clubs" && c.rank === 5)).toBe(false);
+  });
+});
+
+describe("Bug 2g: illegal weapon action must not resolve monster", () => {
+  it("throws and preserves room/discard when weapon lock is violated", () => {
+    const player = new Player(20, 20);
+    player.equippedWeapon = new WeaponCard(10);
+    player.lastMonsterDefeated = new MonsterCard("clubs", 6);
+
+    const blockedMonster = new MonsterCard("spades", 7);
+    const game = createGameWithState({
+      deck: [new MonsterCard("clubs", 9), new MonsterCard("spades", 10), new MonsterCard("clubs", 11), new MonsterCard("spades", 12)],
+      room: [blockedMonster, new WeaponCard(4), new PotionCard(3), new MonsterCard("spades", 2)],
+      player,
+      roomBeingEntered: true,
+    });
+
+    const roomSizeBefore = game.currentRoom.cards.length;
+    const discardSizeBefore = game.discard.length;
+
+    expect(() => game.handleCardAction(blockedMonster, "weapon")).toThrow("Illegal weapon action: monster exceeds weapon lock");
+    expect(game.currentRoom.cards.length).toBe(roomSizeBefore);
+    expect(game.currentRoom.cards.some((c) => c.type === "monster" && c.suit === "spades" && c.rank === 7)).toBe(true);
+    expect(game.discard.length).toBe(discardSizeBefore);
   });
 });

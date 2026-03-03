@@ -29,6 +29,9 @@ function createGameWithState(opts: {
   game.gameOver = false;
   game.victory = false;
   game.roomBeingEntered = opts.roomBeingEntered ?? false;
+  game.cardsResolvedThisTurn = 0;
+  game.lastResolvedCardType = null;
+  game.lastResolvedPotionValue = null;
   game.lastAction = null;
   game.discard = opts.discard ?? [];
   return game;
@@ -230,7 +233,7 @@ describe("RuleConfig", () => {
     expect(weaponActionForRank8).toBe(true);
   });
 
-  it("weaponKillLimit: true only allows strictly lower rank for weapon mode", () => {
+  it("weaponKillLimit: true allows equal-or-lower rank for weapon mode", () => {
     const player = new Player(20, 20);
     player.equippedWeapon = new WeaponCard(5);
     player.lastMonsterDefeated = new MonsterCard("clubs", 6);
@@ -250,7 +253,7 @@ describe("RuleConfig", () => {
     const weaponActionForLowerRank = actions.some(
       (a) => a.actionType === "playCard" && a.card?.type === "monster" && a.card.rank === 5 && a.mode === "weapon",
     );
-    expect(weaponActionForEqualRank).toBe(false);
+    expect(weaponActionForEqualRank).toBe(true);
     expect(weaponActionForLowerRank).toBe(true);
   });
 
