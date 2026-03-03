@@ -1,0 +1,240 @@
+metadata:
+  game: Scoundrel
+  version: "1.0"
+  release_date: "2011-08-15"
+  authors:
+    - Zach Gage
+    - Kurt Bieg
+  source_document: src/engine-lib/README.md
+  intent: "AI-digestible formal rules specification for parsing, simulation, and validation."
+
+constants:
+  max_health: 20
+  room_size: 4
+  cards_resolved_per_enter: 3
+  cannot_avoid_consecutive_rooms: true
+  potion_limit_per_turn: 1
+  ace_value: 14
+  face_card_values:
+    jack: 11
+    queen: 12
+    king: 13
+
+card_value_model:
+  ordered_numeric_values:
+    "2": 2
+    "3": 3
+    "4": 4
+    "5": 5
+    "6": 6
+    "7": 7
+    "8": 8
+    "9": 9
+    "10": 10
+    J: 11
+    Q: 12
+    K: 13
+    A: 14
+
+deck_definition:
+  base_deck: "standard_52_plus_jokers"
+  excluded_cards:
+    - all_jokers
+    - hearts_J
+    - hearts_Q
+    - hearts_K
+    - diamonds_J
+    - diamonds_Q
+    - diamonds_K
+    - hearts_A
+    - diamonds_A
+  included_card_count: 44
+  semantic_types:
+    monsters:
+      suits: [spades, clubs]
+      count: 26
+      value_source: ordered_numeric_values
+    weapons:
+      suits: [diamonds]
+      allowed_ranks: ["2", "3", "4", "5", "6", "7", "8", "9", "10"]
+      count: 9
+      value_source: ordered_numeric_values
+    potions:
+      suits: [hearts]
+      allowed_ranks: ["2", "3", "4", "5", "6", "7", "8", "9", "10"]
+      count: 9
+      value_source: ordered_numeric_values
+
+state_model:
+  health:
+    type: integer
+    range: [0, 20]
+    initial: 20
+  dungeon:
+    type: list
+    description: "Face-down draw pile."
+  room:
+    type: list
+    description: "Up to 4 face-up cards available for current turn decisions."
+  equipped_weapon:
+    type: nullable_card
+    description: "Current equipped weapon card, or null."
+  weapon_lock_value:
+    type: nullable_integer
+    description: "If weapon has killed at least one monster, only monsters with value <= this can be fought using weapon."
+  monsters_on_weapon:
+    type: list
+    description: "Monsters previously killed with currently equipped weapon."
+  discard:
+    type: list
+    description: "Face-down discard pile."
+  last_turn_was_avoid:
+    type: boolean
+    initial: false
+  potion_used_this_turn:
+    type: boolean
+    reset_point: "start_of_turn"
+  terminal:
+    type: boolean
+    initial: false
+
+turn_model:
+  room_creation:
+    trigger: "start_of_turn_when_terminal_is_false"
+    rules:
+      - "If room contains carried card from prior turn, keep it."
+      - "Draw from dungeon until room has 4 cards OR dungeon is empty."
+  room_decision:
+    legal_choices:
+      - avoid_room
+      - enter_room
+
+actions:
+  avoid_room:
+    preconditions:
+      - "terminal == false"
+      - "last_turn_was_avoid == false"
+      - "room size >= 1"
+    effects:
+      - "Move all room cards to bottom of dungeon preserving relative order."
+      - "Set room to empty."
+      - "Set last_turn_was_avoid = true."
+      - "End turn."
+    notes:
+      - "Cannot avoid two rooms in a row."
+
+  enter_room:
+    preconditions:
+      - "terminal == false"
+      - "room size >= 1"
+    effects:
+      - "Set last_turn_was_avoid = false."
+      - "Resolve exactly 3 cards if at least 3 cards exist; otherwise resolve all available cards."
+      - "After resolution, end turn with one unresolved carried card if one remains."
+    resolution_loop:
+      max_resolutions: 3
+      each_step:
+        - "Choose one card currently in room."
+        - "Dispatch by card semantic type: choose_weapon | drink_potion | fight_monster."
+
+  choose_weapon:
+    preconditions:
+      - "selected card type == weapon"
+      - "action invoked during enter_room resolution"
+    effects:
+      - "If equipped_weapon exists: move old equipped_weapon to discard."
+      - "If equipped_weapon exists: move all monsters_on_weapon to discard."
+      - "Set equipped_weapon = selected weapon."
+      - "Set monsters_on_weapon = []."
+      - "Set weapon_lock_value = null."
+      - "Remove selected weapon from room."
+
+  drink_potion:
+    preconditions:
+      - "selected card type == potion"
+      - "action invoked during enter_room resolution"
+    effects:
+      - condition: "potion_used_this_turn == false"
+        then:
+          - "health = min(max_health, health + potion_value)"
+          - "potion_used_this_turn = true"
+      - condition: "potion_used_this_turn == true"
+        then:
+          - "No healing is applied."
+      - "Move selected potion to discard."
+      - "Remove selected potion from room."
+
+  fight_monster_barehand:
+    preconditions:
+      - "selected card type == monster"
+      - "action invoked during enter_room resolution"
+    effects:
+      - "health = health - monster_value"
+      - "Move selected monster to discard."
+      - "Remove selected monster from room."
+      - "If health <= 0: set terminal = true."
+
+  fight_monster_with_weapon:
+    preconditions:
+      - "selected card type == monster"
+      - "equipped_weapon exists"
+      - "action invoked during enter_room resolution"
+      - "weapon_lock_value is null OR monster_value <= weapon_lock_value"
+    effects:
+      - "damage = max(0, monster_value - weapon_value)"
+      - "health = health - damage"
+      - "Move selected monster from room to monsters_on_weapon (stacked above weapon)."
+      - "weapon_lock_value = monster_value"
+      - "If health <= 0: set terminal = true."
+
+combat_model:
+  barehand:
+    damage_formula: "damage = monster_value"
+  with_weapon:
+    damage_formula: "damage = max(0, monster_value - weapon_value)"
+    post_kill_lock_rule: "After weapon kills a monster of value V, weapon may only be used on monsters with value <= V."
+  examples:
+    - "weapon 5 vs monster 3 => damage 0"
+    - "weapon 5 vs monster J(11) => damage 6"
+
+end_of_turn_model:
+  steps:
+    - "If terminal == true: skip remaining turn cleanup."
+    - "Carry forward unresolved room card(s), typically exactly one after a normal enter."
+    - "Reset potion_used_this_turn = false at next turn start."
+
+terminal_conditions:
+  death:
+    condition: "health <= 0"
+    immediate_end: true
+  victory:
+    condition: "dungeon empty AND room empty"
+    immediate_end: true
+
+scoring_model:
+  on_death:
+    formula: "score = health - sum(values of all monsters remaining in dungeon)"
+    notes:
+      - "Health may be zero or negative at death, depending on implementation choice."
+  on_victory:
+    formula: "score = health"
+    special_case:
+      condition: "health == 20 AND last_resolved_card_type == potion"
+      formula: "score = health + last_potion_value"
+
+invariants:
+  - "health never exceeds max_health."
+  - "At most one potion healing effect can apply per turn."
+  - "Consecutive avoid_room actions are illegal."
+  - "When a new weapon is equipped, prior weapon and its attached monsters are discarded."
+  - "Weapon-based monster fights must satisfy weapon_lock_value constraint once set."
+
+agent_notes:
+  legal_action_priority_guidance:
+    - "At each resolution step, enumerate all room cards and legal interaction modes (barehand/weapon for monsters)."
+    - "Reject fight_monster_with_weapon if lock constraint fails."
+  ambiguity_resolution_policy:
+    - issue: "When fewer than 4 cards can be drawn into a room near game end."
+      policy: "Use all remaining dungeon cards; room may contain fewer than 4."
+    - issue: "Enter-room instruction says resolve 3 cards."
+      policy: "If fewer than 3 cards are present, resolve all present cards."
