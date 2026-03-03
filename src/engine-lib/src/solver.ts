@@ -45,11 +45,30 @@ export interface SolveResult {
   victory: boolean;
   score: number;
   nodesExplored: number;
+  trace?: SolveTraceStep[];
 }
 
-export function solve(game: Game, originalDeck: DungeonCard[]): SolveResult {
+export interface SolveTraceStep {
+  step: number;
+  action: GameAction;
+  healthBefore: number;
+  healthAfter: number;
+  deckBefore: number;
+  deckAfter: number;
+  roomBefore: string[];
+  roomAfter: string[];
+  gameOver: boolean;
+  victory: boolean;
+  scoreAfter: number;
+}
+
+interface SolverOptions {
+  trace?: boolean;
+}
+
+export function solve(game: Game, originalDeck: DungeonCard[], options: SolverOptions = {}): SolveResult {
   const cardIndex = buildCardIndex(originalDeck);
-  const transpositionTable = new Map<string, { victory: boolean; score: number }>();
+  const transpositionTable = new Map<string, { victory: boolean; score: number; bestAction?: GameAction }>();
   let nodesExplored = 0;
 
   function dfs(): { victory: boolean; score: number } {
@@ -66,7 +85,7 @@ export function solve(game: Game, originalDeck: DungeonCard[]): SolveResult {
     // Transposition table lookup
     const stateKey = compactStateKey(game, cardIndex);
     const cached = transpositionTable.get(stateKey);
-    if (cached) return cached;
+    if (cached) return { victory: cached.victory, score: cached.score };
 
     const actions = game.getPossibleActions();
     if (actions.length === 0) {
@@ -80,6 +99,7 @@ export function solve(game: Game, originalDeck: DungeonCard[]): SolveResult {
 
     // Start with current state score as baseline (in case all actions are pruned)
     let best: { victory: boolean; score: number } = { victory: false, score: game.calculateScore() };
+    let bestAction: GameAction | undefined;
 
     for (const action of actions) {
       // Dominated strategy pruning
@@ -107,18 +127,28 @@ export function solve(game: Game, originalDeck: DungeonCard[]): SolveResult {
 
       if (!best || compareBetter(result, best)) {
         best = result;
+        bestAction = action;
       }
 
       // Victory cutoff — can't do better than winning
       if (best.victory) break;
     }
 
-    transpositionTable.set(stateKey, best);
+    transpositionTable.set(stateKey, { ...best, bestAction });
     return best;
   }
 
   const result = dfs();
-  return { ...result, nodesExplored };
+  const finalResult: SolveResult = { ...result, nodesExplored };
+
+  if (options.trace) {
+    const tableTrace = replayBestPath(game, cardIndex, transpositionTable);
+    const tableTraceReachedTerminal =
+      tableTrace.length > 0 && (tableTrace[tableTrace.length - 1].gameOver || tableTrace[tableTrace.length - 1].victory);
+    finalResult.trace = tableTraceReachedTerminal ? tableTrace : replayBestPathByReSolve(game, originalDeck);
+  }
+
+  return finalResult;
 }
 
 function actionPriority(action: GameAction, game: Game): number {
@@ -180,4 +210,98 @@ function doAction(game: Game, action: GameAction): void {
 
 function undoAction(game: Game): void {
   game.undoLastAction();
+}
+
+function replayBestPath(
+  rootGame: Game,
+  cardIndex: CardIndex,
+  transpositionTable: Map<string, { victory: boolean; score: number; bestAction?: GameAction }>,
+): SolveTraceStep[] {
+  const replay = rootGame.clone();
+  const trace: SolveTraceStep[] = [];
+  let step = 1;
+
+  while (!replay.gameOver && !replay.victory) {
+    const stateKey = compactStateKey(replay, cardIndex);
+    const cached = transpositionTable.get(stateKey);
+    if (!cached?.bestAction) break;
+
+    const healthBefore = replay.player.health;
+    const deckBefore = replay.deck.length;
+    const roomBefore = replay.currentRoom.cards.map((card) => card.toString());
+    const action = cached.bestAction;
+
+    doAction(replay, action);
+
+    trace.push({
+      step,
+      action,
+      healthBefore,
+      healthAfter: replay.player.health,
+      deckBefore,
+      deckAfter: replay.deck.length,
+      roomBefore,
+      roomAfter: replay.currentRoom.cards.map((card) => card.toString()),
+      gameOver: replay.gameOver,
+      victory: replay.victory,
+      scoreAfter: replay.calculateScore(),
+    });
+    step++;
+  }
+
+  return trace;
+}
+
+function replayBestPathByReSolve(rootGame: Game, originalDeck: DungeonCard[]): SolveTraceStep[] {
+  const replay = rootGame.clone();
+  const trace: SolveTraceStep[] = [];
+  let step = 1;
+  const maxSteps = 1000;
+
+  while (!replay.gameOver && !replay.victory && step <= maxSteps) {
+    const actions = replay.getPossibleActions();
+    if (actions.length === 0) break;
+    actions.sort((a, b) => actionPriority(a, replay) - actionPriority(b, replay));
+
+    let chosenAction: GameAction | undefined;
+    let bestResult: { victory: boolean; score: number } | undefined;
+
+    for (const action of actions) {
+      const candidate = replay.clone();
+      doAction(candidate, action);
+      const result = solve(candidate, originalDeck, { trace: false });
+
+      if (!bestResult || compareBetter(result, bestResult)) {
+        bestResult = result;
+        chosenAction = action;
+      }
+
+      if (bestResult.victory) break;
+    }
+
+    if (!chosenAction) break;
+
+    const healthBefore = replay.player.health;
+    const deckBefore = replay.deck.length;
+    const roomBefore = replay.currentRoom.cards.map((card) => card.toString());
+
+    doAction(replay, chosenAction);
+
+    trace.push({
+      step,
+      action: chosenAction,
+      healthBefore,
+      healthAfter: replay.player.health,
+      deckBefore,
+      deckAfter: replay.deck.length,
+      roomBefore,
+      roomAfter: replay.currentRoom.cards.map((card) => card.toString()),
+      gameOver: replay.gameOver,
+      victory: replay.victory,
+      scoreAfter: replay.calculateScore(),
+    });
+    step++;
+  }
+
+  return trace;
 }

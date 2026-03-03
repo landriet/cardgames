@@ -1,11 +1,12 @@
 import * as fs from "fs";
-import { RuleConfig } from "./src/index";
+import { RuleConfig, GameAction, DungeonCard } from "./src/index";
 import { runSimulation, SimulationResult } from "./src/simulation";
 
-function parseArgs(argv: string[]): { configs: Array<{ name: string; rules: RuleConfig }>; games: number } {
+function parseArgs(argv: string[]): { configs: Array<{ name: string; rules: RuleConfig }>; games: number; trace: boolean } {
   const args = argv.slice(2);
   let games = 1000;
   let configPath: string | undefined;
+  let trace = false;
   const rules: RuleConfig = {};
 
   for (let i = 0; i < args.length; i++) {
@@ -37,6 +38,9 @@ function parseArgs(argv: string[]): { configs: Array<{ name: string; rules: Rule
       case "--config":
         configPath = args[++i];
         break;
+      case "--trace":
+        trace = true;
+        break;
     }
   }
 
@@ -50,15 +54,16 @@ function parseArgs(argv: string[]): { configs: Array<{ name: string; rules: Rule
           name: entry.name || "Custom",
           rules: entry,
         })),
+        trace,
       };
     }
-    return { games, configs: [{ name: configPath, rules: parsed }] };
+    return { games, configs: [{ name: configPath, rules: parsed }], trace };
   }
 
   const hasCustomRules = Object.keys(rules).length > 0;
   const configs = [{ name: hasCustomRules ? "Custom" : "Default", rules }];
 
-  return { games, configs };
+  return { games, configs, trace };
 }
 
 function formatResult(name: string, result: SimulationResult): string {
@@ -92,17 +97,54 @@ function formatResult(name: string, result: SimulationResult): string {
   return lines.join("\n");
 }
 
+function formatAction(action: GameAction): string {
+  if (action.actionType !== "playCard") return action.actionType;
+  const card = action.card ? formatCard(action.card) : "unknown-card";
+  if (action.card?.type === "monster") {
+    return `${action.actionType} ${card} (${action.mode ?? "barehanded"})`;
+  }
+  return `${action.actionType} ${card}`;
+}
+
+function formatCard(card: DungeonCard): string {
+  return `${card.type}-${card.suit}-${card.rank}`;
+}
+
 function main(): void {
-  const { configs, games } = parseArgs(process.argv);
+  const { configs, games, trace } = parseArgs(process.argv);
 
   console.log(`Scoundrel Optimal Solver — Difficulty Analysis`);
   console.log(`Running ${games} games per rule set...`);
+  if (trace) {
+    console.log(`Trace mode enabled: printing each game step.`);
+  }
 
   const results: Array<{ name: string; result: SimulationResult }> = [];
 
   for (const { name, rules } of configs) {
     const start = Date.now();
-    const result = runSimulation(rules, games);
+    const result = runSimulation(rules, games, {
+      trace,
+      onGameComplete: trace
+        ? ({ gameNumber, result: gameResult }) => {
+            console.log(`\n[${name}] Game ${gameNumber}`);
+            if (!gameResult.trace || gameResult.trace.length === 0) {
+              console.log(`  No trace steps recorded.`);
+            } else {
+              for (const step of gameResult.trace) {
+                console.log(
+                  `  Step ${step.step}: ${formatAction(step.action)} | HP ${step.healthBefore}->${step.healthAfter} | Deck ${step.deckBefore}->${step.deckAfter}`,
+                );
+                console.log(`           Room: [${step.roomBefore.join(", ")}] -> [${step.roomAfter.join(", ")}]`);
+                console.log(`           Score: ${step.scoreAfter} | gameOver=${step.gameOver} victory=${step.victory}`);
+              }
+            }
+            console.log(
+              `  Final: victory=${gameResult.victory} score=${gameResult.score} nodesExplored=${gameResult.nodesExplored} steps=${gameResult.trace?.length ?? 0}`,
+            );
+          }
+        : undefined,
+    });
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
     console.log(formatResult(name, result));
     console.log(`  Time:              ${elapsed}s`);

@@ -1,5 +1,5 @@
 import { Game, Player, RuleConfig } from "./index";
-import { solve } from "./solver";
+import { solve, SolveResult } from "./solver";
 
 export interface SimulationResult {
   winRate: number;
@@ -10,7 +10,12 @@ export interface SimulationResult {
   avgNodesExplored: number;
 }
 
-export function runSimulation(rules: RuleConfig, numGames: number): SimulationResult {
+export interface SimulationOptions {
+  trace?: boolean;
+  onGameComplete?: (details: { gameNumber: number; result: SolveResult }) => void;
+}
+
+export function runSimulation(rules: RuleConfig, numGames: number, options: SimulationOptions = {}): SimulationResult {
   const fullRules: Required<RuleConfig> = {
     startingHealth: rules.startingHealth ?? 20,
     maxHealth: rules.maxHealth ?? 20,
@@ -30,11 +35,12 @@ export function runSimulation(rules: RuleConfig, numGames: number): SimulationRe
     const player = new Player(fullRules.startingHealth, fullRules.maxHealth);
     const game = new Game(deck, player, fullRules);
 
-    const result = solve(game, originalDeck);
+    const result = solve(game, originalDeck, { trace: options.trace });
 
     scores.push(result.score);
     if (result.victory) wins++;
     totalNodes += result.nodesExplored;
+    options.onGameComplete?.({ gameNumber: i + 1, result });
   }
 
   scores.sort((a, b) => a - b);
