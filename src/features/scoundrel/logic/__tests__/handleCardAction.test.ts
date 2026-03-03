@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { vi } from "vitest";
-import { handleCardAction } from "../engine";
+import { handleCardAction } from "../engineAdapter";
 import { CardType, DungeonCard, Rank, ScoundrelGameState } from "../../../../types/scoundrel";
 
 function getBaseState(overrides: Partial<ScoundrelGameState> = {}): ScoundrelGameState {
@@ -38,11 +37,11 @@ describe("handleCardAction", () => {
       equippedWeapon: weapon,
       currentRoom: { cards: [monster] },
     });
-    const newState = handleCardAction(state, monster);
+    const newState = handleCardAction(state, monster, "weapon");
     expect(newState.health).toBe(8); // 10 - (5-3)
     expect(newState.lastMonsterDefeated).toEqual(monster);
-    expect(newState.discard).toContain(monster);
-    expect(newState.monstersOnWeapon).toContain(monster);
+    expect(newState.discard).toContainEqual(monster);
+    expect(newState.monstersOnWeapon).toContainEqual(monster);
     expect(newState.currentRoom.cards).not.toContain(monster);
   });
 
@@ -53,9 +52,9 @@ describe("handleCardAction", () => {
       type: "monster",
     };
     const state = getBaseState({ currentRoom: { cards: [monster] } });
-    const newState = handleCardAction(state, monster);
+    const newState = handleCardAction(state, monster, "barehanded");
     expect(newState.health).toBe(6); // 10 - 4
-    expect(newState.discard).toContain(monster);
+    expect(newState.discard).toContainEqual(monster);
     expect(newState.currentRoom.cards).not.toContain(monster);
   });
 
@@ -72,6 +71,26 @@ describe("handleCardAction", () => {
     expect(newState.discard).not.toContain(weapon);
   });
 
+  it("returns pending monster choice when no mode is provided with weapon equipped", () => {
+    const monster: DungeonCard = {
+      suit: "spades",
+      rank: 4 as Rank,
+      type: "monster",
+    };
+    const weapon: DungeonCard = {
+      suit: "diamonds",
+      rank: 3 as Rank,
+      type: "weapon",
+    };
+    const state = getBaseState({
+      equippedWeapon: weapon,
+      currentRoom: { cards: [monster] },
+    });
+    const newState = handleCardAction(state, monster);
+    expect(newState.pendingMonsterChoice?.monster).toEqual(monster);
+    expect(newState.health).toBe(state.health);
+  });
+
   it("handles potion pickup (first potion)", () => {
     const potion: DungeonCard = {
       suit: "hearts",
@@ -86,7 +105,7 @@ describe("handleCardAction", () => {
     const newState = handleCardAction(state, potion);
     expect(newState.health).toBe(15); // 10 + 5
     expect(newState.potionTakenThisTurn).toBe(true);
-    expect(newState.discard).toContain(potion);
+    expect(newState.discard).toContainEqual(potion);
     expect(newState.currentRoom.cards).not.toContain(potion);
   });
 
@@ -104,21 +123,17 @@ describe("handleCardAction", () => {
     const newState = handleCardAction(state, potion);
     expect(newState.health).toBe(10); // unchanged
     expect(newState.potionTakenThisTurn).toBe(true);
-    expect(newState.discard).toContain(potion);
+    expect(newState.discard).toContainEqual(potion);
     expect(newState.currentRoom.cards).not.toContain(potion);
   });
 
-  it("logs error and returns state unchanged for unknown card type", () => {
+  it("throws when card is not present in current room", () => {
     const badCard = {
       suit: "spades" as const,
       rank: 2 as Rank,
       type: "unknown" as CardType,
     };
     const state = getBaseState();
-    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const newState = handleCardAction(state, badCard);
-    expect(newState).toBe(state);
-    expect(spy).toHaveBeenCalledWith("[handleCardAction] Unknown card type.");
-    spy.mockRestore();
+    expect(() => handleCardAction(state, badCard)).toThrow("Card not present in current room.");
   });
 });

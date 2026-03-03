@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { DungeonCard, ScoundrelGameState } from "../../types/scoundrel";
-import { avoidRoom, handleCardAction, initGameWithStaticDeck, simulateCardActionHealth } from "./logic/engine";
+import { avoidRoom, handleCardAction, initGameWithStaticDeck, simulateCardActionHealth } from "./logic/engineAdapter";
 import ActionButtons from "./components/ActionButtons";
 import EquippedWeapon from "./components/EquippedWeapon";
 import RoomCards from "./components/RoomCards";
