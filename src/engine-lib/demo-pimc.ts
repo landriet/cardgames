@@ -1,9 +1,28 @@
-import { runPimcGame, PimcGameResult } from "./src/pimc";
+import { runPimcGame, PimcGameResult, ActionStats } from "./src/pimc";
+import { GameAction } from "./src/index";
 
 console.debug = () => {};
 
-const numGames = parseInt(process.argv[2] ?? "10", 10);
-const numSamples = parseInt(process.argv[3] ?? "50", 10);
+const verbose = process.argv.includes("-v") || process.argv.includes("--verbose");
+const positionalArgs = process.argv.slice(2).filter((a) => !a.startsWith("-"));
+const numGames = parseInt(positionalArgs[0] ?? "10", 10);
+const numSamples = parseInt(positionalArgs[1] ?? "50", 10);
+
+function formatAction(action: GameAction): string {
+  if (action.actionType === "enterRoom") return "Enter room";
+  if (action.actionType === "skipRoom") return "Skip room";
+  if (action.actionType === "playCard" && action.card) {
+    const card = `${action.card.suit} ${action.card.rank}`;
+    if (action.card.type === "monster") return `Fight ${card} (${action.mode})`;
+    if (action.card.type === "weapon") return `Equip ${card}`;
+    if (action.card.type === "potion") return `Drink ${card}`;
+  }
+  return action.actionType;
+}
+
+function formatStats(stats: ActionStats[]): string {
+  return stats.map((s) => `    ${formatAction(s.action).padEnd(30)} avg=${s.avgScore.toFixed(1).padStart(6)} wins=${s.wins}`).join("\n");
+}
 
 console.log(`PIMC Simulation: ${numGames} games, ${numSamples} samples per decision`);
 console.log("---");
@@ -22,6 +41,20 @@ for (let i = 0; i < numGames; i++) {
       `Score: ${result.score} | HP: ${result.health} | ` +
       `Moves: ${result.moves.length} | Time: ${(elapsed / 1000).toFixed(1)}s`,
   );
+
+  if (verbose) {
+    for (let m = 0; m < result.moves.length; m++) {
+      const move = result.moves[m];
+      const chosen = formatAction(move.action);
+      if (move.stats.length <= 1) {
+        console.log(`  ${String(m + 1).padStart(3)}. ${chosen}`);
+      } else {
+        console.log(`  ${String(m + 1).padStart(3)}. ${chosen}  [${move.stats.length} options]`);
+        console.log(formatStats(move.stats));
+      }
+    }
+    console.log();
+  }
 }
 
 const totalElapsed = performance.now() - startTotal;
