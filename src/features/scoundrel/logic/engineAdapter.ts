@@ -146,7 +146,7 @@ export function handleCardAction(state: ScoundrelGameState, card: DungeonCard, m
     };
   }
 
-  if (card.type === "monster" && mode === "weapon" && state.lastMonsterDefeated && card.rank > state.lastMonsterDefeated.rank) {
+  if (card.type === "monster" && mode === "weapon" && state.lastMonsterDefeated && card.rank >= state.lastMonsterDefeated.rank) {
     return {
       ...state,
       pendingMonsterChoice: { monster: card },

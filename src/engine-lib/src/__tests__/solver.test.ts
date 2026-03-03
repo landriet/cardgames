@@ -230,6 +230,30 @@ describe("RuleConfig", () => {
     expect(weaponActionForRank8).toBe(true);
   });
 
+  it("weaponKillLimit: true only allows strictly lower rank for weapon mode", () => {
+    const player = new Player(20, 20);
+    player.equippedWeapon = new WeaponCard(5);
+    player.lastMonsterDefeated = new MonsterCard("clubs", 6);
+
+    const game = createGameWithState({
+      deck: [new MonsterCard("clubs", 9), new MonsterCard("spades", 10), new MonsterCard("clubs", 11), new MonsterCard("spades", 12)],
+      room: [new MonsterCard("spades", 6), new MonsterCard("clubs", 5), new PotionCard(3), new WeaponCard(4)],
+      player,
+      roomBeingEntered: true,
+    });
+    game.rules = { ...DEFAULT_RULES, weaponKillLimit: true };
+
+    const actions = game.getPossibleActions();
+    const weaponActionForEqualRank = actions.some(
+      (a) => a.actionType === "playCard" && a.card?.type === "monster" && a.card.rank === 6 && a.mode === "weapon",
+    );
+    const weaponActionForLowerRank = actions.some(
+      (a) => a.actionType === "playCard" && a.card?.type === "monster" && a.card.rank === 5 && a.mode === "weapon",
+    );
+    expect(weaponActionForEqualRank).toBe(false);
+    expect(weaponActionForLowerRank).toBe(true);
+  });
+
   it("startingHealth and maxHealth are respected", () => {
     const game = new Game(undefined, undefined, { startingHealth: 15, maxHealth: 15 });
     expect(game.player.health).toBe(15);

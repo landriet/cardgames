@@ -63,14 +63,20 @@ describe("engineAdapter", () => {
     expect(simulateCardActionHealth(state, staleCard)).toBe(state.health);
   });
 
-  it("does not allow weapon mode on monster stronger than last weapon kill", () => {
+  it("does not allow weapon mode on monster with same or higher rank than last weapon kill", () => {
+    const equalMonster: DungeonCard = { type: "monster", suit: "spades", rank: 4 };
     const strongMonster: DungeonCard = { type: "monster", suit: "spades", rank: 9 };
     const state = withOverrides({
       health: 20,
       equippedWeapon: { type: "weapon", suit: "diamonds", rank: 7 },
       lastMonsterDefeated: { type: "monster", suit: "clubs", rank: 4 },
-      currentRoom: { cards: [strongMonster] },
+      currentRoom: { cards: [equalMonster, strongMonster] },
     });
+
+    const equalAttempt = handleCardAction(state, equalMonster, "weapon");
+    expect(equalAttempt.health).toBe(20);
+    expect(equalAttempt.currentRoom.cards).toContainEqual(equalMonster);
+    expect(equalAttempt.discard).toEqual([]);
 
     const next = handleCardAction(state, strongMonster, "weapon");
     expect(next.health).toBe(20);

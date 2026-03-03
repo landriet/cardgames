@@ -201,7 +201,7 @@ export class Player {
     if (mode === "barehanded") {
       this.health -= card.rank;
     } else if (this.equippedWeapon) {
-      if (weaponKillLimit && this.lastMonsterDefeated && card.rank > this.lastMonsterDefeated.rank) return;
+      if (weaponKillLimit && this.lastMonsterDefeated && card.rank >= this.lastMonsterDefeated.rank) return;
       const damage = Math.max(card.rank - this.equippedWeapon.rank, 0);
       this.health -= damage;
       this.lastMonsterDefeated = card;
@@ -302,7 +302,7 @@ export class Game {
       for (const card of this.currentRoom.cards) {
         if (card.type === "monster") {
           if (this.player.equippedWeapon) {
-            if (!this.rules.weaponKillLimit || !this.player.lastMonsterDefeated || card.rank <= this.player.lastMonsterDefeated.rank) {
+            if (!this.rules.weaponKillLimit || !this.player.lastMonsterDefeated || card.rank < this.player.lastMonsterDefeated.rank) {
               actions.push({ actionType: "playCard", card, mode: "weapon" });
             }
           }
