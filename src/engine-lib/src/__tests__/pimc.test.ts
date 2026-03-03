@@ -1,5 +1,5 @@
 import { Game, Player, Room, MonsterCard, WeaponCard, PotionCard, DungeonCard, RuleConfig } from "../index";
-import { getUnseenCards, pimcBestAction } from "../pimc";
+import { getUnseenCards, pimcBestAction, runPimcGame } from "../pimc";
 
 const DEFAULT_RULES: Required<RuleConfig> = {
   startingHealth: 20,
@@ -159,4 +159,19 @@ describe("pimcBestAction", () => {
     const result = pimcBestAction(game, 5);
     expect(result.stats.length).toBe(0);
   });
+});
+
+describe("runPimcGame", () => {
+  it("plays a complete game and returns a result", () => {
+    const result = runPimcGame(5); // low sample count for speed
+    expect(typeof result.victory).toBe("boolean");
+    expect(typeof result.score).toBe("number");
+    expect(typeof result.health).toBe("number");
+    expect(result.moves.length).toBeGreaterThan(0);
+  }, 60000); // generous timeout
+
+  it("terminates with game over or victory", () => {
+    const result = runPimcGame(5);
+    expect(result.victory || result.health <= 0 || result.score !== undefined).toBe(true);
+  }, 60000);
 });

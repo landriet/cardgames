@@ -1,4 +1,4 @@
-import { DungeonCard, Game, GameAction } from "./index";
+import { DungeonCard, Game, GameAction, RuleConfig } from "./index";
 import { solve } from "./solver";
 
 function cardKey(card: DungeonCard): string {
@@ -151,4 +151,31 @@ function doAction(game: Game, action: GameAction): void {
   } else if (action.actionType === "playCard" && action.card) {
     game.handleCardAction(action.card, action.mode);
   }
+}
+
+export interface PimcGameResult {
+  victory: boolean;
+  score: number;
+  health: number;
+  moves: Array<{ action: GameAction; stats: ActionStats[] }>;
+}
+
+export function runPimcGame(numSamples: number, rules?: RuleConfig): PimcGameResult {
+  const game = new Game(undefined, undefined, rules);
+  const moves: PimcGameResult["moves"] = [];
+
+  while (!game.gameOver && !game.victory) {
+    const result = pimcBestAction(game, numSamples);
+    if (result.stats.length === 0) break;
+
+    doAction(game, result.bestAction);
+    moves.push({ action: result.bestAction, stats: result.stats });
+  }
+
+  return {
+    victory: game.victory,
+    score: game.calculateScore(),
+    health: game.player.health,
+    moves,
+  };
 }
