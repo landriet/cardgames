@@ -87,21 +87,34 @@ function formatResult(name: string, result: SimulationResult): string {
   lines.push(`  Win rate:          ${result.winRate.toFixed(1)}%`);
   lines.push(`  Avg score:         ${result.avgScore.toFixed(2)}`);
   lines.push(`  Median score:      ${result.medianScore}`);
-  lines.push(`  Score range:       ${Math.min(...result.scoreDistribution)} to ${Math.max(...result.scoreDistribution)}`);
   lines.push(`  Avg nodes/game:    ${result.avgNodesExplored.toFixed(0)}`);
 
-  // Score histogram
+  // Single pass over score distribution to collect range and histogram.
+  let minScore = Number.POSITIVE_INFINITY;
+  let maxScore = Number.NEGATIVE_INFINITY;
+  let maxBucketCount = 0;
   const buckets = new Map<number, number>();
   for (const score of result.scoreDistribution) {
+    if (score < minScore) minScore = score;
+    if (score > maxScore) maxScore = score;
+
     const bucket = Math.floor(score / 5) * 5;
-    buckets.set(bucket, (buckets.get(bucket) || 0) + 1);
+    const nextCount = (buckets.get(bucket) || 0) + 1;
+    buckets.set(bucket, nextCount);
+    if (nextCount > maxBucketCount) maxBucketCount = nextCount;
   }
+
+  if (result.scoreDistribution.length > 0) {
+    lines.push(`  Score range:       ${minScore} to ${maxScore}`);
+  } else {
+    lines.push(`  Score range:       n/a`);
+  }
+
   const sortedBuckets = [...buckets.entries()].sort((a, b) => a[0] - b[0]);
-  const maxCount = Math.max(...sortedBuckets.map(([, c]) => c));
 
   lines.push(`\n  Score distribution:`);
   for (const [bucket, count] of sortedBuckets) {
-    const bar = "█".repeat(Math.round((count / maxCount) * 30));
+    const bar = "█".repeat(Math.round((count / maxBucketCount) * 30));
     const label = `${bucket >= 0 ? " " : ""}${bucket}..${bucket + 4}`;
     lines.push(`  ${label.padStart(8)} | ${bar} ${count}`);
   }
