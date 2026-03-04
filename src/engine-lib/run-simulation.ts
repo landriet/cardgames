@@ -2,11 +2,19 @@ import * as fs from "fs";
 import { RuleConfig, GameAction, DungeonCard } from "./src/index";
 import { runSimulation, SimulationResult } from "./src/simulation";
 
-function parseArgs(argv: string[]): { configs: Array<{ name: string; rules: RuleConfig }>; games: number; trace: boolean } {
+const DEFAULT_NODE_LIMIT = 5_000_000;
+
+function parseArgs(argv: string[]): {
+  configs: Array<{ name: string; rules: RuleConfig }>;
+  games: number;
+  trace: boolean;
+  nodeLimit: number;
+} {
   const args = argv.slice(2);
   let games = 1000;
   let configPath: string | undefined;
   let trace = false;
+  let nodeLimit = DEFAULT_NODE_LIMIT;
   const rules: RuleConfig = {};
 
   for (let i = 0; i < args.length; i++) {
@@ -41,6 +49,9 @@ function parseArgs(argv: string[]): { configs: Array<{ name: string; rules: Rule
       case "--trace":
         trace = true;
         break;
+      case "--node-limit":
+        nodeLimit = parseInt(args[++i], 10);
+        break;
     }
   }
 
@@ -55,15 +66,16 @@ function parseArgs(argv: string[]): { configs: Array<{ name: string; rules: Rule
           rules: entry,
         })),
         trace,
+        nodeLimit,
       };
     }
-    return { games, configs: [{ name: configPath, rules: parsed }], trace };
+    return { games, configs: [{ name: configPath, rules: parsed }], trace, nodeLimit };
   }
 
   const hasCustomRules = Object.keys(rules).length > 0;
   const configs = [{ name: hasCustomRules ? "Custom" : "Default", rules }];
 
-  return { games, configs, trace };
+  return { games, configs, trace, nodeLimit };
 }
 
 function formatResult(name: string, result: SimulationResult): string {
@@ -111,10 +123,11 @@ function formatCard(card: DungeonCard): string {
 }
 
 function main(): void {
-  const { configs, games, trace } = parseArgs(process.argv);
+  const { configs, games, trace, nodeLimit } = parseArgs(process.argv);
 
   console.log(`Scoundrel Optimal Solver — Difficulty Analysis`);
   console.log(`Running ${games} games per rule set...`);
+  console.log(`Node limit per game: ${nodeLimit.toLocaleString()}`);
   if (trace) {
     console.log(`Trace mode enabled: printing each game step.`);
   }
@@ -125,6 +138,7 @@ function main(): void {
     const start = Date.now();
     const result = runSimulation(rules, games, {
       trace,
+      nodeLimit,
       onGameComplete: trace
         ? ({ gameNumber, result: gameResult }) => {
             console.log(`\n[${name}] Game ${gameNumber}`);

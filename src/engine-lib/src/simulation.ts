@@ -12,6 +12,7 @@ export interface SimulationResult {
 
 export interface SimulationOptions {
   trace?: boolean;
+  nodeLimit?: number;
   onGameComplete?: (details: { gameNumber: number; result: SolveResult }) => void;
 }
 
@@ -35,7 +36,7 @@ export function runSimulation(rules: RuleConfig, numGames: number, options: Simu
     const player = new Player(fullRules.startingHealth, fullRules.maxHealth);
     const game = new Game(deck, player, fullRules);
 
-    const result = solve(game, originalDeck, { trace: options.trace });
+    const result = solve(game, originalDeck, { trace: options.trace, nodeLimit: options.nodeLimit });
 
     scores.push(result.score);
     if (result.victory) wins++;

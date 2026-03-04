@@ -80,7 +80,7 @@ export interface PimcResult {
   stats: ActionStats[];
 }
 
-export function pimcBestAction(game: Game, numSamples: number): PimcResult {
+export function pimcBestAction(game: Game, numSamples: number, nodeLimit?: number): PimcResult {
   const actions = game.getPossibleActions();
 
   if (actions.length === 0) {
@@ -120,7 +120,7 @@ export function pimcBestAction(game: Game, numSamples: number): PimcResult {
       // Apply the candidate action
       doAction(clone, actions[a]);
 
-      const result = solve(clone, allCards);
+      const result = solve(clone, allCards, { nodeLimit });
       actionScores[a].push(result.score);
       if (result.victory) actionWins[a]++;
     }
@@ -161,12 +161,12 @@ export interface PimcGameResult {
   moves: Array<{ action: GameAction; stats: ActionStats[] }>;
 }
 
-export function runPimcGame(numSamples: number, rules?: RuleConfig): PimcGameResult {
+export function runPimcGame(numSamples: number, rules?: RuleConfig, nodeLimit?: number): PimcGameResult {
   const game = new Game(undefined, undefined, rules);
   const moves: PimcGameResult["moves"] = [];
 
   while (!game.gameOver && !game.victory) {
-    const result = pimcBestAction(game, numSamples);
+    const result = pimcBestAction(game, numSamples, nodeLimit);
     if (result.stats.length === 0) break;
 
     doAction(game, result.bestAction);
@@ -181,12 +181,12 @@ export function runPimcGame(numSamples: number, rules?: RuleConfig): PimcGameRes
   };
 }
 
-export function runPimcSimulation(numGames: number, numSamples: number, rules?: RuleConfig): SimulationResult {
+export function runPimcSimulation(numGames: number, numSamples: number, rules?: RuleConfig, nodeLimit?: number): SimulationResult {
   const scores: number[] = [];
   let wins = 0;
 
   for (let i = 0; i < numGames; i++) {
-    const result = runPimcGame(numSamples, rules);
+    const result = runPimcGame(numSamples, rules, nodeLimit);
     scores.push(result.score);
     if (result.victory) wins++;
   }

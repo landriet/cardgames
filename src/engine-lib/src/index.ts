@@ -253,7 +253,6 @@ export class Game {
     _savedDeckLength?: number;
     _dealtCards?: DungeonCard[];
     _dealHappened?: boolean;
-    _roomCardsBeforeDeal?: DungeonCard[];
     _savedGameOver?: boolean;
     _savedVictory?: boolean;
     _savedRoomBeingEntered?: boolean;
@@ -486,13 +485,14 @@ export class Game {
       this.cardsResolvedThisTurn = 0;
     }
 
-    // Snapshot room cards before applyTurnRules (needed to reverse deal)
-    const roomCardsBeforeDeal = this.currentRoom.cards.slice();
+    // Snapshot room card references before applyTurnRules (needed to reverse deal)
+    const roomRefsBeforeDeal = new Set(this.currentRoom.cards);
 
     this.applyTurnRules();
 
-    // Detect if a deal happened
-    const dealHappened = this.currentRoom.cards.length > roomCardsBeforeDeal.length;
+    // Identify dealt cards by reference (cards in room now but not before the deal)
+    const dealtCards = this.currentRoom.cards.filter((c) => !roomRefsBeforeDeal.has(c));
+    const dealHappened = dealtCards.length > 0;
 
     this.lastAction = {
       actionType: "playCard",
@@ -508,7 +508,7 @@ export class Game {
       _savedLastResolvedCardType: savedLastResolvedCardType,
       _savedLastResolvedPotionValue: savedLastResolvedPotionValue,
       _dealHappened: dealHappened,
-      _roomCardsBeforeDeal: dealHappened ? roomCardsBeforeDeal : undefined,
+      _dealtCards: dealHappened ? dealtCards : undefined,
       _savedActualHealAmount: actualHealAmount,
     };
   }
@@ -522,11 +522,12 @@ export class Game {
     if (!card) return;
 
     // Reverse deal first if one happened
-    if (saved._dealHappened && saved._roomCardsBeforeDeal) {
-      const carryCount = saved._roomCardsBeforeDeal.length;
-      const fromDeck = this.currentRoom.cards.slice(carryCount);
-      this.deck.unshift(...fromDeck);
-      this.currentRoom = new Room(saved._roomCardsBeforeDeal);
+    if (saved._dealHappened && saved._dealtCards) {
+      const dealtSet = new Set(saved._dealtCards);
+      // Remove dealt cards from room by reference and put them back at front of deck
+      const remainingCards = this.currentRoom.cards.filter((c) => !dealtSet.has(c));
+      this.deck.unshift(...saved._dealtCards);
+      this.currentRoom = new Room(remainingCards);
     }
 
     // Restore gameOver/victory

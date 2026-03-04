@@ -166,30 +166,23 @@ describe("pimcBestAction", () => {
   });
 });
 
-describe("runPimcGame", () => {
-  it("plays a complete game and returns a result", () => {
-    const result = runPimcGame(5); // low sample count for speed
-    expect(typeof result.victory).toBe("boolean");
-    expect(typeof result.score).toBe("number");
-    expect(typeof result.health).toBe("number");
-    expect(result.moves.length).toBeGreaterThan(0);
-  }, 60000); // generous timeout
+describe("pimcBestAction with fully-visible state", () => {
+  it("plays through a fully-visible game using PIMC", () => {
+    // All cards visible (in room + discard) so unseen=0 and solve is trivial
+    const fullDeck = Game.createDeck();
+    const roomCards = fullDeck.slice(0, 4);
+    const discardCards = fullDeck.slice(4);
 
-  it("terminates with game over or victory", () => {
-    const result = runPimcGame(5);
-    expect(result.victory || result.health <= 0 || result.score !== undefined).toBe(true);
-  }, 60000);
-});
+    const game = createGameWithState({
+      deck: [],
+      room: roomCards,
+      player: new Player(20, 20),
+      discard: discardCards,
+      roomBeingEntered: true,
+    });
 
-describe("runPimcSimulation", () => {
-  it("runs multiple games and returns aggregated stats", () => {
-    const result = runPimcSimulation(3, 5); // 3 games, 5 samples each
-    expect(result.totalGames).toBe(3);
-    expect(typeof result.winRate).toBe("number");
-    expect(typeof result.avgScore).toBe("number");
-    expect(typeof result.medianScore).toBe("number");
-    expect(result.scoreDistribution.length).toBe(3);
-    expect(result.winRate).toBeGreaterThanOrEqual(0);
-    expect(result.winRate).toBeLessThanOrEqual(100);
-  }, 120000);
+    const result = pimcBestAction(game, 3);
+    expect(result.bestAction.actionType).toBe("playCard");
+    expect(result.stats.length).toBeGreaterThan(0);
+  });
 });

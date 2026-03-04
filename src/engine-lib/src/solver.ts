@@ -45,6 +45,7 @@ export interface SolveResult {
   victory: boolean;
   score: number;
   nodesExplored: number;
+  nodeLimitHit?: boolean;
   trace?: SolveTraceStep[];
 }
 
@@ -64,12 +65,14 @@ export interface SolveTraceStep {
 
 interface SolverOptions {
   trace?: boolean;
+  nodeLimit?: number;
 }
 
 export function solve(game: Game, originalDeck: DungeonCard[], options: SolverOptions = {}): SolveResult {
   const cardIndex = buildCardIndex(originalDeck);
   const transpositionTable = new Map<string, { victory: boolean; score: number; bestAction?: GameAction }>();
   let nodesExplored = 0;
+  const nodeLimit = options.nodeLimit ?? Infinity;
 
   function dfs(): { victory: boolean; score: number } {
     nodesExplored++;
@@ -80,6 +83,11 @@ export function solve(game: Game, originalDeck: DungeonCard[], options: SolverOp
     }
     if (game.victory) {
       return { victory: true, score: game.calculateScore() };
+    }
+
+    // Node limit: return heuristic score to avoid OOM
+    if (nodesExplored >= nodeLimit) {
+      return { victory: false, score: game.calculateScore() };
     }
 
     // Transposition table lookup
@@ -139,13 +147,13 @@ export function solve(game: Game, originalDeck: DungeonCard[], options: SolverOp
   }
 
   const result = dfs();
-  const finalResult: SolveResult = { ...result, nodesExplored };
+  const finalResult: SolveResult = { ...result, nodesExplored, nodeLimitHit: nodesExplored >= nodeLimit };
 
   if (options.trace) {
     const tableTrace = replayBestPath(game, cardIndex, transpositionTable);
     const tableTraceReachedTerminal =
       tableTrace.length > 0 && (tableTrace[tableTrace.length - 1].gameOver || tableTrace[tableTrace.length - 1].victory);
-    finalResult.trace = tableTraceReachedTerminal ? tableTrace : replayBestPathByReSolve(game, originalDeck);
+    finalResult.trace = tableTraceReachedTerminal ? tableTrace : replayBestPathByReSolve(game, originalDeck, options.nodeLimit);
   }
 
   return finalResult;
@@ -252,7 +260,7 @@ function replayBestPath(
   return trace;
 }
 
-function replayBestPathByReSolve(rootGame: Game, originalDeck: DungeonCard[]): SolveTraceStep[] {
+function replayBestPathByReSolve(rootGame: Game, originalDeck: DungeonCard[], nodeLimit?: number): SolveTraceStep[] {
   const replay = rootGame.clone();
   const trace: SolveTraceStep[] = [];
   let step = 1;
@@ -269,7 +277,7 @@ function replayBestPathByReSolve(rootGame: Game, originalDeck: DungeonCard[]): S
     for (const action of actions) {
       const candidate = replay.clone();
       doAction(candidate, action);
-      const result = solve(candidate, originalDeck, { trace: false });
+      const result = solve(candidate, originalDeck, { trace: false, nodeLimit });
 
       if (!bestResult || compareBetter(result, bestResult)) {
         bestResult = result;
