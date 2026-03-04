@@ -1,4 +1,4 @@
-import { DungeonCard, Game, GameAction, MonsterCard, PotionCard, WeaponCard } from "./index";
+import { DungeonCard, Game, GameAction } from "./index";
 
 // --- Compact State Hashing ---
 
@@ -39,6 +39,134 @@ export function compactStateKey(game: Game, cardIndex: CardIndex): string {
   return `${deckIds.join(",")}|${roomIds.join(",")}|${health}|${weaponRank}|${lastMonsterRank}|${monstersOnWeapon.join(",")}|${flags.toString(16)}`;
 }
 
+// --- Zobrist Hashing ---
+
+function mulberry32(seed: number): () => number {
+  return () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return (t ^ (t >>> 14)) >>> 0;
+  };
+}
+
+interface ZobristTable {
+  cardInDeck: [Int32Array, Int32Array];
+  cardInRoom: [Int32Array, Int32Array];
+  monsterOnWeapon: [Int32Array, Int32Array];
+  health: [Int32Array, Int32Array];
+  weaponRank: [Int32Array, Int32Array];
+  lastMonsterRank: [Int32Array, Int32Array];
+  flags: [Int32Array, Int32Array];
+}
+
+const ZOBRIST_MAX_RANK = 15;
+
+function createZobristTable(numCards: number, maxMoWPositions: number): ZobristTable {
+  const rng = mulberry32(0xdeadbeef);
+  const fill = (size: number): [Int32Array, Int32Array] => {
+    const a = new Int32Array(size);
+    const b = new Int32Array(size);
+    for (let i = 0; i < size; i++) {
+      a[i] = rng() | 0;
+      b[i] = rng() | 0;
+    }
+    return [a, b];
+  };
+  return {
+    cardInDeck: fill(numCards),
+    cardInRoom: fill(numCards),
+    monsterOnWeapon: fill(maxMoWPositions * ZOBRIST_MAX_RANK),
+    health: fill(21),
+    weaponRank: fill(ZOBRIST_MAX_RANK),
+    lastMonsterRank: fill(ZOBRIST_MAX_RANK),
+    flags: fill(16),
+  };
+}
+
+type CardIdentityIndex = Map<DungeonCard, number>;
+
+function buildCardIdentityIndex(game: Game): CardIdentityIndex {
+  const identity: CardIdentityIndex = new Map();
+  let idx = 0;
+  const add = (card: DungeonCard) => {
+    if (!identity.has(card)) identity.set(card, idx++);
+  };
+  for (const card of game.deck) add(card);
+  for (const card of game.currentRoom.cards) add(card);
+  for (const card of game.discard) add(card);
+  if (game.player.equippedWeapon) add(game.player.equippedWeapon);
+  for (const card of game.player.monstersOnWeapon) add(card);
+  if (game.player.lastMonsterDefeated) add(game.player.lastMonsterDefeated);
+  return identity;
+}
+
+// Module-level scratch buffer for monstersOnWeapon rank sorting (avoids per-call allocation)
+const _mowScratch = new Uint8Array(52);
+
+function zobristStateKey(game: Game, cardIdentity: CardIdentityIndex, table: ZobristTable): string {
+  let h1 = 0;
+  let h2 = 0;
+
+  // Deck cards (XOR = order-independent, no sort needed)
+  for (const card of game.deck) {
+    const idx = cardIdentity.get(card)!;
+    h1 ^= table.cardInDeck[0][idx];
+    h2 ^= table.cardInDeck[1][idx];
+  }
+
+  // Room cards (XOR = order-independent)
+  for (const card of game.currentRoom.cards) {
+    const idx = cardIdentity.get(card)!;
+    h1 ^= table.cardInRoom[0][idx];
+    h2 ^= table.cardInRoom[1][idx];
+  }
+
+  // Monsters on weapon — rank-based, position-sensitive after sort
+  let mowLen = 0;
+  for (const m of game.player.monstersOnWeapon) {
+    _mowScratch[mowLen++] = m.rank;
+  }
+  // Insertion sort (typically 0-3 elements)
+  for (let i = 1; i < mowLen; i++) {
+    const v = _mowScratch[i];
+    let j = i - 1;
+    while (j >= 0 && _mowScratch[j] > v) {
+      _mowScratch[j + 1] = _mowScratch[j];
+      j--;
+    }
+    _mowScratch[j + 1] = v;
+  }
+  for (let i = 0; i < mowLen; i++) {
+    const slot = i * ZOBRIST_MAX_RANK + _mowScratch[i];
+    h1 ^= table.monsterOnWeapon[0][slot];
+    h2 ^= table.monsterOnWeapon[1][slot];
+  }
+
+  // Scalar state
+  h1 ^= table.health[0][game.player.health];
+  h2 ^= table.health[1][game.player.health];
+
+  const wr = game.player.equippedWeapon ? game.player.equippedWeapon.rank : 0;
+  h1 ^= table.weaponRank[0][wr];
+  h2 ^= table.weaponRank[1][wr];
+
+  const lmr = game.player.lastMonsterDefeated ? game.player.lastMonsterDefeated.rank : 0;
+  h1 ^= table.lastMonsterRank[0][lmr];
+  h2 ^= table.lastMonsterRank[1][lmr];
+
+  const flags =
+    (game.player.potionTakenThisTurn ? 1 : 0) |
+    (game.canDeferRoom ? 2 : 0) |
+    (game.lastActionWasDefer ? 4 : 0) |
+    (game.roomBeingEntered ? 8 : 0);
+  h1 ^= table.flags[0][flags];
+  h2 ^= table.flags[1][flags];
+
+  return `${h1 >>> 0}_${h2 >>> 0}`;
+}
+
 // --- Solver ---
 
 export interface SolveResult {
@@ -69,7 +197,8 @@ interface SolverOptions {
 }
 
 export function solve(game: Game, originalDeck: DungeonCard[], options: SolverOptions = {}): SolveResult {
-  const cardIndex = buildCardIndex(originalDeck);
+  const cardIdentity = buildCardIdentityIndex(game);
+  const zobrist = createZobristTable(cardIdentity.size, cardIdentity.size);
   const transpositionTable = new Map<string, { victory: boolean; score: number; bestAction?: GameAction }>();
   let nodesExplored = 0;
   const nodeLimit = options.nodeLimit ?? Infinity;
@@ -85,13 +214,13 @@ export function solve(game: Game, originalDeck: DungeonCard[], options: SolverOp
       return { victory: true, score: game.calculateScore() };
     }
 
-    // Node limit: return heuristic score to avoid OOM
-    if (nodesExplored >= nodeLimit) {
+    // Node/memory limit: return heuristic score to avoid OOM
+    if (nodesExplored >= nodeLimit || transpositionTable.size >= 16_000_000) {
       return { victory: false, score: game.calculateScore() };
     }
 
     // Transposition table lookup
-    const stateKey = compactStateKey(game, cardIndex);
+    const stateKey = zobristStateKey(game, cardIdentity, zobrist);
     const cached = transpositionTable.get(stateKey);
     if (cached) return { victory: cached.victory, score: cached.score };
 
@@ -150,7 +279,7 @@ export function solve(game: Game, originalDeck: DungeonCard[], options: SolverOp
   const finalResult: SolveResult = { ...result, nodesExplored, nodeLimitHit: nodesExplored >= nodeLimit };
 
   if (options.trace) {
-    const tableTrace = replayBestPath(game, cardIndex, transpositionTable);
+    const tableTrace = replayBestPath(game, zobrist, transpositionTable);
     const tableTraceReachedTerminal =
       tableTrace.length > 0 && (tableTrace[tableTrace.length - 1].gameOver || tableTrace[tableTrace.length - 1].victory);
     finalResult.trace = tableTraceReachedTerminal ? tableTrace : replayBestPathByReSolve(game, originalDeck, options.nodeLimit);
@@ -222,15 +351,16 @@ function undoAction(game: Game): void {
 
 function replayBestPath(
   rootGame: Game,
-  cardIndex: CardIndex,
+  zobrist: ZobristTable,
   transpositionTable: Map<string, { victory: boolean; score: number; bestAction?: GameAction }>,
 ): SolveTraceStep[] {
   const replay = rootGame.clone();
+  const replayCardIdentity = buildCardIdentityIndex(replay);
   const trace: SolveTraceStep[] = [];
   let step = 1;
 
   while (!replay.gameOver && !replay.victory) {
-    const stateKey = compactStateKey(replay, cardIndex);
+    const stateKey = zobristStateKey(replay, replayCardIdentity, zobrist);
     const cached = transpositionTable.get(stateKey);
     if (!cached?.bestAction) break;
 
