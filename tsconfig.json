@@ -16,5 +16,13 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**",
+    "src/stories/**",
+    "src/trainAI.ts",
+    "src/engine-lib/benchmark-*.ts"
+  ]
 }
