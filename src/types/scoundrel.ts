@@ -31,6 +31,7 @@ export interface ScoundrelGameState {
   lastActionWasDefer: boolean;
   gameOver: boolean;
   victory: boolean;
+  cardsResolvedThisTurn?: number;
   potionTakenThisTurn?: boolean;
   score?: number;
   pendingMonsterChoice?: { monster: DungeonCard };

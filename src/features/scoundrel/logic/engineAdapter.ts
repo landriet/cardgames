@@ -77,6 +77,7 @@ function toEngineGame(state: ScoundrelGameState): Game {
   game.gameOver = state.gameOver;
   game.victory = state.victory;
   game.roomBeingEntered = true;
+  game.cardsResolvedThisTurn = state.cardsResolvedThisTurn ?? 0;
   game.lastAction = null;
 
   return game;
@@ -96,6 +97,7 @@ function fromEngineGame(game: Game): ScoundrelGameState {
     lastActionWasDefer: game.lastActionWasDefer,
     gameOver: game.gameOver,
     victory: game.victory,
+    cardsResolvedThisTurn: game.cardsResolvedThisTurn,
     potionTakenThisTurn: game.player.potionTakenThisTurn,
   };
 
@@ -146,7 +148,7 @@ export function handleCardAction(state: ScoundrelGameState, card: DungeonCard, m
     };
   }
 
-  if (card.type === "monster" && mode === "weapon" && state.lastMonsterDefeated && card.rank >= state.lastMonsterDefeated.rank) {
+  if (card.type === "monster" && mode === "weapon" && state.lastMonsterDefeated && card.rank > state.lastMonsterDefeated.rank) {
     return {
       ...state,
       pendingMonsterChoice: { monster: card },

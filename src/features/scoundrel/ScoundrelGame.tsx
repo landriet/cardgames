@@ -38,7 +38,7 @@ export default function ScoundrelGame() {
   const canUseWeaponOnPendingMonster = !!(
     game.pendingMonsterChoice &&
     game.equippedWeapon &&
-    (!game.lastMonsterDefeated || game.pendingMonsterChoice.monster.rank < game.lastMonsterDefeated.rank)
+    (!game.lastMonsterDefeated || game.pendingMonsterChoice.monster.rank <= game.lastMonsterDefeated.rank)
   );
 
   // Calculate health percentage for the bar

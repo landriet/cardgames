@@ -63,7 +63,7 @@ describe("engineAdapter", () => {
     expect(simulateCardActionHealth(state, staleCard)).toBe(state.health);
   });
 
-  it("does not allow weapon mode on monster with same or higher rank than last weapon kill", () => {
+  it("allows equal-rank weapon attack but blocks higher-rank weapon attack", () => {
     const equalMonster: DungeonCard = { type: "monster", suit: "spades", rank: 4 };
     const strongMonster: DungeonCard = { type: "monster", suit: "spades", rank: 9 };
     const state = withOverrides({
@@ -74,13 +74,26 @@ describe("engineAdapter", () => {
     });
 
     const equalAttempt = handleCardAction(state, equalMonster, "weapon");
-    expect(equalAttempt.health).toBe(20);
-    expect(equalAttempt.currentRoom.cards).toContainEqual(equalMonster);
-    expect(equalAttempt.discard).toEqual([]);
+    expect(equalAttempt.pendingMonsterChoice).toBeUndefined();
+    expect(equalAttempt.currentRoom.cards).not.toContainEqual(equalMonster);
 
     const next = handleCardAction(state, strongMonster, "weapon");
     expect(next.health).toBe(20);
+    expect(next.pendingMonsterChoice?.monster).toEqual(strongMonster);
     expect(next.currentRoom.cards).toContainEqual(strongMonster);
-    expect(next.discard).toEqual([]);
+  });
+
+  it("advances room after 3 resolved cards even when first action is taking a weapon", () => {
+    const state = initGameWithStaticDeck();
+    const weapon = state.currentRoom.cards.find((card) => card.type === "weapon" && card.rank === 7)!;
+
+    const afterWeapon = handleCardAction(state, weapon);
+    const weakMonster = afterWeapon.currentRoom.cards.find((card) => card.type === "monster" && card.rank === 3)!;
+    const potion = afterWeapon.currentRoom.cards.find((card) => card.type === "potion" && card.rank === 5)!;
+
+    const afterMonster = handleCardAction(afterWeapon, weakMonster, "weapon");
+    const afterThirdCard = handleCardAction(afterMonster, potion);
+
+    expect(afterThirdCard.currentRoom.cards.length).toBe(4);
   });
 });
