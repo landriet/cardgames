@@ -1,6 +1,6 @@
 import { DungeonCard, Game, GameAction, RuleConfig } from "./index";
 import { SimulationResult } from "./simulation";
-import { solve } from "./solver";
+import { solveRootActions } from "./solver";
 
 function cardKey(card: DungeonCard): string {
   return `${card.type}-${card.suit}-${card.rank}`;
@@ -80,6 +80,13 @@ export interface PimcResult {
   stats: ActionStats[];
 }
 
+function actionKey(a: GameAction): string {
+  if (a.actionType === "enterRoom") return "enterRoom";
+  if (a.actionType === "skipRoom") return "skipRoom";
+  if (a.card) return `play|${a.card.type}|${a.card.suit}|${a.card.rank}|${a.mode ?? ""}`;
+  return a.actionType;
+}
+
 export function pimcBestAction(game: Game, numSamples: number, nodeLimit?: number): PimcResult {
   const actions = game.getPossibleActions();
 
@@ -96,6 +103,12 @@ export function pimcBestAction(game: Game, numSamples: number, nodeLimit?: numbe
 
   const unseen = getUnseenCards(game);
 
+  // Build mapping from action key to index in the original actions array
+  const actionKeyToIndex = new Map<string, number>();
+  for (let i = 0; i < actions.length; i++) {
+    actionKeyToIndex.set(actionKey(actions[i]), i);
+  }
+
   // Initialize per-action score accumulators
   const actionScores: number[][] = actions.map(() => []);
   const actionWins: number[] = actions.map(() => 0);
@@ -103,33 +116,26 @@ export function pimcBestAction(game: Game, numSamples: number, nodeLimit?: numbe
   for (let s = 0; s < numSamples; s++) {
     const sampledDeck = shuffle(unseen.map((c) => c.clone()));
 
-    for (let a = 0; a < actions.length; a++) {
-      const clone = game.clone();
-      clone.deck = sampledDeck.map((c) => c.clone());
+    const clone = game.clone();
+    clone.deck = sampledDeck;
 
-      // Build the full "original deck" for the solver's card index:
-      // all cards in the game (room + discard + weapon + monstersOnWeapon + sampled deck)
-      const allCards = [
-        ...clone.currentRoom.cards,
-        ...clone.discard,
-        ...(clone.player.equippedWeapon ? [clone.player.equippedWeapon] : []),
-        ...clone.player.monstersOnWeapon,
-        ...clone.deck,
-      ];
+    // One solve evaluating all root actions with a shared transposition table
+    const result = solveRootActions(clone, { nodeLimit });
 
-      // Apply the candidate action
-      doAction(clone, actions[a]);
-
-      const result = solve(clone, allCards, { nodeLimit });
-      actionScores[a].push(result.score);
-      if (result.victory) actionWins[a]++;
+    for (const ar of result.actionResults) {
+      const key = actionKey(ar.action);
+      const idx = actionKeyToIndex.get(key);
+      if (idx !== undefined) {
+        actionScores[idx].push(ar.score);
+        if (ar.victory) actionWins[idx]++;
+      }
     }
   }
 
   // Build stats and find best
   const stats: ActionStats[] = actions.map((action, i) => ({
     action,
-    avgScore: actionScores[i].reduce((sum, s) => sum + s, 0) / numSamples,
+    avgScore: actionScores[i].length > 0 ? actionScores[i].reduce((sum, s) => sum + s, 0) / actionScores[i].length : 0,
     wins: actionWins[i],
     scores: actionScores[i],
   }));

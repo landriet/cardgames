@@ -191,20 +191,37 @@ export interface SolveTraceStep {
   scoreAfter: number;
 }
 
+export interface RootActionResult {
+  action: GameAction;
+  victory: boolean;
+  score: number;
+}
+
+export interface SolveRootActionsResult {
+  actionResults: RootActionResult[];
+  nodesExplored: number;
+  nodeLimitHit: boolean;
+}
+
 interface SolverOptions {
   trace?: boolean;
   nodeLimit?: number;
 }
 
-export function solve(game: Game, originalDeck: DungeonCard[], options: SolverOptions = {}): SolveResult {
-  const cardIdentity = buildCardIdentityIndex(game);
-  const zobrist = createZobristTable(cardIdentity.size, cardIdentity.size);
-  const transpositionTable = new Map<string, { victory: boolean; score: number; bestAction?: GameAction }>();
-  let nodesExplored = 0;
-  const nodeLimit = options.nodeLimit ?? Infinity;
+interface NodeLimitRef {
+  count: number;
+  limit: number;
+}
 
+function makeDfs(
+  game: Game,
+  cardIdentity: CardIdentityIndex,
+  zobrist: ZobristTable,
+  transpositionTable: Map<string, { victory: boolean; score: number; bestAction?: GameAction }>,
+  nodeLimitRef: NodeLimitRef,
+): () => { victory: boolean; score: number } {
   function dfs(): { victory: boolean; score: number } {
-    nodesExplored++;
+    nodeLimitRef.count++;
 
     // Terminal checks
     if (game.gameOver) {
@@ -215,7 +232,7 @@ export function solve(game: Game, originalDeck: DungeonCard[], options: SolverOp
     }
 
     // Node/memory limit: return heuristic score to avoid OOM
-    if (nodesExplored >= nodeLimit || transpositionTable.size >= 16_000_000) {
+    if (nodeLimitRef.count >= nodeLimitRef.limit || transpositionTable.size >= 16_000_000) {
       return { victory: false, score: game.calculateScore() };
     }
 
@@ -275,8 +292,22 @@ export function solve(game: Game, originalDeck: DungeonCard[], options: SolverOp
     return best;
   }
 
+  return dfs;
+}
+
+export function solve(game: Game, originalDeck: DungeonCard[], options: SolverOptions = {}): SolveResult {
+  const cardIdentity = buildCardIdentityIndex(game);
+  const zobrist = createZobristTable(cardIdentity.size, cardIdentity.size);
+  const transpositionTable = new Map<string, { victory: boolean; score: number; bestAction?: GameAction }>();
+  const nodeLimitRef: NodeLimitRef = { count: 0, limit: options.nodeLimit ?? Infinity };
+
+  const dfs = makeDfs(game, cardIdentity, zobrist, transpositionTable, nodeLimitRef);
   const result = dfs();
-  const finalResult: SolveResult = { ...result, nodesExplored, nodeLimitHit: nodesExplored >= nodeLimit };
+  const finalResult: SolveResult = {
+    ...result,
+    nodesExplored: nodeLimitRef.count,
+    nodeLimitHit: nodeLimitRef.count >= nodeLimitRef.limit,
+  };
 
   if (options.trace) {
     const tableTrace = replayBestPath(game, zobrist, transpositionTable);
@@ -286,6 +317,31 @@ export function solve(game: Game, originalDeck: DungeonCard[], options: SolverOp
   }
 
   return finalResult;
+}
+
+export function solveRootActions(game: Game, options: SolverOptions = {}): SolveRootActionsResult {
+  const cardIdentity = buildCardIdentityIndex(game);
+  const zobrist = createZobristTable(cardIdentity.size, cardIdentity.size);
+  const transpositionTable = new Map<string, { victory: boolean; score: number; bestAction?: GameAction }>();
+  const nodeLimitRef: NodeLimitRef = { count: 0, limit: options.nodeLimit ?? Infinity };
+
+  const dfs = makeDfs(game, cardIdentity, zobrist, transpositionTable, nodeLimitRef);
+
+  const actions = game.getPossibleActions();
+  const actionResults: RootActionResult[] = [];
+
+  for (const action of actions) {
+    doAction(game, action);
+    const result = dfs();
+    undoAction(game);
+    actionResults.push({ action, victory: result.victory, score: result.score });
+  }
+
+  return {
+    actionResults,
+    nodesExplored: nodeLimitRef.count,
+    nodeLimitHit: nodeLimitRef.count >= nodeLimitRef.limit,
+  };
 }
 
 function actionPriority(action: GameAction, game: Game): number {

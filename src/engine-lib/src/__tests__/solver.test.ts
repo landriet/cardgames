@@ -1,5 +1,5 @@
 import { Game, Player, Room, MonsterCard, WeaponCard, PotionCard, DungeonCard, RuleConfig } from "../index";
-import { compactStateKey, buildCardIndex, solve } from "../solver";
+import { compactStateKey, buildCardIndex, solve, solveRootActions } from "../solver";
 
 const DEFAULT_RULES: Required<RuleConfig> = {
   startingHealth: 20,
@@ -261,5 +261,100 @@ describe("RuleConfig", () => {
     const game = new Game(undefined, undefined, { startingHealth: 15, maxHealth: 15 });
     expect(game.player.health).toBe(15);
     expect(game.player.maxHealth).toBe(15);
+  });
+});
+
+describe("solveRootActions", () => {
+  it("returns an entry for every root action", () => {
+    const deck = [new WeaponCard(10), new MonsterCard("clubs", 2), new MonsterCard("spades", 3), new MonsterCard("clubs", 4)];
+
+    const game = createGameWithState({
+      deck: deck.slice(),
+      room: [],
+      player: new Player(20, 20),
+    });
+    game.applyTurnRules();
+
+    const actions = game.getPossibleActions();
+    const result = solveRootActions(game);
+
+    expect(result.actionResults.length).toBe(actions.length);
+    expect(result.nodesExplored).toBeGreaterThan(0);
+  });
+
+  it("scores match individual solve calls on a small deterministic game", () => {
+    function makeGame() {
+      const deck = [new WeaponCard(8), new PotionCard(5), new MonsterCard("clubs", 6), new MonsterCard("spades", 4)];
+      const allCards = deck.map((c) => c.clone());
+      const game = createGameWithState({
+        deck: deck.slice(),
+        room: [],
+        player: new Player(20, 20),
+      });
+      game.applyTurnRules();
+      return { game, allCards };
+    }
+
+    // Get results from solveRootActions on one game instance
+    const { game: rootGame } = makeGame();
+    const rootResult = solveRootActions(rootGame);
+
+    // Compare with individual solve calls on fresh game instances
+    for (const ar of rootResult.actionResults) {
+      const { game: freshGame, allCards } = makeGame();
+      if (ar.action.actionType === "enterRoom") {
+        freshGame.enterRoom();
+      } else if (ar.action.actionType === "skipRoom") {
+        freshGame.avoidRoom();
+      } else if (ar.action.actionType === "playCard" && ar.action.card) {
+        const card = freshGame.currentRoom.cards.find(
+          (c) => c.type === ar.action.card!.type && c.suit === ar.action.card!.suit && c.rank === ar.action.card!.rank,
+        );
+        if (card) freshGame.handleCardAction(card, ar.action.mode);
+      }
+
+      const individualResult = solve(freshGame, allCards);
+      expect(ar.victory).toBe(individualResult.victory);
+      expect(ar.score).toBe(individualResult.score);
+    }
+  });
+
+  it("sets nodeLimitHit true when nodeLimit is small", () => {
+    const deck = [
+      new WeaponCard(8),
+      new PotionCard(5),
+      new MonsterCard("clubs", 6),
+      new MonsterCard("spades", 4),
+      new MonsterCard("clubs", 3),
+      new MonsterCard("spades", 2),
+      new WeaponCard(5),
+      new PotionCard(3),
+    ];
+
+    const game = createGameWithState({
+      deck: deck.slice(),
+      room: [],
+      player: new Player(20, 20),
+    });
+    game.applyTurnRules();
+
+    const result = solveRootActions(game, { nodeLimit: 5 });
+    expect(result.nodeLimitHit).toBe(true);
+    expect(result.nodesExplored).toBeGreaterThanOrEqual(5);
+  });
+
+  it("returns empty results on a terminal game", () => {
+    const player = new Player(20, 20);
+    const game = createGameWithState({
+      deck: [],
+      room: [],
+      player,
+    });
+    game.victory = true;
+
+    const result = solveRootActions(game);
+    expect(result.actionResults).toHaveLength(0);
+    expect(result.nodesExplored).toBe(0);
+    expect(result.nodeLimitHit).toBe(false);
   });
 });
