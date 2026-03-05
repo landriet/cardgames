@@ -1,6 +1,6 @@
 import { DungeonCard, Game, GameAction, RuleConfig } from "./index";
 import { SimulationResult } from "./simulation";
-import { solveRootActions } from "./solver";
+import { createSolverContext, solveRootActionsWithContext } from "./solver";
 
 function cardKey(card: DungeonCard): string {
   return `${card.type}-${card.suit}-${card.rank}`;
@@ -112,6 +112,7 @@ export function pimcBestAction(game: Game, numSamples: number, nodeLimit?: numbe
   // Initialize per-action score accumulators
   const actionScores: number[][] = actions.map(() => []);
   const actionWins: number[] = actions.map(() => 0);
+  const solverContext = createSolverContext(Game.createDeck());
 
   for (let s = 0; s < numSamples; s++) {
     const sampledDeck = shuffle(unseen.map((c) => c.clone()));
@@ -120,7 +121,7 @@ export function pimcBestAction(game: Game, numSamples: number, nodeLimit?: numbe
     clone.deck = sampledDeck;
 
     // One solve evaluating all root actions with a shared transposition table
-    const result = solveRootActions(clone, { nodeLimit });
+    const result = solveRootActionsWithContext(clone, solverContext, { nodeLimit });
 
     for (const ar of result.actionResults) {
       const key = actionKey(ar.action);

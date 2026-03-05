@@ -1,5 +1,14 @@
 import { Game, Player, Room, MonsterCard, WeaponCard, PotionCard, DungeonCard, RuleConfig } from "../index";
-import { compactStateKey, buildCardIndex, solve, solveRootActions } from "../solver";
+import {
+  buildCardIndex,
+  compactStateKey,
+  createSolverContext,
+  resetSolverContext,
+  solve,
+  solveRootActions,
+  solveRootActionsWithContext,
+  solveWithContext,
+} from "../solver";
 
 const DEFAULT_RULES: Required<RuleConfig> = {
   startingHealth: 20,
@@ -356,5 +365,74 @@ describe("solveRootActions", () => {
     expect(result.actionResults).toHaveLength(0);
     expect(result.nodesExplored).toBe(0);
     expect(result.nodeLimitHit).toBe(false);
+  });
+
+  it("matches solveRootActionsWithContext results on deterministic game", () => {
+    const deck = [new WeaponCard(8), new PotionCard(5), new MonsterCard("clubs", 6), new MonsterCard("spades", 4)];
+
+    const gameA = createGameWithState({
+      deck: deck.slice(),
+      room: [],
+      player: new Player(20, 20),
+    });
+    gameA.applyTurnRules();
+
+    const gameB = createGameWithState({
+      deck: deck.slice(),
+      room: [],
+      player: new Player(20, 20),
+    });
+    gameB.applyTurnRules();
+
+    const baseline = solveRootActions(gameA);
+    const context = createSolverContext(deck);
+    const withContext = solveRootActionsWithContext(gameB, context);
+
+    expect(withContext.actionResults).toHaveLength(baseline.actionResults.length);
+    for (let i = 0; i < baseline.actionResults.length; i++) {
+      expect(withContext.actionResults[i].victory).toBe(baseline.actionResults[i].victory);
+      expect(withContext.actionResults[i].score).toBe(baseline.actionResults[i].score);
+    }
+  });
+});
+
+describe("solveWithContext", () => {
+  it("matches solve result and supports context reset", () => {
+    const deck = [new WeaponCard(10), new MonsterCard("clubs", 2), new MonsterCard("spades", 3), new MonsterCard("clubs", 4)];
+    const allCards = deck.map((c) => c.clone());
+
+    const gameA = createGameWithState({
+      deck: deck.slice(),
+      room: [],
+      player: new Player(20, 20),
+    });
+    gameA.applyTurnRules();
+
+    const gameB = createGameWithState({
+      deck: deck.slice(),
+      room: [],
+      player: new Player(20, 20),
+    });
+    gameB.applyTurnRules();
+
+    const baseline = solve(gameA, allCards);
+    const context = createSolverContext(allCards);
+    const withContext = solveWithContext(gameB, context);
+
+    expect(withContext.victory).toBe(baseline.victory);
+    expect(withContext.score).toBe(baseline.score);
+
+    resetSolverContext(context);
+
+    const gameC = createGameWithState({
+      deck: deck.slice(),
+      room: [],
+      player: new Player(20, 20),
+    });
+    gameC.applyTurnRules();
+    const afterReset = solveWithContext(gameC, context);
+
+    expect(afterReset.victory).toBe(baseline.victory);
+    expect(afterReset.score).toBe(baseline.score);
   });
 });
