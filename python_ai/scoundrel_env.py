@@ -31,13 +31,15 @@ CARD_INDEX = {card: i for i, card in enumerate(CANONICAL_DECK)}
 class ScoundrelEnv(gym.Env[np.ndarray, int]):
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, worker_command: Optional[List[str]] = None) -> None:
+    def __init__(self, worker_command: Optional[List[str]] = None, max_episode_steps: int = 200) -> None:
         super().__init__()
         self.client = EngineWorkerClient(command=worker_command)
         self.session_id: Optional[str] = None
         self.state: Optional[Dict[str, Any]] = None
         self.possible_actions: List[Dict[str, Any]] = []
         self.last_health = 20.0
+        self.max_episode_steps = max_episode_steps
+        self.episode_steps = 0
         self.seen_cards = np.zeros(len(CANONICAL_DECK), dtype=np.float32)
 
         self.action_space = spaces.Discrete(10)
@@ -55,6 +57,7 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         self.state = result["state"]
         self.possible_actions = result["possibleActions"]
         self.last_health = float(self.state.get("health", 20))
+        self.episode_steps = 0
         self.seen_cards = np.zeros(len(CANONICAL_DECK), dtype=np.float32)
         self._update_seen_cards(self.state)
 
@@ -64,6 +67,7 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         if self.state is None or self.session_id is None:
             raise RuntimeError("Environment not initialized. Call reset() first.")
 
+        action = int(action)
         mask = self.action_masks()
         if action < 0 or action >= len(mask) or not mask[action]:
             obs = self._encode_state(self.state)
@@ -76,8 +80,9 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         self.possible_actions = result["possibleActions"]
         self._update_seen_cards(self.state)
 
+        self.episode_steps += 1
         terminated = bool(self.state.get("gameOver") or self.state.get("victory"))
-        truncated = False
+        truncated = self.episode_steps >= self.max_episode_steps and not terminated
         reward = self._compute_reward(self.state, terminated)
         obs = self._encode_state(self.state)
 
@@ -85,6 +90,7 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
             "score": self.state.get("score", 0),
             "victory": bool(self.state.get("victory", False)),
             "gameOver": bool(self.state.get("gameOver", False)),
+            "truncated": truncated,
         }
         return obs, reward, terminated, truncated, info
 
@@ -221,17 +227,19 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         return base
 
     def _discrete_to_worker_action(self, action_idx: int) -> Dict[str, Any]:
-        if action_idx == 0:
-            return {"actionType": "enterRoom"}
-        if action_idx == 1:
-            return {"actionType": "skipRoom"}
+        for action in self.possible_actions:
+            mapped = self._possible_action_to_discrete(action)
+            if mapped != action_idx:
+                continue
 
-        play_idx = action_idx - 2
-        card_idx = play_idx // 2
-        use_weapon = play_idx % 2 == 1
-        if use_weapon:
-            return {"actionType": "playCard", "cardIdx": card_idx, "mode": "weapon"}
-        return {"actionType": "playCard", "cardIdx": card_idx, "mode": "barehanded"}
+            payload: Dict[str, Any] = {"actionType": action["actionType"]}
+            if action["actionType"] == "playCard":
+                payload["cardIdx"] = int(action["cardIdx"])
+                if action.get("mode") in ("barehanded", "weapon"):
+                    payload["mode"] = action["mode"]
+            return payload
+
+        raise RuntimeError(f"No legal worker action mapped for discrete action index {action_idx}.")
 
 
 __all__ = ["ScoundrelEnv"]
