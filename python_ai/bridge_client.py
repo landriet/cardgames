@@ -1,0 +1,94 @@
+from __future__ import annotations
+
+import json
+import subprocess
+import uuid
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+
+class EngineWorkerClient:
+    def __init__(
+        self,
+        command: Optional[List[str]] = None,
+        cwd: Optional[Path] = None,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        self._cwd = cwd or repo_root
+        self._command = command or ["npx", "tsx", "src/engine-lib/worker/engineWorker.ts"]
+        self._process: Optional[subprocess.Popen[str]] = None
+
+    def start(self) -> None:
+        if self._process and self._process.poll() is None:
+            return
+
+        self._process = subprocess.Popen(
+            self._command,
+            cwd=self._cwd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+        )
+
+    def stop(self) -> None:
+        if not self._process:
+            return
+        if self._process.poll() is None:
+            self._process.terminate()
+            try:
+                self._process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self._process.kill()
+        self._process = None
+
+    def request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        self.start()
+        assert self._process and self._process.stdin and self._process.stdout
+
+        request_id = str(uuid.uuid4())
+        payload = {
+            "id": request_id,
+            "method": method,
+            "params": params or {},
+        }
+        self._process.stdin.write(json.dumps(payload) + "\n")
+        self._process.stdin.flush()
+
+        line = self._process.stdout.readline()
+        if not line:
+            stderr = ""
+            if self._process.stderr:
+                stderr = self._process.stderr.read()
+            raise RuntimeError(f"Worker closed unexpectedly. stderr={stderr}")
+
+        response = json.loads(line)
+        if response.get("id") != request_id:
+            raise RuntimeError("Worker response ID mismatch.")
+        if not response.get("ok"):
+            error = response.get("error", {})
+            message = error.get("message", "Unknown worker error")
+            raise RuntimeError(message)
+        return response["result"]
+
+    def create_session(self) -> Dict[str, Any]:
+        return self.request("create_session")
+
+    def reset_session(self, session_id: str) -> Dict[str, Any]:
+        return self.request("reset_session", {"sessionId": session_id})
+
+    def get_state(self, session_id: str) -> Dict[str, Any]:
+        return self.request("get_state", {"sessionId": session_id})
+
+    def get_possible_actions(self, session_id: str) -> Dict[str, Any]:
+        return self.request("get_possible_actions", {"sessionId": session_id})
+
+    def step_action(self, session_id: str, action: Dict[str, Any]) -> Dict[str, Any]:
+        return self.request("step_action", {"sessionId": session_id, "action": action})
+
+    def close_session(self, session_id: str) -> Dict[str, Any]:
+        return self.request("close_session", {"sessionId": session_id})
+
+
+__all__ = ["EngineWorkerClient"]
