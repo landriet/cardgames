@@ -10,6 +10,10 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "engine:worker": "tsx src/engine-lib/worker/engineWorker.ts",
+    "ai:train": "python3 python_ai/train_ppo.py",
+    "ai:eval": "python3 python_ai/evaluate_agent.py",
+    "ai:baseline": "python3 python_ai/baseline_random.py",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },

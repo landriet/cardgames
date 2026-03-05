@@ -177,6 +177,16 @@ export function avoidRoom(state: ScoundrelGameState): ScoundrelGameState {
   };
 }
 
+export function enterRoom(state: ScoundrelGameState): ScoundrelGameState {
+  const game = toEngineGame(state);
+  game.enterRoom();
+
+  return {
+    ...fromEngineGame(game),
+    pendingMonsterChoice: undefined,
+  };
+}
+
 export function simulateCardActionHealth(state: ScoundrelGameState, card: DungeonCard, mode?: "barehanded" | "weapon"): number {
   const isCardInCurrentRoom = state.currentRoom.cards.some(
     (roomCard) => roomCard.type === card.type && roomCard.suit === card.suit && roomCard.rank === card.rank,

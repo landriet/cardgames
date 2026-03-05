@@ -28,3 +28,9 @@ storybook-static
 
 # Git worktrees
 .worktrees
+
+# Python AI artifacts
+python_ai/__pycache__/
+python_ai/models/
+python_ai/results/
+.venv/
