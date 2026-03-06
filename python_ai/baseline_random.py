@@ -3,45 +3,67 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 
-from scoundrel_env import ScoundrelEnv
+from vec_env_utils import START_METHOD_CHOICES, VEC_ENV_CHOICES, build_vec_env, resolve_num_envs, resolve_vec_env_kind
 
 
-def evaluate_random(games: int, seed: int, max_episode_steps: int) -> dict:
-    env = ScoundrelEnv(max_episode_steps=max_episode_steps)
+def evaluate_random(
+    games: int,
+    seed: int,
+    max_episode_steps: int,
+    num_envs: Optional[int] = None,
+    vec_env_kind: Optional[str] = None,
+    start_method: str = "spawn",
+) -> dict:
+    resolved_num_envs = resolve_num_envs(num_envs)
+    resolved_vec_env_kind = resolve_vec_env_kind(vec_env_kind, resolved_num_envs)
+    env = build_vec_env(
+        num_envs=resolved_num_envs,
+        vec_env_kind=resolved_vec_env_kind,
+        start_method=start_method,
+        max_episode_steps=max_episode_steps,
+        seed=seed,
+        wrap_action_masker=False,
+    )
     rng = np.random.default_rng(seed)
 
     terminal_scores = []
     wins = 0
     truncated_games = 0
+    completed_or_truncated = 0
 
-    for _ in range(games):
-        _, _ = env.reset(seed=int(rng.integers(0, 1_000_000_000)))
-        done = False
-        truncated = False
-        info = {}
+    try:
+        _ = env.reset()
+        while completed_or_truncated < games:
+            masks = np.asarray(env.env_method("action_masks"), dtype=bool)
+            actions = np.zeros(resolved_num_envs, dtype=np.int64)
+            for idx in range(resolved_num_envs):
+                legal = np.flatnonzero(masks[idx])
+                if len(legal) > 0:
+                    actions[idx] = int(rng.choice(legal))
 
-        while not done and not truncated:
-            mask = env.action_masks()
-            legal = np.flatnonzero(mask)
-            if len(legal) == 0:
-                action = 0
-            else:
-                action = int(rng.choice(legal))
-            _, _, done, truncated, info = env.step(action)
+            _, _, dones, infos = env.step(actions)
+            for idx, done in enumerate(dones):
+                if not bool(done):
+                    continue
+                if completed_or_truncated >= games:
+                    continue
 
-        if truncated:
-            truncated_games += 1
-            continue
-
-        score = float(info.get("score", 0.0))
-        terminal_scores.append(score)
-        if info.get("victory"):
-            wins += 1
-
-    env.close()
+                info = infos[idx]
+                truncated = bool(info.get("truncated", False) or info.get("TimeLimit.truncated", False))
+                if truncated:
+                    truncated_games += 1
+                else:
+                    score = float(info.get("score", 0.0))
+                    terminal_scores.append(score)
+                    if info.get("victory"):
+                        wins += 1
+                completed_or_truncated += 1
+    finally:
+        env.close()
     completed_games = len(terminal_scores)
 
     return {
@@ -59,11 +81,21 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Random legal-action baseline for Scoundrel env.")
     parser.add_argument("--games", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--num-envs", type=int, default=None, help="Parallel environments/workers. Default: cpu_count-1.")
+    parser.add_argument("--vec-env", choices=VEC_ENV_CHOICES, default=None, help="Vectorization backend. Default: subproc when num_envs>1.")
+    parser.add_argument("--start-method", choices=START_METHOD_CHOICES, default="spawn", help="Subprocess start method for SubprocVecEnv.")
     parser.add_argument("--max-episode-steps", type=int, default=200)
     parser.add_argument("--out", type=Path, default=Path("python_ai/results/random_baseline.json"))
     args = parser.parse_args()
 
-    result = evaluate_random(args.games, args.seed, args.max_episode_steps)
+    result = evaluate_random(
+        games=args.games,
+        seed=args.seed,
+        max_episode_steps=args.max_episode_steps,
+        num_envs=args.num_envs,
+        vec_env_kind=args.vec_env,
+        start_method=args.start_method,
+    )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(json.dumps(result, indent=2))

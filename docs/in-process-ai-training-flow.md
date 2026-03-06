@@ -19,6 +19,12 @@ This document explains the full RL pipeline used in this branch, from command ex
 - `npm run ai:compare -- --baseline <path> --eval <path> --target-lift <pct>`
 - `npm run engine:worker` (manual worker run)
 
+Parallel flags available in train/eval/baseline:
+
+- `--num-envs <n>`: number of parallel environments/workers. Default: `cpu_count - 1` (minimum `1`).
+- `--vec-env <subproc|dummy>`: vectorized backend. Default is `subproc` when `num_envs > 1`, else `dummy`.
+- `--start-method <spawn|fork|forkserver>`: subprocess start method for `SubprocVecEnv` (default `spawn`).
+
 ### Script files
 
 - Training: `python_ai/train_ppo.py`
@@ -153,19 +159,20 @@ It also applies a truncation guard via `max_episode_steps` (default `200`) to pr
 
 `python_ai/train_ppo.py`:
 
-1. Builds env with `ActionMasker`.
+1. Builds vectorized env with `ActionMasker` (`SubprocVecEnv` for multi-core by default).
 2. Creates a new `MaskablePPO(MlpPolicy, ...)` model, or loads an existing checkpoint when `--resume-from` is provided.
-3. Runs `model.learn(total_timesteps=...)`.
-4. Saves model zip at `--model-out`.
-5. Runs a small deterministic post-save sanity rollout.
+3. For new models, scales per-env `n_steps` so total rollout size stays close to the historical single-env default (`~2048`).
+4. Runs `model.learn(total_timesteps=...)`.
+5. Saves model zip at `--model-out`.
+6. Runs a small deterministic post-save sanity rollout.
 
 ## 11) Evaluation Flow
 
 `python_ai/evaluate_agent.py`:
 
 1. Loads model zip.
-2. Runs `N` episodes with deterministic policy and legal action masks.
-3. Stores JSON metrics:
+2. Runs `N` episodes in parallel across vectorized env workers with deterministic policy and legal action masks.
+3. Stores JSON metrics (schema unchanged):
    - `avg_score`
    - `median_score`
    - `win_rate`
@@ -175,9 +182,9 @@ It also applies a truncation guard via `max_episode_steps` (default `200`) to pr
 
 `python_ai/baseline_random.py`:
 
-1. Runs same env and termination logic.
-2. Chooses random action from legal mask each step.
-3. Writes same metrics schema as eval.
+1. Runs same env and termination logic with vectorized workers.
+2. Chooses random legal action per worker each step.
+3. Writes same metrics schema as eval (unchanged).
 
 ## 13) How to Compare Results
 
@@ -231,6 +238,11 @@ The compare script prints:
 - Cause: no hard episode cap.
 - Fix: enforce `max_episode_steps` truncation in env.
 
+### Too many worker processes / high CPU usage
+
+- Cause: `--num-envs` defaults to nearly all CPU cores.
+- Fix: pass a lower value such as `--num-envs 4`, or use `--vec-env dummy`.
+
 ### `python: command not found`
 
 - Use `python3` scripts and virtualenv created with `python3 -m venv`.
@@ -238,9 +250,9 @@ The compare script prints:
 ## 15) Suggested Run Sequence
 
 1. `source .venv/bin/activate`
-2. `npm run ai:train -- --timesteps 10000 --model-out python_ai/models/smoke_ppo`
-3. `npm run ai:baseline -- --games 200 --out python_ai/results/random_smoke.json`
-4. `npm run ai:eval -- --model python_ai/models/smoke_ppo.zip --games 200 --out python_ai/results/eval_smoke.json`
+2. `npm run ai:train -- --timesteps 10000 --num-envs 4 --vec-env subproc --model-out python_ai/models/smoke_ppo`
+3. `npm run ai:baseline -- --games 200 --num-envs 4 --vec-env subproc --out python_ai/results/random_smoke.json`
+4. `npm run ai:eval -- --model python_ai/models/smoke_ppo.zip --games 200 --num-envs 4 --vec-env subproc --out python_ai/results/eval_smoke.json`
 5. `npm run ai:compare -- --baseline python_ai/results/random_smoke.json --eval python_ai/results/eval_smoke.json --target-lift 30`
 
 Resume training from a saved checkpoint:
