@@ -1,5 +1,22 @@
 # React + TypeScript + Vite
 
+## Python RL Agent
+
+The repository includes a Python PPO agent integration under `python_ai/`.
+
+### Watch one full RL game
+
+```bash
+python_ai/.venv/bin/python python_ai/watch_agent_game.py \
+  --model python_ai/models/scoundrel_maskable_ppo.zip \
+  --seed 42 \
+  --sleep 0.2
+```
+
+Use `--stochastic` to sample actions instead of deterministic policy inference.
+
+For training/evaluation commands, see `python_ai/README.md`.
+
 ## Scoundrel AI: Monte Carlo Tree Search (MCTS)
 
 This project includes a reusable Monte Carlo Tree Search (MCTS) implementation for building AI agents in the Scoundrel card game.

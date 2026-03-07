@@ -21,11 +21,12 @@ Parallel training (default already auto-detects workers as `cpu_count - 1`):
 
 ```bash
 python3 python_ai/train_ppo.py \
+  --resume-from python_ai/models/a.zip \
   --timesteps 1000000 \
   --num-envs 8 \
   --vec-env subproc \
   --start-method spawn \
-  --model-out python_ai/models/scoundrel_maskable_ppo
+  --model-out python_ai/models/ai
 ```
 
 Resume training from an existing checkpoint:
@@ -79,6 +80,17 @@ python3 python_ai/compare_results.py \
   --eval python_ai/results/eval.json \
   --target-lift 30
 ```
+
+## Watch one full agent game (step-by-step)
+
+```bash
+python3 python_ai/watch_agent_game.py \
+  --model python_ai/models/scoundrel_maskable_ppo.zip \
+  --seed 42 \
+  --sleep 0.2
+```
+
+Use `--stochastic` if you want sampled (non-deterministic) actions.
 
 ## Notes
 
