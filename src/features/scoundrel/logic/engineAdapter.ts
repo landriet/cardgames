@@ -18,6 +18,10 @@ export interface ScoundrelPossibleAction {
   mode?: "barehanded" | "weapon";
 }
 
+export interface InitGameOptions {
+  deckSeed?: number;
+}
+
 const STATIC_DECK: DungeonCard[] = [
   { type: "potion", suit: "hearts", rank: 5 },
   { type: "weapon", suit: "diamonds", rank: 7 },
@@ -130,8 +134,9 @@ export function initGameWithStaticDeck(): ScoundrelGameState {
   return fromEngineGame(buildStaticGame());
 }
 
-export function initGame(): ScoundrelGameState {
-  const game = new Game();
+export function initGame(options: InitGameOptions = {}): ScoundrelGameState {
+  const deck = Number.isInteger(options.deckSeed) ? Game.createDeck(options.deckSeed) : undefined;
+  const game = new Game(deck);
   game.enterRoom();
   return fromEngineGame(game);
 }
@@ -210,7 +215,7 @@ export function simulateCardActionHealth(state: ScoundrelGameState, card: Dungeo
 
 export function getPossibleActions(state: ScoundrelGameState): ScoundrelPossibleAction[] {
   const game = toEngineGame(state);
-  const actions = game.getPossibleActions().map((action) => ({
+  const actions: ScoundrelPossibleAction[] = game.getPossibleActions().map((action) => ({
     actionType: action.actionType as ScoundrelActionType,
     card: action.card ? fromEngineCard(action.card) : undefined,
     mode: action.mode,

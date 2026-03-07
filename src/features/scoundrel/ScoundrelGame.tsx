@@ -17,8 +17,19 @@ export const rankToString = (rank: number): string => {
   return rank.toString();
 };
 
+function getDeckSeedFromUrl(): number | undefined {
+  const seedParam = new URLSearchParams(window.location.search).get("seed");
+  if (seedParam === null) return undefined;
+  const parsed = Number(seedParam);
+  return Number.isInteger(parsed) ? parsed : undefined;
+}
+
+function initGameFromUrlSeed(): ScoundrelGameState {
+  return initGame({ deckSeed: getDeckSeedFromUrl() });
+}
+
 export default function ScoundrelGame() {
-  const [game, setGame] = useState<ScoundrelGameState>(initGame());
+  const [game, setGame] = useState<ScoundrelGameState>(initGameFromUrlSeed());
   const [hoveredCard, setHoveredCard] = useState<DungeonCard | null>(null);
 
   // Unified handler for card click, always delegates to engine
@@ -88,7 +99,7 @@ export default function ScoundrelGame() {
             setGame((prev: ScoundrelGameState) => avoidRoom(prev));
           }
         }}
-        onRestart={() => setGame(initGame())}
+        onRestart={() => setGame(initGameFromUrlSeed())}
       />
 
       {/* Monster attack choice modal */}
@@ -120,7 +131,7 @@ export default function ScoundrelGame() {
       />
 
       {/* Death modal when player is dead */}
-      <DeathModal isOpen={!!game.gameOver} onRestart={() => setGame(initGame())} score={game.score} />
+      <DeathModal isOpen={!!game.gameOver} onRestart={() => setGame(initGameFromUrlSeed())} score={game.score} />
     </div>
   );
 }

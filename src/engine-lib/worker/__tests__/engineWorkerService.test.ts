@@ -83,4 +83,20 @@ describe("EngineWorkerService", () => {
     const readAfterClose = service.handleRequest(request("get_state", { sessionId }));
     expect(readAfterClose.ok).toBe(false);
   });
+
+  it("creates identical initial states for the same deckSeed", () => {
+    const service = new EngineWorkerService();
+    const seed = 12345;
+    const first = service.handleRequest(request("create_session", { deckSeed: seed }));
+    const second = service.handleRequest(request("create_session", { deckSeed: seed }));
+
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    if (!first.ok || !second.ok) return;
+
+    const firstState = (first.result as Extract<typeof first.result, { state: unknown }>).state;
+    const secondState = (second.result as Extract<typeof second.result, { state: unknown }>).state;
+    expect(firstState.currentRoom.cards).toEqual(secondState.currentRoom.cards);
+    expect(firstState.deck).toEqual(secondState.deck);
+  });
 });

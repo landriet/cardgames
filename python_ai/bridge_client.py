@@ -72,11 +72,17 @@ class EngineWorkerClient:
             raise RuntimeError(message)
         return response["result"]
 
-    def create_session(self) -> Dict[str, Any]:
-        return self.request("create_session")
+    def create_session(self, deck_seed: Optional[int] = None) -> Dict[str, Any]:
+        params: Dict[str, Any] = {}
+        if deck_seed is not None:
+            params["deckSeed"] = int(deck_seed)
+        return self.request("create_session", params)
 
-    def reset_session(self, session_id: str) -> Dict[str, Any]:
-        return self.request("reset_session", {"sessionId": session_id})
+    def reset_session(self, session_id: str, deck_seed: Optional[int] = None) -> Dict[str, Any]:
+        params: Dict[str, Any] = {"sessionId": session_id}
+        if deck_seed is not None:
+            params["deckSeed"] = int(deck_seed)
+        return self.request("reset_session", params)
 
     def get_state(self, session_id: str) -> Dict[str, Any]:
         return self.request("get_state", {"sessionId": session_id})

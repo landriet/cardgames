@@ -19,6 +19,7 @@ def evaluate(
     num_envs: Optional[int] = None,
     vec_env_kind: Optional[str] = None,
     start_method: str = "spawn",
+    deck_seed: Optional[int] = None,
 ) -> dict:
     resolved_num_envs = resolve_num_envs(num_envs)
     resolved_vec_env_kind = resolve_vec_env_kind(vec_env_kind, resolved_num_envs)
@@ -29,6 +30,7 @@ def evaluate(
         max_episode_steps=max_episode_steps,
         seed=seed,
         wrap_action_masker=False,
+        deck_seed=deck_seed,
     )
     model = MaskablePPO.load(str(model_path))
 
@@ -84,6 +86,7 @@ def main() -> None:
     parser.add_argument("--vec-env", choices=VEC_ENV_CHOICES, default=None, help="Vectorization backend. Default: subproc when num_envs>1.")
     parser.add_argument("--start-method", choices=START_METHOD_CHOICES, default="spawn", help="Subprocess start method for SubprocVecEnv.")
     parser.add_argument("--max-episode-steps", type=int, default=200)
+    parser.add_argument("--deck-seed", type=int, default=None, help="Deterministic game deck seed shared with frontend runs.")
     parser.add_argument("--out", type=Path, default=Path("python_ai/results/eval.json"))
     args = parser.parse_args()
 
@@ -95,6 +98,7 @@ def main() -> None:
         num_envs=args.num_envs,
         vec_env_kind=args.vec_env,
         start_method=args.start_method,
+        deck_seed=args.deck_seed,
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2), encoding="utf-8")

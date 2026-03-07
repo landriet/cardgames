@@ -53,6 +53,16 @@ python3 python_ai/evaluate_agent.py \
   --out python_ai/results/eval.json
 ```
 
+Deterministic deck comparison (same deck as frontend `?seed=<N>`):
+
+```bash
+python3 python_ai/evaluate_agent.py \
+  --model python_ai/models/scoundrel_maskable_ppo.zip \
+  --games 1000 \
+  --deck-seed 123 \
+  --out python_ai/results/eval_seed_123.json
+```
+
 ## Random baseline
 
 ```bash
@@ -87,6 +97,7 @@ python3 python_ai/compare_results.py \
 python3 python_ai/watch_agent_game.py \
   --model python_ai/models/scoundrel_maskable_ppo.zip \
   --seed 42 \
+  --deck-seed 123 \
   --sleep 0.2
 ```
 

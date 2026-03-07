@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { avoidRoom, getPossibleActions, handleCardAction, initGameWithStaticDeck, simulateCardActionHealth } from "../engineAdapter";
+import {
+  avoidRoom,
+  getPossibleActions,
+  handleCardAction,
+  initGame,
+  initGameWithStaticDeck,
+  simulateCardActionHealth,
+} from "../engineAdapter";
 import type { DungeonCard, ScoundrelGameState } from "../../../../types/scoundrel";
 
 function withOverrides(overrides: Partial<ScoundrelGameState>): ScoundrelGameState {
@@ -101,5 +108,12 @@ describe("engineAdapter", () => {
     const afterThirdCard = handleCardAction(afterMonster, potion);
 
     expect(afterThirdCard.currentRoom.cards.length).toBe(4);
+  });
+
+  it("creates the same opening room and deck for the same deckSeed", () => {
+    const first = initGame({ deckSeed: 777 });
+    const second = initGame({ deckSeed: 777 });
+    expect(first.currentRoom.cards).toEqual(second.currentRoom.cards);
+    expect(first.deck).toEqual(second.deck);
   });
 });

@@ -88,13 +88,13 @@ export class EngineWorkerService {
         return { status: "ok" };
       case "create_session": {
         const sessionId = randomUUID();
-        const state = initGame();
+        const state = initGame({ deckSeed: this.readDeckSeed(request.params) });
         this.sessions.set(sessionId, state);
         return { sessionId, state, possibleActions: listPossibleActions(state) };
       }
       case "reset_session": {
         const sessionId = this.readSessionId(request.params);
-        const state = initGame();
+        const state = initGame({ deckSeed: this.readDeckSeed(request.params) });
         this.sessions.set(sessionId, state);
         return { sessionId, state, possibleActions: listPossibleActions(state) };
       }
@@ -145,6 +145,17 @@ export class EngineWorkerService {
     const value = params?.sessionId;
     if (!isString(value)) {
       throw new Error("sessionId is required.");
+    }
+    return value;
+  }
+
+  private readDeckSeed(params?: Record<string, unknown>): number | undefined {
+    const value = params?.deckSeed;
+    if (value === undefined) {
+      return undefined;
+    }
+    if (typeof value !== "number" || !Number.isInteger(value)) {
+      throw new Error("deckSeed must be an integer.");
     }
     return value;
   }

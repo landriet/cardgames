@@ -31,7 +31,12 @@ CARD_INDEX = {card: i for i, card in enumerate(CANONICAL_DECK)}
 class ScoundrelEnv(gym.Env[np.ndarray, int]):
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, worker_command: Optional[List[str]] = None, max_episode_steps: int = 200) -> None:
+    def __init__(
+        self,
+        worker_command: Optional[List[str]] = None,
+        max_episode_steps: int = 200,
+        deck_seed: Optional[int] = None,
+    ) -> None:
         super().__init__()
         self.client = EngineWorkerClient(command=worker_command)
         self.session_id: Optional[str] = None
@@ -39,6 +44,7 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         self.possible_actions: List[Dict[str, Any]] = []
         self.last_health = 20.0
         self.max_episode_steps = max_episode_steps
+        self.deck_seed = deck_seed
         self.episode_steps = 0
         self.seen_cards = np.zeros(len(CANONICAL_DECK), dtype=np.float32)
 
@@ -49,9 +55,9 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
         if self.session_id is None:
-            result = self.client.create_session()
+            result = self.client.create_session(deck_seed=self.deck_seed)
         else:
-            result = self.client.reset_session(self.session_id)
+            result = self.client.reset_session(self.session_id, deck_seed=self.deck_seed)
 
         self.session_id = result["sessionId"]
         self.state = result["state"]

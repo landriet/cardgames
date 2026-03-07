@@ -38,11 +38,17 @@ def resolve_vec_env_kind(requested: Optional[str], num_envs: int) -> VecEnvKind:
     return requested  # type: ignore[return-value]
 
 
-def make_env_factory(worker_idx: int, max_episode_steps: int, seed: int, wrap_action_masker: bool) -> Callable[[], object]:
+def make_env_factory(
+    worker_idx: int,
+    max_episode_steps: int,
+    seed: int,
+    wrap_action_masker: bool,
+    deck_seed: Optional[int] = None,
+) -> Callable[[], object]:
     worker_seed = seed + worker_idx * 100_003
 
     def _factory() -> object:
-        env = ScoundrelEnv(max_episode_steps=max_episode_steps)
+        env = ScoundrelEnv(max_episode_steps=max_episode_steps, deck_seed=deck_seed)
         env.action_space.seed(worker_seed)
         env.observation_space.seed(worker_seed)
         if wrap_action_masker:
@@ -60,6 +66,7 @@ def build_vec_env(
     max_episode_steps: int,
     seed: int,
     wrap_action_masker: bool,
+    deck_seed: Optional[int] = None,
 ) -> VecEnv:
     env_factories = [
         make_env_factory(
@@ -67,6 +74,7 @@ def build_vec_env(
             max_episode_steps=max_episode_steps,
             seed=seed,
             wrap_action_masker=wrap_action_masker,
+            deck_seed=deck_seed,
         )
         for worker_idx in range(num_envs)
     ]
