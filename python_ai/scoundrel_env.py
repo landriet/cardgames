@@ -36,6 +36,8 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         worker_command: Optional[List[str]] = None,
         max_episode_steps: int = 200,
         deck_seed: Optional[int] = None,
+        reward_mode: str = "baseline",
+        reward_debug: bool = False,
     ) -> None:
         super().__init__()
         self.client = EngineWorkerClient(command=worker_command)
@@ -45,6 +47,8 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         self.last_health = 20.0
         self.max_episode_steps = max_episode_steps
         self.deck_seed = deck_seed
+        self.reward_mode = reward_mode
+        self.reward_debug = reward_debug
         self.episode_steps = 0
         self.seen_cards = np.zeros(len(CANONICAL_DECK), dtype=np.float32)
 
@@ -79,6 +83,7 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
             obs = self._encode_state(self.state)
             return obs, -1.0, False, False, {"invalid_action": True}
 
+        prev_state = self.state
         worker_action = self._discrete_to_worker_action(action)
         result = self.client.step_action(self.session_id, worker_action)
 
@@ -89,7 +94,7 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         self.episode_steps += 1
         terminated = bool(self.state.get("gameOver") or self.state.get("victory"))
         truncated = self.episode_steps >= self.max_episode_steps and not terminated
-        reward = self._compute_reward(self.state, terminated)
+        reward, reward_components = self._compute_reward(prev_state, self.state, terminated)
         obs = self._encode_state(self.state)
 
         info = {
@@ -98,6 +103,8 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
             "gameOver": bool(self.state.get("gameOver", False)),
             "truncated": truncated,
         }
+        if self.reward_debug:
+            info["rewardComponents"] = reward_components
         return obs, reward, terminated, truncated, info
 
     def render(self):
@@ -129,7 +136,20 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
                 mask[idx] = True
         return mask
 
-    def _compute_reward(self, state: Dict[str, Any], terminated: bool) -> float:
+    def _compute_reward(
+        self,
+        prev_state: Optional[Dict[str, Any]],
+        state: Dict[str, Any],
+        terminated: bool,
+    ) -> Tuple[float, Dict[str, float]]:
+        if self.reward_mode == "baseline":
+            reward = self._compute_reward_baseline(state, terminated)
+            return reward, {"total": reward}
+        if self.reward_mode == "dense_v1":
+            return self._compute_reward_dense_v1(prev_state, state, terminated)
+        raise ValueError(f"Unsupported reward_mode: {self.reward_mode}")
+
+    def _compute_reward_baseline(self, state: Dict[str, Any], terminated: bool) -> float:
         health = float(state.get("health", self.last_health))
         health_delta = (health - self.last_health) / max(float(state.get("maxHealth", 20)), 1.0)
         self.last_health = health
@@ -142,6 +162,55 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         # Score-first terminal objective with clipping for stable learning.
         terminal = np.clip(score / 100.0, -1.0, 1.0)
         return float(terminal + shaped)
+
+    def _compute_reward_dense_v1(
+        self,
+        prev_state: Optional[Dict[str, Any]],
+        state: Dict[str, Any],
+        terminated: bool,
+    ) -> Tuple[float, Dict[str, float]]:
+        health = float(state.get("health", self.last_health))
+        health_delta = (health - self.last_health) / max(float(state.get("maxHealth", 20)), 1.0)
+        self.last_health = health
+
+        health_component = 0.1 * health_delta
+        discard_delta = 0
+        room_transition = 0.0
+        skip_penalty = 0.0
+
+        if prev_state is not None:
+            prev_discard = len(prev_state.get("discard", []))
+            curr_discard = len(state.get("discard", []))
+            discard_delta = max(curr_discard - prev_discard, 0)
+
+            prev_room_len = len(prev_state.get("currentRoom", {}).get("cards", []))
+            curr_room_len = len(state.get("currentRoom", {}).get("cards", []))
+            if prev_room_len > 0 and curr_room_len == 4 and prev_room_len != 4:
+                room_transition = 0.02
+
+            if (
+                not prev_state.get("lastActionWasDefer", False)
+                and state.get("lastActionWasDefer", False)
+                and prev_room_len == 4
+            ):
+                skip_penalty = -0.02
+
+        resolve_component = 0.01 * float(discard_delta)
+        terminal_component = 0.0
+        if terminated:
+            score = float(state.get("score", 0))
+            terminal_component = float(np.clip(score / 100.0, -1.0, 1.0))
+
+        total = float(health_component + resolve_component + room_transition + skip_penalty + terminal_component)
+        components = {
+            "health": float(health_component),
+            "resolve": float(resolve_component),
+            "roomTransition": float(room_transition),
+            "skipPenalty": float(skip_penalty),
+            "terminal": float(terminal_component),
+            "total": total,
+        }
+        return total, components
 
     def _encode_state(self, state: Dict[str, Any]) -> np.ndarray:
         features: List[float] = []

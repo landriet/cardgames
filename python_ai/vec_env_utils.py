@@ -44,11 +44,18 @@ def make_env_factory(
     seed: int,
     wrap_action_masker: bool,
     deck_seed: Optional[int] = None,
+    reward_mode: str = "baseline",
+    reward_debug: bool = False,
 ) -> Callable[[], object]:
     worker_seed = seed + worker_idx * 100_003
 
     def _factory() -> object:
-        env = ScoundrelEnv(max_episode_steps=max_episode_steps, deck_seed=deck_seed)
+        env = ScoundrelEnv(
+            max_episode_steps=max_episode_steps,
+            deck_seed=deck_seed,
+            reward_mode=reward_mode,
+            reward_debug=reward_debug,
+        )
         env.action_space.seed(worker_seed)
         env.observation_space.seed(worker_seed)
         if wrap_action_masker:
@@ -67,6 +74,8 @@ def build_vec_env(
     seed: int,
     wrap_action_masker: bool,
     deck_seed: Optional[int] = None,
+    reward_mode: str = "baseline",
+    reward_debug: bool = False,
 ) -> VecEnv:
     env_factories = [
         make_env_factory(
@@ -75,6 +84,8 @@ def build_vec_env(
             seed=seed,
             wrap_action_masker=wrap_action_masker,
             deck_seed=deck_seed,
+            reward_mode=reward_mode,
+            reward_debug=reward_debug,
         )
         for worker_idx in range(num_envs)
     ]

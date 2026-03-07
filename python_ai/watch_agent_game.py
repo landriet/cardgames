@@ -58,8 +58,9 @@ def play(
     max_episode_steps: int,
     sleep_seconds: float,
     deck_seed: Optional[int],
+    reward_mode: str,
 ) -> None:
-    env = ScoundrelEnv(max_episode_steps=max_episode_steps, deck_seed=deck_seed)
+    env = ScoundrelEnv(max_episode_steps=max_episode_steps, deck_seed=deck_seed, reward_mode=reward_mode)
     model = MaskablePPO.load(str(model_path))
 
     try:
@@ -112,6 +113,7 @@ def main() -> None:
     parser.add_argument("--stochastic", action="store_true", help="Sample actions instead of deterministic inference.")
     parser.add_argument("--max-episode-steps", type=int, default=200)
     parser.add_argument("--deck-seed", type=int, default=None, help="Deterministic game deck seed shared with frontend runs.")
+    parser.add_argument("--reward-mode", choices=("baseline", "dense_v1"), default="baseline")
     parser.add_argument("--sleep", type=float, default=0.0, help="Seconds to wait between steps for readability.")
     args = parser.parse_args()
 
@@ -122,6 +124,7 @@ def main() -> None:
         max_episode_steps=args.max_episode_steps,
         sleep_seconds=max(args.sleep, 0.0),
         deck_seed=args.deck_seed,
+        reward_mode=args.reward_mode,
     )
 
 
