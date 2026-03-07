@@ -210,9 +210,18 @@ export function simulateCardActionHealth(state: ScoundrelGameState, card: Dungeo
 
 export function getPossibleActions(state: ScoundrelGameState): ScoundrelPossibleAction[] {
   const game = toEngineGame(state);
-  return game.getPossibleActions().map((action) => ({
+  const actions = game.getPossibleActions().map((action) => ({
     actionType: action.actionType as ScoundrelActionType,
     card: action.card ? fromEngineCard(action.card) : undefined,
     mode: action.mode,
   }));
+
+  // Frontend flow starts directly inside a room (no explicit enter action),
+  // so surface skipRoom whenever defer is currently legal for that room.
+  const canSkipCurrentRoom = state.canDeferRoom && !state.lastActionWasDefer && state.currentRoom.cards.length === 4;
+  if (canSkipCurrentRoom && !actions.some((action) => action.actionType === "skipRoom")) {
+    actions.push({ actionType: "skipRoom" });
+  }
+
+  return actions;
 }

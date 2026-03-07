@@ -21,18 +21,18 @@ Parallel training (default already auto-detects workers as `cpu_count - 1`):
 
 ```bash
 python3 python_ai/train_ppo.py \
-  --resume-from python_ai/models/a.zip \
+  --resume-from python_ai/models/ai4.zip \
   --timesteps 1000000 \
   --num-envs 8 \
   --vec-env subproc \
   --start-method spawn \
-  --model-out python_ai/models/ai
+  --model-out python_ai/models/ai4
 ```
 
 Resume training from an existing checkpoint:
 
 ```bash
-python3 python_ai/train_ppo.py --resume-from python_ai/models/scoundrel_maskable_ppo.zip --timesteps 500000 --model-out python_ai/models/scoundrel_maskable_ppo
+python3 python_ai/train_ppo.py --resume-from python_ai/models/ai4.zip --timesteps 1000000 --model-out python_ai/models/ai4
 ```
 
 ## Evaluate trained model

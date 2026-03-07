@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { avoidRoom, handleCardAction, initGameWithStaticDeck, simulateCardActionHealth } from "../engineAdapter";
+import { avoidRoom, getPossibleActions, handleCardAction, initGameWithStaticDeck, simulateCardActionHealth } from "../engineAdapter";
 import type { DungeonCard, ScoundrelGameState } from "../../../../types/scoundrel";
 
 function withOverrides(overrides: Partial<ScoundrelGameState>): ScoundrelGameState {
@@ -54,6 +54,12 @@ describe("engineAdapter", () => {
     expect(next.currentRoom.cards.length).toBe(4);
     expect(next.canDeferRoom).toBe(false);
     expect(next.lastActionWasDefer).toBe(true);
+  });
+
+  it("exposes skipRoom in possible actions when room defer is legal", () => {
+    const state = initGameWithStaticDeck();
+    const actions = getPossibleActions(state);
+    expect(actions.some((action) => action.actionType === "skipRoom")).toBe(true);
   });
 
   it("does not throw if simulateCardActionHealth receives a stale hovered card", () => {
