@@ -1,12 +1,21 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-from bridge_client import EngineWorkerClient
+from engine import (
+    GameState,
+    avoid_room,
+    build_action_mask,
+    calculate_score,
+    encode_observation,
+    enter_room,
+    init_game,
+    play_card,
+)
 
 # 10 player features + 16 room slot features + 4 monster-on-weapon ranks + 44 seen-card bits
 OBS_SIZE = 74
@@ -17,15 +26,13 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
 
     def __init__(
         self,
-        worker_command: Optional[List[str]] = None,
         max_episode_steps: int = 200,
         deck_seed: Optional[int] = None,
         reward_mode: str = "baseline",
         reward_debug: bool = False,
     ) -> None:
         super().__init__()
-        self.client = EngineWorkerClient(command=worker_command)
-        self.session_id: Optional[str] = None
+        self._state: Optional[GameState] = None
         self.last_health = 20.0
         self.max_episode_steps = max_episode_steps
         self.deck_seed = deck_seed
@@ -51,18 +58,14 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
-        if self.session_id is None:
-            result = self.client.create_session_rl(deck_seed=self.deck_seed)
-        else:
-            result = self.client.reset_session_rl(self.session_id, deck_seed=self.deck_seed)
-
-        self._apply_snapshot(result)
-        self.last_health = float(self._step_stats.get("health", 20.0))
+        self._state = init_game(seed=self.deck_seed)
+        self._sync_from_state(self._state)
+        self.last_health = float(self._step_stats["health"])
         self.episode_steps = 0
         return self._last_obs.copy(), {}
 
     def step(self, action: int):
-        if self.session_id is None:
+        if self._state is None:
             raise RuntimeError("Environment not initialized. Call reset() first.")
 
         action = int(action)
@@ -70,16 +73,17 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
             return self._last_obs.copy(), -1.0, False, False, {"invalid_action": True}
 
         prev_stats = self._step_stats.copy()
-        worker_action = self.discrete_to_worker_action(action)
-        result = self.client.step_action_rl(self.session_id, worker_action)
-        self._apply_snapshot(result)
+
+        # Apply the action to get a new state.
+        self._state = self._apply_discrete_action(self._state, action)
+        self._sync_from_state(self._state)
 
         self.episode_steps += 1
         terminated = bool(self._step_stats.get("gameOver") or self._step_stats.get("victory"))
         truncated = self.episode_steps >= self.max_episode_steps and not terminated
         reward, reward_components = self._compute_reward(prev_stats, self._step_stats, terminated)
 
-        info = {
+        info: Dict[str, Any] = {
             "score": float(self._step_stats.get("score", 0.0)),
             "victory": bool(self._step_stats.get("victory", False)),
             "gameOver": bool(self._step_stats.get("gameOver", False)),
@@ -98,15 +102,7 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         )
 
     def close(self):
-        try:
-            if self.session_id is not None:
-                try:
-                    self.client.close_session(self.session_id)
-                except Exception:
-                    pass
-                self.session_id = None
-        finally:
-            self.client.stop()
+        self._state = None
 
     def action_masks(self) -> np.ndarray:
         return self._last_mask.copy()
@@ -114,19 +110,35 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
     def set_deck_seed(self, deck_seed: Optional[int]) -> None:
         self.deck_seed = deck_seed
 
-    def _apply_snapshot(self, snapshot: Dict[str, Any]) -> None:
-        self.session_id = str(snapshot["sessionId"])
-        self._last_obs = np.asarray(snapshot["observation"], dtype=np.float32)
-        self._last_mask = np.asarray(snapshot["actionMask"], dtype=bool)
+    def _apply_discrete_action(self, state: GameState, action_idx: int) -> GameState:
+        """Translate a discrete action index (0–9) into an engine call and return the new state."""
+        if action_idx == 0:
+            return enter_room(state)
+        if action_idx == 1:
+            return avoid_room(state)
+
+        # action_idx 2–9: play card
+        # rel = 0..7; card_index = rel // 2; weapon = rel % 2 == 1
+        rel = action_idx - 2
+        card_index = rel // 2
+        mode = "weapon" if rel % 2 == 1 else "barehanded"
+        return play_card(state, card_index=card_index, mode=mode)
+
+    def _sync_from_state(self, state: GameState) -> None:
+        """Recompute obs vector, action mask, and step stats from a GameState."""
+        terminal = state.game_over or state.victory
+        self._last_obs = encode_observation(state)
+        self._last_mask = build_action_mask(state)
         self._step_stats = {
-            "health": float(snapshot.get("health", 20.0)),
-            "maxHealth": float(snapshot.get("maxHealth", 20.0)),
-            "score": float(snapshot.get("score", 0.0)),
-            "victory": bool(snapshot.get("victory", False)),
-            "gameOver": bool(snapshot.get("gameOver", False)),
-            "discardCount": int(snapshot.get("discardCount", 0)),
-            "roomCount": int(snapshot.get("roomCount", 0)),
-            "lastActionWasDefer": bool(snapshot.get("lastActionWasDefer", False)),
+            "health": float(state.health),
+            "maxHealth": float(state.max_health),
+            # Score is only meaningful (and expensive to compute) at terminal states.
+            "score": float(calculate_score(state)) if terminal else 0.0,
+            "victory": state.victory,
+            "gameOver": state.game_over,
+            "discardCount": len(state.discard),
+            "roomCount": len(state.room),
+            "lastActionWasDefer": state.last_action_was_defer,
         }
 
     def _compute_reward(
@@ -205,6 +217,11 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         return total, components
 
     def discrete_to_worker_action(self, action_idx: int) -> Dict[str, Any]:
+        """Translate a discrete action index to a worker-action dict.
+
+        Kept for compatibility with watch_agent_game.py which uses this mapping
+        to display human-readable action labels.
+        """
         if action_idx == 0:
             return {"actionType": "enterRoom"}
         if action_idx == 1:
