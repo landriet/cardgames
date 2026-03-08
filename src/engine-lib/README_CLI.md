@@ -21,7 +21,7 @@ npm install -D tsx
 ### 1) Exact solver benchmark
 
 ```bash
-npx tsx src/engine-lib/benchmark-solver.ts [--seed <n>]
+npx tsx src/engine-lib/benchmark-solver.ts [--seed <n>] [--exhaustive]
 ```
 
 What it does:
@@ -32,6 +32,7 @@ What it does:
 Flags:
 
 - `-s`, `--seed <n>`: Use a deterministic shuffled deck for reproducible runs.
+- `--exhaustive`: Explore all nodes (disables solver pruning/early-stop heuristics).
 
 Use this when:
 

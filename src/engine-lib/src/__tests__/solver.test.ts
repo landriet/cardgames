@@ -190,6 +190,43 @@ describe("solve", () => {
     expect(result.victory).toBe(true);
   });
 
+  it("can run in exhaustive mode and explores at least as many nodes", () => {
+    const deck = [
+      new WeaponCard(8),
+      new PotionCard(5),
+      new MonsterCard("clubs", 6),
+      new MonsterCard("spades", 4),
+      new MonsterCard("clubs", 3),
+      new MonsterCard("spades", 2),
+      new WeaponCard(5),
+      new PotionCard(3),
+    ];
+    const allCards = deck.map((c) => c.clone());
+
+    const gameA = createGameWithState({
+      deck: deck.slice(),
+      room: [],
+      player: new Player(20, 20),
+    });
+    gameA.applyTurnRules();
+
+    const gameB = createGameWithState({
+      deck: deck.slice(),
+      room: [],
+      player: new Player(20, 20),
+    });
+    gameB.applyTurnRules();
+
+    const baseline = solve(gameA, allCards);
+    const exhaustive = solve(gameB, allCards, { exhaustive: true });
+
+    if (baseline.victory) {
+      expect(exhaustive.victory).toBe(true);
+    }
+    expect(exhaustive.score).toBeGreaterThanOrEqual(baseline.score);
+    expect(exhaustive.nodesExplored).toBeGreaterThanOrEqual(baseline.nodesExplored);
+  });
+
   it("solves a full standard game without crashing", () => {
     const deck = Game.createDeck();
     const allCards = deck.map((c) => c.clone());

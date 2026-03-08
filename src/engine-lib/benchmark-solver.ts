@@ -45,7 +45,7 @@ function buildStaticDeck(): Array<MonsterCard | WeaponCard | PotionCard> {
   return deck;
 }
 
-function benchmarkAI(minSize = 7, maxSize = 20, seed?: number) {
+function benchmarkAI(minSize = 7, maxSize = 20, seed?: number, exhaustive = false) {
   const deck = typeof seed === "number" && Number.isInteger(seed) ? Game.createDeck(seed) : Game.createDeck();
   const results: Array<{ size: number; timeMs: number; result: any }> = [];
   for (let size = minSize; size <= maxSize; size++) {
@@ -54,7 +54,7 @@ function benchmarkAI(minSize = 7, maxSize = 20, seed?: number) {
     const originalDeck = slicedDeck.map((card) => card.clone());
     const game = new Game(gameDeck);
     const start = performance.now();
-    const result = solve(game, originalDeck);
+    const result = solve(game, originalDeck, { exhaustive });
     const end = performance.now();
     results.push({ size, timeMs: end - start, result });
     console.log(`Deck size: ${size}, Time: ${(end - start).toFixed(2)}ms, Result:`, result);
@@ -65,10 +65,14 @@ function benchmarkAI(minSize = 7, maxSize = 20, seed?: number) {
 function main() {
   const args = process.argv.slice(2);
   const seed = readIntFlag(args, ["--seed", "-s"]);
+  const exhaustive = args.includes("--exhaustive");
   if (seed !== undefined) {
     console.log(`Seed: ${seed}`);
   }
-  benchmarkAI(26, 26, seed);
+  if (exhaustive) {
+    console.log("Mode: exhaustive");
+  }
+  benchmarkAI(44, 44, seed, exhaustive);
 }
 
 //try with static deck

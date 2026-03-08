@@ -123,6 +123,7 @@ export interface SolveRootActionsResult {
 export interface SolverOptions {
   trace?: boolean;
   nodeLimit?: number;
+  exhaustive?: boolean;
 }
 
 export interface SolverContextOptions {
@@ -270,6 +271,7 @@ function makeDfs(
   context: SolverContext,
   nodeLimitRef: NodeLimitRef,
   storeBestAction: boolean,
+  exhaustive: boolean,
 ): () => { victory: boolean; score: number } {
   const transpositionTable = context.transpositionTable;
 
@@ -305,9 +307,10 @@ function makeDfs(
     let bestAction: GameAction | undefined;
 
     for (const action of actions) {
-      if (isDominated(action, actions, game)) continue;
+      if (!exhaustive && isDominated(action, actions, game)) continue;
 
       if (
+        !exhaustive &&
         action.actionType === "playCard" &&
         action.card?.type === "monster" &&
         action.mode === "barehanded" &&
@@ -316,7 +319,13 @@ function makeDfs(
         continue;
       }
 
-      if (action.actionType === "playCard" && action.card?.type === "monster" && action.mode === "weapon" && game.player.equippedWeapon) {
+      if (
+        !exhaustive &&
+        action.actionType === "playCard" &&
+        action.card?.type === "monster" &&
+        action.mode === "weapon" &&
+        game.player.equippedWeapon
+      ) {
         const damage = Math.max(action.card.rank - game.player.equippedWeapon.rank, 0);
         if (game.player.health <= damage) continue;
       }
@@ -331,7 +340,7 @@ function makeDfs(
         bestAction = action;
       }
 
-      if (best.victory) break;
+      if (!exhaustive && best.victory) break;
     }
 
     maybeTrimTranspositionTable(transpositionTable, context.maxTranspositionEntries);
@@ -352,7 +361,7 @@ function runSolve(game: Game, context: SolverContext, options: SolverOptions = {
   const nodeLimitRef: NodeLimitRef = { count: 0, limit: options.nodeLimit ?? Infinity };
   const shouldStoreBestAction = context.storeBestAction || options.trace === true;
 
-  const dfs = makeDfs(game, cardIdentity, context, nodeLimitRef, shouldStoreBestAction);
+  const dfs = makeDfs(game, cardIdentity, context, nodeLimitRef, shouldStoreBestAction, options.exhaustive === true);
   const result = dfs();
 
   const finalResult: SolveResult = {
@@ -365,7 +374,9 @@ function runSolve(game: Game, context: SolverContext, options: SolverOptions = {
     const tableTrace = replayBestPath(game, context);
     const tableTraceReachedTerminal =
       tableTrace.length > 0 && (tableTrace[tableTrace.length - 1].gameOver || tableTrace[tableTrace.length - 1].victory);
-    finalResult.trace = tableTraceReachedTerminal ? tableTrace : replayBestPathByReSolve(game, context.originalDeck, options.nodeLimit);
+    finalResult.trace = tableTraceReachedTerminal
+      ? tableTrace
+      : replayBestPathByReSolve(game, context.originalDeck, options.nodeLimit, options.exhaustive === true);
   }
 
   return finalResult;
@@ -407,7 +418,14 @@ export function solveRootActionsWithContext(game: Game, context: SolverContext, 
   const cardIdentity = buildCardIdentityIndex(game, context);
   const nodeLimitRef: NodeLimitRef = { count: 0, limit: options.nodeLimit ?? Infinity };
 
-  const dfs = makeDfs(game, cardIdentity, context, nodeLimitRef, context.storeBestAction || options.trace === true);
+  const dfs = makeDfs(
+    game,
+    cardIdentity,
+    context,
+    nodeLimitRef,
+    context.storeBestAction || options.trace === true,
+    options.exhaustive === true,
+  );
   const actions = game.getPossibleActions();
   const actionResults: RootActionResult[] = [];
 
@@ -519,7 +537,7 @@ function replayBestPath(rootGame: Game, context: SolverContext): SolveTraceStep[
   return trace;
 }
 
-function replayBestPathByReSolve(rootGame: Game, originalDeck: DungeonCard[], nodeLimit?: number): SolveTraceStep[] {
+function replayBestPathByReSolve(rootGame: Game, originalDeck: DungeonCard[], nodeLimit?: number, exhaustive?: boolean): SolveTraceStep[] {
   const replay = rootGame.clone();
   const trace: SolveTraceStep[] = [];
   let step = 1;
@@ -536,7 +554,7 @@ function replayBestPathByReSolve(rootGame: Game, originalDeck: DungeonCard[], no
     for (const action of actions) {
       const candidate = replay.clone();
       doAction(candidate, action);
-      const result = solve(candidate, originalDeck, { trace: false, nodeLimit });
+      const result = solve(candidate, originalDeck, { trace: false, nodeLimit, exhaustive });
 
       if (!bestResult || compareBetter(result, bestResult)) {
         bestResult = result;
