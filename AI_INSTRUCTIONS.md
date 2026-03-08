@@ -32,6 +32,8 @@ Run a single Vitest test file: `npx vitest run src/features/scoundrel/logic/__te
 
 Run a single engine-lib Jest test: `npx --prefix src/engine-lib jest src/__tests__/clone.test.ts`
 
+Run Python RL tests: `cd python_ai && .venv/bin/python -m pytest tests/ -v`
+
 ## Architecture
 
 ### Engine Layers
@@ -51,6 +53,14 @@ The codebase contains two engine layers:
 - Has its own `package.json`, Jest test suite, and TypeScript config (`CommonJS`, emits to `dist/`)
 - Also includes solver/simulation/PIMC modules (`src/engine-lib/src/solver.ts`, `src/engine-lib/src/simulation.ts`, `src/engine-lib/src/pimc.ts`)
 
+**3. Pure Python engine** (`python_ai/engine.py`)
+
+- Training-only replica of the TS engine — eliminates IPC subprocess overhead (~85x faster step throughput).
+- Pure functions: `init_game`, `play_card`, `enter_room`, `avoid_room`, `get_legal_actions`, `calculate_score`.
+- Includes `encode_observation` (74-dim) and `build_action_mask` (10-bool) matching the TS worker encoding exactly.
+- Cross-validated against the TS engine with deterministic seed-based tests (`python_ai/tests/test_cross_validation.py`).
+- `ScoundrelEnv` calls this directly — no subprocess, no JSON serialization.
+
 **Legacy functional engine** (`src/features/scoundrel/logic/engine.ts`)
 
 - Retained for historical/reference tests and direct state-machine experiments.
@@ -69,7 +79,8 @@ The codebase contains two engine layers:
 | `src/engine-lib/benchmark-pimc.ts`                  | CLI entry point for PIMC benchmarks (`npx tsx src/engine-lib/benchmark-pimc.ts <games> <samples>`)       |
 | `src/engine-lib/benchmark-rules.ts`                 | CLI benchmark for rule-set difficulty analysis (`npx tsx src/engine-lib/benchmark-rules.ts --games <n>`) |
 | `src/trainAI.ts`                                    | Tabular Q-learning experimentation against frontend state                                                |
-| `python_ai/`                                        | Python PPO (TensorFlow) + OpenAI Gym environment                                                         |
+| `python_ai/`                                        | Python MaskablePPO (sb3-contrib) + Gymnasium environment                                                 |
+| `python_ai/engine.py`                               | Pure Python port of the Scoundrel engine (training-only, no IPC)                                         |
 
 ### Express API Server
 
@@ -92,7 +103,7 @@ src/main.tsx → src/router/index.tsx (BrowserRouter)
 - **Formatting**: Prettier (`printWidth: 140`). Pre-commit hook runs `pretty-quick --staged`.
 - **Naming**: `PascalCase` for components, `camelCase` for functions/utilities, `*.test.ts` for tests.
 - **Commits**: Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`).
-- **Testing**: Vitest for frontend/game integration logic. Jest for engine-lib (`src/engine-lib/src/__tests__/`). Cover rule changes with deterministic unit tests.
+- **Testing**: Vitest for frontend/game integration logic. Jest for engine-lib (`src/engine-lib/src/__tests__/`). pytest for Python RL engine (`python_ai/tests/`). Cover rule changes with deterministic unit tests and cross-validate Python engine against TS engine when game rules change.
 - **Feature organization**: Domain logic grouped in `src/features/`. Shared UI in `src/components/`.
 - **Styling**: Tailwind CSS utility classes.
 - **TypeScript**: Strict mode enabled. No unused locals/params.
