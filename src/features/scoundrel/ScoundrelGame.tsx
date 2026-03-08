@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DungeonCard, ScoundrelGameState } from "../../types/scoundrel";
 import { avoidRoom, handleCardAction, initGame, simulateCardActionHealth } from "./logic/engineAdapter";
+import type { SolverRequest, SolverResponse, WinnabilityStatus } from "./logic/winnability";
 import ActionButtons from "./components/ActionButtons";
 import EquippedWeapon from "./components/EquippedWeapon";
 import RoomCards from "./components/RoomCards";
@@ -28,9 +29,61 @@ function initGameFromUrlSeed(): ScoundrelGameState {
   return initGame({ deckSeed: getDeckSeedFromUrl() });
 }
 
+function labelForWinnabilityStatus(status: WinnabilityStatus): string {
+  if (status === "computing") return "Calculating...";
+  if (status === "winnable") return "Winnable";
+  if (status === "not_winnable") return "Not Winnable";
+  if (status === "victory") return "Victory";
+  return "Defeat";
+}
+
+function classForWinnabilityStatus(status: WinnabilityStatus): string {
+  if (status === "computing") return "bg-slate-500 text-white";
+  if (status === "winnable" || status === "victory") return "bg-green-600 text-white";
+  return "bg-red-600 text-white";
+}
+
 export default function ScoundrelGame() {
   const [game, setGame] = useState<ScoundrelGameState>(initGameFromUrlSeed());
   const [hoveredCard, setHoveredCard] = useState<DungeonCard | null>(null);
+  const [winnabilityStatus, setWinnabilityStatus] = useState<WinnabilityStatus>("computing");
+  const solverWorkerRef = useRef<Worker | null>(null);
+  const latestSolverRequestRef = useRef(0);
+
+  useEffect(() => {
+    const worker = new Worker(new URL("./workers/winnabilityWorker.ts", import.meta.url), { type: "module" });
+    solverWorkerRef.current = worker;
+
+    worker.onmessage = (event: MessageEvent<SolverResponse>) => {
+      const response = event.data;
+      if (response.requestId !== latestSolverRequestRef.current) return;
+      setWinnabilityStatus(response.status);
+    };
+
+    worker.onerror = (event: ErrorEvent) => {
+      console.error("Winnability worker failed", event.message);
+    };
+
+    return () => {
+      worker.terminate();
+      solverWorkerRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const worker = solverWorkerRef.current;
+    if (!worker) return;
+
+    setWinnabilityStatus("computing");
+    const requestId = latestSolverRequestRef.current + 1;
+    latestSolverRequestRef.current = requestId;
+
+    const request: SolverRequest = {
+      requestId,
+      gameState: game,
+    };
+    worker.postMessage(request);
+  }, [game]);
 
   // Unified handler for card click, always delegates to engine
   const handleCardClick = (card: DungeonCard) => {
@@ -73,6 +126,9 @@ export default function ScoundrelGame() {
               {simulatedHealth} / {game.maxHealth}
             </span>
           )}
+        </div>
+        <div className={`px-2 py-1 text-sm font-semibold rounded ${classForWinnabilityStatus(winnabilityStatus)}`}>
+          {labelForWinnabilityStatus(winnabilityStatus)}
         </div>
       </div>
 
