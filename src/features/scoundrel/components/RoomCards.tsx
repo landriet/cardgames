@@ -7,11 +7,20 @@ export default function RoomCards({
   onCardClick,
   onCardHover,
   onCardUnhover,
+  hoveredCard,
+  equippedWeapon: _equippedWeapon,
+  health,
+  maxHealth,
 }: {
   cards: (DungeonCard | undefined)[];
   onCardClick: (card: DungeonCard) => void;
   onCardHover?: (card: DungeonCard) => void;
   onCardUnhover?: () => void;
+  hoveredCard: DungeonCard | null;
+  /** Accepted for future use (e.g. weapon-adjusted damage preview); not used in badge computation yet. */
+  equippedWeapon: DungeonCard | null;
+  health: number;
+  maxHealth: number;
 }) {
   return (
     <div className="grid grid-cols-4 gap-2">
@@ -41,7 +50,19 @@ export default function RoomCards({
             style={{ minWidth: "85px", minHeight: "128px" }}
           >
             {card ? (
-              <Card suit={card.suit as any} rank={rankToString(card.rank) as any} faceUp={true} cardType={card.type} />
+              <>
+                <Card suit={card.suit as any} rank={rankToString(card.rank) as any} faceUp={true} cardType={card.type} />
+                {hoveredCard === card && card.type === "monster" && (
+                  <div className="absolute top-1 right-1 bg-red-600 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow z-30">
+                    -{card.rank}
+                  </div>
+                )}
+                {hoveredCard === card && card.type === "potion" && (
+                  <div className="absolute top-1 right-1 bg-green-600 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow z-30">
+                    +{Math.min(card.rank, maxHealth - health)}
+                  </div>
+                )}
+              </>
             ) : (
               <span className="text-xs text-gray-400 dark:text-gray-500 mt-1">&nbsp;</span>
             )}
