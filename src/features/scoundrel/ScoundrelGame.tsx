@@ -105,6 +105,10 @@ export default function ScoundrelGame() {
     (!game.lastMonsterDefeated || game.pendingMonsterChoice.monster.rank <= game.lastMonsterDefeated.rank)
   );
 
+  // 44 cards start in the deck (full Scoundrel deck), 4 dealt per room
+  const totalCardsDealt = 44 - game.deck.length;
+  const currentRoom = Math.max(1, Math.ceil(totalCardsDealt / 4));
+
   // Calculate health percentage for the bar
   const healthPercent = Math.max(0, Math.min(100, Math.round((game.health / game.maxHealth) * 100)));
 
@@ -128,6 +132,7 @@ export default function ScoundrelGame() {
               </span>
             )}
           </div>
+          <div className="text-sm font-semibold text-gray-600 dark:text-gray-300">Room {currentRoom}</div>
           <div className={`px-2 py-1 text-sm font-semibold rounded ${classForWinnabilityStatus(winnabilityStatus)}`}>
             {labelForWinnabilityStatus(winnabilityStatus)}
           </div>
