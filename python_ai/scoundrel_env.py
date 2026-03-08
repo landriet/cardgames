@@ -150,6 +150,8 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
             "discardCount": len(state.discard),
             "roomCount": len(state.room),
             "lastActionWasDefer": state.last_action_was_defer,
+            "hasWeapon": state.equipped_weapon is not None,
+            "weaponMonsterCount": len(state.monsters_on_weapon),
         }
 
     def _compute_reward(
@@ -163,6 +165,8 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
             return reward, {"total": reward}
         if self.reward_mode == "dense_v1":
             return self._compute_reward_dense_v1(prev_stats, curr_stats, terminated)
+        if self.reward_mode == "dense_v2":
+            return self._compute_reward_dense_v2(prev_stats, curr_stats, terminated)
         raise ValueError(f"Unsupported reward_mode: {self.reward_mode}")
 
     def _compute_reward_baseline(self, curr_stats: Dict[str, Any], terminated: bool) -> float:
@@ -222,6 +226,70 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
             "resolve": float(resolve_component),
             "roomTransition": float(room_transition),
             "skipPenalty": float(skip_penalty),
+            "terminal": float(terminal_component),
+            "total": total,
+        }
+        return total, components
+
+    def _compute_reward_dense_v2(
+        self,
+        prev_stats: Optional[Dict[str, Any]],
+        curr_stats: Dict[str, Any],
+        terminated: bool,
+    ) -> Tuple[float, Dict[str, float]]:
+        health = float(curr_stats.get("health", self.last_health))
+        health_delta = (health - self.last_health) / max(float(curr_stats.get("maxHealth", 20)), 1.0)
+        self.last_health = health
+
+        # Larger health coefficient than dense_v1 (0.15 vs 0.10) to make
+        # damage avoidance a stronger signal without overpowering the terminal reward.
+        health_component = 0.15 * health_delta
+
+        # Weapon-use bonus: reward equipping a new weapon and landing hits with it.
+        weapon_component = 0.0
+        if prev_stats is not None:
+            prev_weapon = bool(prev_stats.get("hasWeapon", False))
+            curr_weapon = bool(curr_stats.get("hasWeapon", False))
+            if not prev_weapon and curr_weapon:
+                # Agent just equipped a weapon this step.
+                weapon_component = 0.03
+
+            prev_weapon_monsters = int(prev_stats.get("weaponMonsterCount", 0))
+            curr_weapon_monsters = int(curr_stats.get("weaponMonsterCount", 0))
+            if curr_weapon_monsters > prev_weapon_monsters:
+                # Weapon was used to kill a monster.
+                weapon_component += 0.02
+
+        # Small per-step survival bonus to encourage longer, healthier play.
+        survival_component = 0.005 if not terminated else 0.0
+
+        # Resolve bonus: reward actually playing/discarding cards (same as dense_v1,
+        # but without any skip penalty — this mode does not discourage deferring).
+        resolve_component = 0.0
+        if prev_stats is not None:
+            prev_discard = int(prev_stats.get("discardCount", 0))
+            curr_discard = int(curr_stats.get("discardCount", 0))
+            discard_delta = max(curr_discard - prev_discard, 0)
+            resolve_component = 0.01 * float(discard_delta)
+
+        # Terminal reward: score normalised over 40 (tighter scale than baseline's
+        # /100) plus an explicit victory bonus to strongly incentivise winning.
+        terminal_component = 0.0
+        if terminated:
+            score = float(curr_stats.get("score", 0.0))
+            terminal_component = float(np.clip(score / 40.0, -1.0, 1.0))
+            if bool(curr_stats.get("victory", False)):
+                terminal_component += 0.5
+
+        total = float(
+            health_component + weapon_component + survival_component
+            + resolve_component + terminal_component
+        )
+        components = {
+            "health": float(health_component),
+            "weapon": float(weapon_component),
+            "survival": float(survival_component),
+            "resolve": float(resolve_component),
             "terminal": float(terminal_component),
             "total": total,
         }

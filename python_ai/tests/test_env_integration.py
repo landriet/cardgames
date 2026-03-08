@@ -305,3 +305,85 @@ class TestObsV2Integration:
             done = terminated or truncated
             steps += 1
             assert obs.shape == (84,), f"Step {steps}: expected obs shape (84,), got {obs.shape}"
+
+
+# ---------------------------------------------------------------------------
+# Test: dense_v2 reward mode
+# ---------------------------------------------------------------------------
+
+
+class TestDenseV2Reward:
+    """Test dense_v2 reward mode."""
+
+    def test_dense_v2_returns_components(self):
+        env = ScoundrelEnv(reward_mode="dense_v2", reward_debug=True)
+        obs, _ = env.reset()
+        mask = env.action_masks()
+        action = int(np.where(mask)[0][0])
+        _, reward, _, _, info = env.step(action)
+        assert "rewardComponents" in info
+        components = info["rewardComponents"]
+        assert "health" in components
+        assert "weapon" in components
+        assert "survival" in components
+        assert "terminal" in components
+        assert "total" in components
+
+    def test_dense_v2_survival_bonus(self):
+        env = ScoundrelEnv(reward_mode="dense_v2", reward_debug=True)
+        obs, _ = env.reset()
+        mask = env.action_masks()
+        action = int(np.where(mask)[0][0])
+        _, reward, terminated, _, info = env.step(action)
+        if not terminated:
+            components = info["rewardComponents"]
+            assert components["survival"] > 0.0
+
+    def test_dense_v2_terminal_uses_40_scale(self):
+        """Verify terminal reward uses /40 not /100 scaling."""
+        env = ScoundrelEnv(reward_mode="dense_v2", reward_debug=True)
+        obs, _ = env.reset()
+        done = False
+        steps = 0
+        last_info = {}
+        while not done and steps < 200:
+            mask = env.action_masks()
+            action = int(np.where(mask)[0][0])
+            _, _, terminated, truncated, info = env.step(action)
+            last_info = info
+            done = terminated or truncated
+            steps += 1
+        if last_info.get("gameOver") or last_info.get("victory"):
+            components = last_info.get("rewardComponents", {})
+            score = last_info.get("score", 0.0)
+            expected_terminal = np.clip(score / 40.0, -1.0, 1.0)
+            if last_info.get("victory"):
+                expected_terminal += 0.5
+            assert components.get("terminal", 0.0) == pytest.approx(
+                expected_terminal, abs=0.01
+            )
+
+    def test_dense_v2_no_skip_penalty(self):
+        """dense_v2 should not penalize room skipping."""
+        env = ScoundrelEnv(reward_mode="dense_v2", reward_debug=True)
+        obs, _ = env.reset()
+        mask = env.action_masks()
+        if mask[1]:
+            _, _, _, _, info = env.step(1)
+            components = info.get("rewardComponents", {})
+            assert components.get("skipPenalty", 0.0) == 0.0
+
+    def test_dense_v2_full_episode_completes(self):
+        env = ScoundrelEnv(reward_mode="dense_v2")
+        obs, _ = env.reset()
+        done = False
+        steps = 0
+        total_reward = 0.0
+        while not done and steps < 200:
+            mask = env.action_masks()
+            action = int(np.where(mask)[0][0])
+            obs, reward, terminated, truncated, _ = env.step(action)
+            total_reward += reward
+            done = terminated or truncated
+            steps += 1
+        assert done
