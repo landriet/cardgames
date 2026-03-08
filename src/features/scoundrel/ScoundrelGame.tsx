@@ -145,7 +145,8 @@ export default function ScoundrelGame() {
       </div>
       {/* Equipped Weapon display with stacked monsters */}
       <div className="mb-4 text-gray-800 dark:text-gray-100">
-        Equipped Weapon: <EquippedWeapon weapon={game.equippedWeapon} monsters={game.monstersOnWeapon || []} />
+        <div className="text-sm font-semibold mb-1">Equipped Weapon</div>
+        <EquippedWeapon weapon={game.equippedWeapon} monsters={game.monstersOnWeapon || []} />
       </div>
       {/* Action buttons */}
       <ActionButtons

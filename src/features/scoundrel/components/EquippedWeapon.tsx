@@ -3,23 +3,20 @@ import { DungeonCard } from "../../../types/scoundrel";
 import { rankToString } from "../ScoundrelGame";
 
 export default function EquippedWeapon({ weapon, monsters }: { weapon: DungeonCard | null; monsters: DungeonCard[] }) {
+  if (!weapon) {
+    return <span className="font-mono text-gray-500 dark:text-gray-400">None</span>;
+  }
+
   return (
-    <span className="relative inline-block ml-2" style={{ minWidth: "80px", minHeight: "120px" }}>
-      {weapon ? (
-        <>
-          <div className="absolute top-0 left-0 z-10">
-            <Card suit={weapon.suit as any} rank={rankToString(weapon.rank) as any} faceUp={true} cardType={weapon.type} />
-          </div>
-          {monsters &&
-            monsters.map((monster: DungeonCard, idx: number) => (
-              <div key={idx} className="absolute z-20" style={{ top: `0px`, left: `${(idx + 1) * 34}px` }}>
-                <Card suit={monster.suit as any} rank={rankToString(monster.rank) as any} faceUp={true} cardType={monster.type} />
-              </div>
-            ))}
-        </>
-      ) : (
-        <span className="font-mono">None</span>
-      )}
-    </span>
+    <div className="flex flex-row items-start">
+      <div className="flex-shrink-0">
+        <Card suit={weapon.suit as any} rank={rankToString(weapon.rank) as any} faceUp={true} cardType={weapon.type} />
+      </div>
+      {monsters.map((monster: DungeonCard, idx: number) => (
+        <div key={idx} className="flex-shrink-0 -ml-12">
+          <Card suit={monster.suit as any} rank={rankToString(monster.rank) as any} faceUp={true} cardType={monster.type} />
+        </div>
+      ))}
+    </div>
   );
 }
