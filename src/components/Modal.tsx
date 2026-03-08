@@ -31,10 +31,10 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, ariaLabel }) =
         if (e.key === "Escape") onClose();
       }}
     >
-      <div className="relative bg-white p-6 rounded-lg shadow-lg transform transition-transform duration-300 ease-out w-full max-w-md mx-4">
+      <div className="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg transform transition-transform duration-300 ease-out w-full max-w-md mx-4">
         <button
           onClick={onClose}
-          className="absolute top-2 right-2 text-gray-600 hover:text-gray-800 text-2xl font-bold focus:outline-none p-2"
+          className="absolute top-2 right-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 text-2xl font-bold focus:outline-none p-2"
           aria-label="Close popup"
         >
           &times;
