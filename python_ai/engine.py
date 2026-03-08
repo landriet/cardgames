@@ -372,6 +372,14 @@ def avoid_room(state: GameState) -> GameState:
     new.room_being_entered = False
     # Deal a new room from the front of the (now-extended) deck.
     _apply_turn_rules(new)
+
+    # Mirror engineAdapter behaviour: toEngineGame() always forces roomBeingEntered=True,
+    # so the freshly dealt room is treated as immediately entered — WITHOUT resetting
+    # the other flags (canDeferRoom stays False, lastActionWasDefer stays True, etc.).
+    # Contrast with play_card's auto-enter which calls the full enter_room() reset.
+    if not new.game_over and not new.victory and len(new.room) > 0:
+        new.room_being_entered = True
+
     return new
 
 
@@ -430,6 +438,13 @@ def play_card(
         new.cards_resolved_this_turn = 0
 
     _apply_turn_rules(new)
+
+    # Mirror engineAdapter.handleCardAction(): after the turn ends, if the room
+    # still has cards and the game is not terminal, automatically enter the room.
+    # This matches the TS adapter behaviour at engineAdapter.ts line 167–169.
+    if not new.game_over and not new.victory and not new.room_being_entered and len(new.room) > 0:
+        return enter_room(new)
+
     return new
 
 
