@@ -78,7 +78,14 @@ function parseArgs(argv: string[]): {
   return { games, configs, trace, nodeLimit };
 }
 
-function formatResult(name: string, result: SimulationResult): string {
+interface FailedGame {
+  seed: number;
+  score: number;
+  nodesExplored: number;
+  nodeLimitHit: boolean;
+}
+
+function formatResult(name: string, result: SimulationResult, failedGames: FailedGame[] = []): string {
   const lines: string[] = [];
   lines.push(`\n${"=".repeat(50)}`);
   lines.push(`  ${name}`);
@@ -98,7 +105,7 @@ function formatResult(name: string, result: SimulationResult): string {
     if (score < minScore) minScore = score;
     if (score > maxScore) maxScore = score;
 
-    const bucket = Math.floor(score / 5) * 5;
+    const bucket = score <= 0 ? score : Math.floor((score - 1) / 5) * 5 + 1;
     const nextCount = (buckets.get(bucket) || 0) + 1;
     buckets.set(bucket, nextCount);
     if (nextCount > maxBucketCount) maxBucketCount = nextCount;
@@ -115,8 +122,17 @@ function formatResult(name: string, result: SimulationResult): string {
   lines.push(`\n  Score distribution:`);
   for (const [bucket, count] of sortedBuckets) {
     const bar = "█".repeat(Math.round((count / maxBucketCount) * 30));
-    const label = `${bucket >= 0 ? " " : ""}${bucket}..${bucket + 4}`;
+    const label = bucket <= 0 ? `${bucket}` : `${bucket}..${bucket + 4}`;
     lines.push(`  ${label.padStart(8)} | ${bar} ${count}`);
+  }
+
+  if (failedGames.length > 0) {
+    const sampled = failedGames.slice(0, 5);
+    lines.push(`\n  Sample failed games (${Math.min(5, failedGames.length)} of ${failedGames.length}):`);
+    for (const fg of sampled) {
+      const limitTag = fg.nodeLimitHit ? " [node-limit]" : "";
+      lines.push(`    seed=${fg.seed}  score=${fg.score}  nodes=${fg.nodesExplored}${limitTag}`);
+    }
   }
 
   return lines.join("\n");
@@ -149,31 +165,40 @@ function main(): void {
 
   for (const { name, rules } of configs) {
     const start = Date.now();
+    const failedGames: FailedGame[] = [];
     const result = runSimulation(rules, games, {
       trace,
       nodeLimit,
-      onGameComplete: trace
-        ? ({ gameNumber, result: gameResult }) => {
-            console.log(`\n[${name}] Game ${gameNumber}`);
-            if (!gameResult.trace || gameResult.trace.length === 0) {
-              console.log(`  No trace steps recorded.`);
-            } else {
-              for (const step of gameResult.trace) {
-                console.log(
-                  `  Step ${step.step}: ${formatAction(step.action)} | HP ${step.healthBefore}->${step.healthAfter} | Deck ${step.deckBefore}->${step.deckAfter}`,
-                );
-                console.log(`           Room: [${step.roomBefore.join(", ")}] -> [${step.roomAfter.join(", ")}]`);
-                console.log(`           Score: ${step.scoreAfter} | gameOver=${step.gameOver} victory=${step.victory}`);
-              }
+      onGameComplete: ({ gameNumber, seed, result: gameResult }) => {
+        if (!gameResult.victory) {
+          failedGames.push({
+            seed,
+            score: gameResult.score,
+            nodesExplored: gameResult.nodesExplored,
+            nodeLimitHit: gameResult.nodeLimitHit ?? false,
+          });
+        }
+        if (trace) {
+          console.log(`\n[${name}] Game ${gameNumber} (seed=${seed})`);
+          if (!gameResult.trace || gameResult.trace.length === 0) {
+            console.log(`  No trace steps recorded.`);
+          } else {
+            for (const step of gameResult.trace) {
+              console.log(
+                `  Step ${step.step}: ${formatAction(step.action)} | HP ${step.healthBefore}->${step.healthAfter} | Deck ${step.deckBefore}->${step.deckAfter}`,
+              );
+              console.log(`           Room: [${step.roomBefore.join(", ")}] -> [${step.roomAfter.join(", ")}]`);
+              console.log(`           Score: ${step.scoreAfter} | gameOver=${step.gameOver} victory=${step.victory}`);
             }
-            console.log(
-              `  Final: victory=${gameResult.victory} score=${gameResult.score} nodesExplored=${gameResult.nodesExplored} steps=${gameResult.trace?.length ?? 0}`,
-            );
           }
-        : undefined,
+          console.log(
+            `  Final: victory=${gameResult.victory} score=${gameResult.score} nodesExplored=${gameResult.nodesExplored} steps=${gameResult.trace?.length ?? 0}`,
+          );
+        }
+      },
     });
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-    console.log(formatResult(name, result));
+    console.log(formatResult(name, result, failedGames));
     console.log(`  Time:              ${elapsed}s`);
     results.push({ name, result });
   }

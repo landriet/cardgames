@@ -72,7 +72,17 @@ function main() {
   if (exhaustive) {
     console.log("Mode: exhaustive");
   }
-  benchmarkAI(44, 44, seed, exhaustive);
+  const results = benchmarkAI(44, 44, seed, exhaustive);
+
+  if (seed !== undefined) {
+    const failedRun = results.find(({ result }) => !result.victory);
+    if (failedRun) {
+      console.error(
+        `Fail-fast: solver lost for seed ${seed} at deck size ${failedRun.size} (score=${failedRun.result.score}, nodes=${failedRun.result.nodesExplored})`,
+      );
+      process.exit(1);
+    }
+  }
 }
 
 //try with static deck

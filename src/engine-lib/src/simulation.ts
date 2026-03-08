@@ -13,7 +13,7 @@ export interface SimulationResult {
 export interface SimulationOptions {
   trace?: boolean;
   nodeLimit?: number;
-  onGameComplete?: (details: { gameNumber: number; result: SolveResult }) => void;
+  onGameComplete?: (details: { gameNumber: number; seed: number; result: SolveResult }) => void;
 }
 
 export function runSimulation(rules: RuleConfig, numGames: number, options: SimulationOptions = {}): SimulationResult {
@@ -31,7 +31,8 @@ export function runSimulation(rules: RuleConfig, numGames: number, options: Simu
   let totalNodes = 0;
 
   for (let i = 0; i < numGames; i++) {
-    const deck = Game.createDeck();
+    const seed = i;
+    const deck = Game.createDeck(seed);
     const originalDeck = deck.map((c) => c.clone());
     const player = new Player(fullRules.startingHealth, fullRules.maxHealth);
     const game = new Game(deck, player, fullRules);
@@ -41,7 +42,7 @@ export function runSimulation(rules: RuleConfig, numGames: number, options: Simu
     scores.push(result.score);
     if (result.victory) wins++;
     totalNodes += result.nodesExplored;
-    options.onGameComplete?.({ gameNumber: i + 1, result });
+    options.onGameComplete?.({ gameNumber: i + 1, seed, result });
   }
 
   scores.sort((a, b) => a - b);

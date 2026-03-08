@@ -286,7 +286,8 @@ function makeDfs(
     }
 
     if (nodeLimitRef.count >= nodeLimitRef.limit) {
-      return { victory: false, score: game.calculateScore() };
+      const roomMonsterValue = game.currentRoom.cards.filter((c) => c.type === "monster").reduce((sum, c) => sum + c.rank, 0);
+      return { victory: false, score: game.calculateScore() - roomMonsterValue };
     }
 
     const stateKey = zobristStateKey(game, cardIdentity, context.zobrist);
