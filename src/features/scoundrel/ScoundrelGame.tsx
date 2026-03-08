@@ -105,9 +105,9 @@ export default function ScoundrelGame() {
     (!game.lastMonsterDefeated || game.pendingMonsterChoice.monster.rank <= game.lastMonsterDefeated.rank)
   );
 
-  // 44 cards start in the deck (full Scoundrel deck), 4 dealt per room
-  const totalCardsDealt = 44 - game.deck.length;
-  const currentRoom = Math.max(1, Math.ceil(totalCardsDealt / 4));
+  // Count cards that have permanently left play (discard + on weapon + weapon itself)
+  const resolvedCards = game.discard.length + game.monstersOnWeapon.length + (game.equippedWeapon ? 1 : 0);
+  const currentRoom = Math.max(1, Math.floor(resolvedCards / 4) + 1);
 
   // Calculate health percentage for the bar
   const healthPercent = Math.max(0, Math.min(100, Math.round((game.health / game.maxHealth) * 100)));
@@ -141,7 +141,7 @@ export default function ScoundrelGame() {
 
       {/* Deck and Room side-by-side */}
       <div className="mb-4 p-4 bg-gray-100 dark:bg-gray-800/50 rounded-lg">
-        <div className="flex flex-row items-top gap-8">
+        <div className="flex flex-row items-start gap-8">
           {/* Deck pile display on the left */}
           <DeckDisplay deck={game.deck} />
           <RoomCards

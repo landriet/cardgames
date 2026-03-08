@@ -2,6 +2,10 @@ import Card from "../../../components/Card";
 import { DungeonCard } from "../../../types/scoundrel";
 import { rankToString } from "../ScoundrelGame";
 
+function isCardHovered(hoveredCard: DungeonCard | null, card: DungeonCard): boolean {
+  return hoveredCard !== null && hoveredCard.suit === card.suit && hoveredCard.rank === card.rank;
+}
+
 export default function RoomCards({
   cards,
   onCardClick,
@@ -30,6 +34,7 @@ export default function RoomCards({
               potion: "hover:ring-2 hover:ring-green-400 hover:shadow-lg",
             }[card.type]
           : "";
+        const hovered = card ? isCardHovered(hoveredCard, card) : false;
         return (
           <div
             key={idx}
@@ -40,8 +45,15 @@ export default function RoomCards({
             }`}
             tabIndex={card ? 0 : -1}
             role={card ? "button" : undefined}
-            aria-label={card ? `Interact with ${card.type}` : `Empty spot`}
+            aria-label={card ? `Interact with ${card.type}` : undefined}
             onClick={card ? () => onCardClick(card) : undefined}
+            onKeyDown={
+              card
+                ? (e) => {
+                    if (e.key === "Enter" || e.key === " ") onCardClick(card);
+                  }
+                : undefined
+            }
             onMouseEnter={card && onCardHover ? () => onCardHover(card) : undefined}
             onMouseLeave={card && onCardUnhover ? () => onCardUnhover() : undefined}
             style={{ minWidth: "85px", minHeight: "128px" }}
@@ -49,12 +61,12 @@ export default function RoomCards({
             {card ? (
               <>
                 <Card suit={card.suit as any} rank={rankToString(card.rank) as any} faceUp={true} cardType={card.type} />
-                {hoveredCard === card && card.type === "monster" && (
+                {hovered && card.type === "monster" && (
                   <div className="absolute top-1 right-1 bg-red-600 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow z-30">
                     -{card.rank}
                   </div>
                 )}
-                {hoveredCard === card && card.type === "potion" && (
+                {hovered && card.type === "potion" && (
                   <div className="absolute top-1 right-1 bg-green-600 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow z-30">
                     +{Math.min(card.rank, maxHealth - health)}
                   </div>
