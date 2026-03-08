@@ -111,41 +111,45 @@ export default function ScoundrelGame() {
   return (
     <div className="p-4 max-w-xl mx-auto">
       <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">Scoundrel</h1>
-      <div className="mb-3 text-gray-800 dark:text-gray-100 flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <span>Health:</span>
-          {/* Health bar */}
-          <div className="w-32 h-4 bg-gray-300 dark:bg-gray-700 rounded overflow-hidden border border-gray-400 dark:border-gray-600">
-            <div className="h-full bg-red-500 transition-all duration-300" style={{ width: `${healthPercent}%` }}></div>
-          </div>
-          <span className="font-semibold">
-            {game.health} / {game.maxHealth}
-          </span>
-          {simulatedHealth !== null && simulatedHealth !== game.health && (
-            <span className="text-green-500 font-semibold">
-              {simulatedHealth} / {game.maxHealth}
+      <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+        <div className="text-gray-800 dark:text-gray-100 flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span>Health:</span>
+            {/* Health bar */}
+            <div className="w-32 h-4 bg-gray-300 dark:bg-gray-700 rounded overflow-hidden border border-gray-400 dark:border-gray-600">
+              <div className="h-full bg-red-500 transition-all duration-300" style={{ width: `${healthPercent}%` }}></div>
+            </div>
+            <span className="font-semibold">
+              {game.health} / {game.maxHealth}
             </span>
-          )}
-        </div>
-        <div className={`px-2 py-1 text-sm font-semibold rounded ${classForWinnabilityStatus(winnabilityStatus)}`}>
-          {labelForWinnabilityStatus(winnabilityStatus)}
+            {simulatedHealth !== null && simulatedHealth !== game.health && (
+              <span className="text-green-500 font-semibold">
+                {simulatedHealth} / {game.maxHealth}
+              </span>
+            )}
+          </div>
+          <div className={`px-2 py-1 text-sm font-semibold rounded ${classForWinnabilityStatus(winnabilityStatus)}`}>
+            {labelForWinnabilityStatus(winnabilityStatus)}
+          </div>
         </div>
       </div>
 
       {/* Deck and Room side-by-side */}
-      <div className="mb-4 flex flex-row items-top gap-8">
-        {/* Deck pile display on the left */}
-        <DeckDisplay deck={game.deck} />
-        <RoomCards
-          cards={game.currentRoom.cards}
-          onCardClick={handleCardClick}
-          onCardHover={setHoveredCard}
-          onCardUnhover={() => setHoveredCard(null)}
-        />
+      <div className="mb-4 p-4 bg-gray-100 dark:bg-gray-800/50 rounded-lg">
+        <div className="flex flex-row items-top gap-8">
+          {/* Deck pile display on the left */}
+          <DeckDisplay deck={game.deck} />
+          <RoomCards
+            cards={game.currentRoom.cards}
+            onCardClick={handleCardClick}
+            onCardHover={setHoveredCard}
+            onCardUnhover={() => setHoveredCard(null)}
+          />
+        </div>
       </div>
       {/* Equipped Weapon display with stacked monsters */}
-      <div className="mb-4 text-gray-800 dark:text-gray-100">
-        <div className="text-sm font-semibold mb-1">Equipped Weapon</div>
+      <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+        <div className="text-sm font-semibold mb-1 text-gray-800 dark:text-gray-100">Equipped Weapon</div>
         <EquippedWeapon weapon={game.equippedWeapon} monsters={game.monstersOnWeapon || []} />
       </div>
       {/* Action buttons */}
