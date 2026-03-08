@@ -51,6 +51,16 @@ def render_state(step_idx: int, state: Dict[str, Any], possible_actions: List[Di
         print(f"  - {format_worker_action(action, room_cards)}")
 
 
+def get_render_payload(env: ScoundrelEnv) -> tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    if env.session_id is None:
+        raise RuntimeError("Environment not initialized. Call reset() first.")
+    state_result = env.client.get_state(env.session_id)
+    actions_result = env.client.get_possible_actions(env.session_id)
+    state = state_result.get("state", {})
+    possible_actions = actions_result.get("possibleActions", [])
+    return state, possible_actions
+
+
 def play(
     model_path: Path,
     seed: int,
@@ -71,14 +81,15 @@ def play(
         total_reward = 0.0
 
         while not done and not truncated:
-            assert env.state is not None
-            render_state(step_idx, env.state, env.possible_actions)
+            state, possible_actions = get_render_payload(env)
+            render_state(step_idx, state, possible_actions)
 
             masks = env.action_masks()
             action, _ = model.predict(_obs, action_masks=masks, deterministic=deterministic)
             action_idx = int(action)
             selected_action = env._discrete_to_worker_action(action_idx)
-            print(f"Chosen action: idx={action_idx} -> {format_worker_action(selected_action, env.state.get('currentRoom', {}).get('cards', []))}")
+            room_cards = state.get("currentRoom", {}).get("cards", [])
+            print(f"Chosen action: idx={action_idx} -> {format_worker_action(selected_action, room_cards)}")
 
             _obs, reward, terminated, was_truncated, info = env.step(action_idx)
             total_reward += float(reward)
@@ -90,7 +101,7 @@ def play(
             if sleep_seconds > 0:
                 time.sleep(sleep_seconds)
 
-        assert env.state is not None
+        final_state, _ = get_render_payload(env)
         print("\nEpisode complete")
         print(
             "Outcome: "
@@ -98,7 +109,7 @@ def play(
             f"gameOver={bool(info.get('gameOver', False))} "
             f"truncated={bool(info.get('truncated', False))}"
         )
-        print(f"Final health: {env.state.get('health')}/{env.state.get('maxHealth')}")
+        print(f"Final health: {final_state.get('health')}/{final_state.get('maxHealth')}")
         print(f"Final score: {info.get('score', 0)}")
         print(f"Total reward: {total_reward:.4f}")
         print(f"Steps: {step_idx}")

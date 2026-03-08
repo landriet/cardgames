@@ -8,7 +8,21 @@ import {
   initGame,
   type ScoundrelPossibleAction,
 } from "../../features/scoundrel/logic/engineAdapter";
-import type { WorkerAction, WorkerPossibleAction, WorkerRequest, WorkerResponse, WorkerResult } from "./protocol";
+import type { WorkerAction, WorkerPossibleAction, WorkerRequest, WorkerResponse, WorkerResult, WorkerRlSnapshot } from "./protocol";
+
+const MAX_RANK = 14;
+
+const canonicalDeck: Array<readonly [cardType: DungeonCard["type"], suit: DungeonCard["suit"], rank: number]> = [];
+for (const suit of ["hearts", "diamonds", "clubs", "spades"] as const) {
+  for (let rank = 2; rank <= 14; rank += 1) {
+    if ((suit === "hearts" || suit === "diamonds") && rank >= 11) {
+      continue;
+    }
+    const cardType: DungeonCard["type"] = suit === "hearts" ? "potion" : suit === "diamonds" ? "weapon" : "monster";
+    canonicalDeck.push([cardType, suit, rank]);
+  }
+}
+const cardIndex = new Map(canonicalDeck.map((card, idx) => [`${card[0]}:${card[1]}:${card[2]}`, idx] as const));
 
 function isString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
@@ -46,11 +60,107 @@ function listPossibleActions(state: ScoundrelGameState): WorkerPossibleAction[] 
   return getPossibleActions(state).map((action) => toWorkerAction(state, action));
 }
 
+function actionToDiscrete(action: WorkerPossibleAction): number | undefined {
+  if (action.actionType === "enterRoom") return 0;
+  if (action.actionType === "skipRoom") return 1;
+  if (action.actionType !== "playCard") return undefined;
+  if (action.cardIdx < 0 || action.cardIdx > 3) return undefined;
+  const base = 2 + action.cardIdx * 2;
+  return action.mode === "weapon" ? base + 1 : base;
+}
+
+function buildActionMask(state: ScoundrelGameState): boolean[] {
+  const mask = Array.from({ length: 10 }, () => false);
+  for (const action of listPossibleActions(state)) {
+    const idx = actionToDiscrete(action);
+    if (idx !== undefined) {
+      mask[idx] = true;
+    }
+  }
+  return mask;
+}
+
+function cardRank(card: DungeonCard | null | undefined): number {
+  return card ? card.rank / MAX_RANK : 0;
+}
+
+function encodeObservation(state: ScoundrelGameState): number[] {
+  const obs = Array.from({ length: 74 }, () => 0);
+  const roomCards = state.currentRoom.cards;
+  const monstersOnWeapon = state.monstersOnWeapon ?? [];
+  const maxHealth = Math.max(state.maxHealth || 1, 1);
+
+  obs[0] = state.health / maxHealth;
+  obs[1] = state.maxHealth / 20;
+  obs[2] = cardRank(state.equippedWeapon);
+  obs[3] = cardRank(state.lastMonsterDefeated);
+  obs[4] = Math.min(monstersOnWeapon.length, 4) / 4;
+  obs[5] = state.potionTakenThisTurn ? 1 : 0;
+  obs[6] = state.canDeferRoom ? 1 : 0;
+  obs[7] = state.lastActionWasDefer ? 1 : 0;
+  obs[8] = Math.min(state.deck.length, 44) / 44;
+  obs[9] = Math.min(roomCards.length, 4) / 4;
+
+  for (let i = 0; i < 4; i += 1) {
+    const card = roomCards[i];
+    if (!card) continue;
+    const base = 10 + i * 4;
+    obs[base] = card.type === "monster" ? 1 : 0;
+    obs[base + 1] = card.type === "weapon" ? 1 : 0;
+    obs[base + 2] = card.type === "potion" ? 1 : 0;
+    obs[base + 3] = card.rank / MAX_RANK;
+  }
+
+  for (let i = 0; i < 4; i += 1) {
+    if (!monstersOnWeapon[i]) continue;
+    obs[26 + i] = monstersOnWeapon[i].rank / MAX_RANK;
+  }
+
+  const markSeen = (card?: DungeonCard | null): void => {
+    if (!card) return;
+    const idx = cardIndex.get(`${card.type}:${card.suit}:${card.rank}`);
+    if (idx !== undefined) {
+      obs[30 + idx] = 1;
+    }
+  };
+  for (const card of state.discard) markSeen(card);
+  for (const card of roomCards) markSeen(card);
+  markSeen(state.equippedWeapon);
+  for (const card of monstersOnWeapon) markSeen(card);
+
+  return obs;
+}
+
+function toRlSnapshot(sessionId: string, state: ScoundrelGameState): WorkerRlSnapshot {
+  return {
+    sessionId,
+    observation: encodeObservation(state),
+    actionMask: buildActionMask(state),
+    health: state.health,
+    maxHealth: state.maxHealth,
+    score: state.score ?? 0,
+    victory: Boolean(state.victory),
+    gameOver: Boolean(state.gameOver),
+    discardCount: state.discard.length,
+    roomCount: state.currentRoom.cards.length,
+    lastActionWasDefer: Boolean(state.lastActionWasDefer),
+  };
+}
+
 function actionKey(action: WorkerAction, state: ScoundrelGameState): string {
   if (action.actionType === "enterRoom") return "enterRoom";
   if (action.actionType === "skipRoom") return "skipRoom";
   const card = state.currentRoom.cards[action.cardIdx];
-  return `playCard:${action.cardIdx}:${action.mode ?? ""}:${cardToIdentity(card)}`;
+  const mode = action.mode === "weapon" ? "weapon" : "barehanded";
+  return `playCard:${action.cardIdx}:${mode}:${cardToIdentity(card)}`;
+}
+
+function applyAction(state: ScoundrelGameState, action: WorkerAction): ScoundrelGameState {
+  if (action.actionType === "enterRoom") return enterRoom(state);
+  if (action.actionType === "skipRoom") return avoidRoom(state);
+  const card = state.currentRoom.cards[action.cardIdx];
+  if (!card) throw new Error("Invalid card index.");
+  return handleCardAction(state, card, action.mode);
 }
 
 function validateAction(state: ScoundrelGameState, action: WorkerAction): void {
@@ -92,11 +202,23 @@ export class EngineWorkerService {
         this.sessions.set(sessionId, state);
         return { sessionId, state, possibleActions: listPossibleActions(state) };
       }
+      case "create_session_rl": {
+        const sessionId = randomUUID();
+        const state = initGame({ deckSeed: this.readDeckSeed(request.params) });
+        this.sessions.set(sessionId, state);
+        return toRlSnapshot(sessionId, state);
+      }
       case "reset_session": {
         const sessionId = this.readSessionId(request.params);
         const state = initGame({ deckSeed: this.readDeckSeed(request.params) });
         this.sessions.set(sessionId, state);
         return { sessionId, state, possibleActions: listPossibleActions(state) };
+      }
+      case "reset_session_rl": {
+        const sessionId = this.readSessionId(request.params);
+        const state = initGame({ deckSeed: this.readDeckSeed(request.params) });
+        this.sessions.set(sessionId, state);
+        return toRlSnapshot(sessionId, state);
       }
       case "get_state": {
         const state = this.getSessionState(this.readSessionId(request.params));
@@ -111,22 +233,18 @@ export class EngineWorkerService {
         const action = this.readAction(request.params);
         const state = this.getSessionState(sessionId);
         validateAction(state, action);
-
-        let nextState: ScoundrelGameState;
-        if (action.actionType === "enterRoom") {
-          nextState = enterRoom(state);
-        } else if (action.actionType === "skipRoom") {
-          nextState = avoidRoom(state);
-        } else {
-          const card = state.currentRoom.cards[action.cardIdx];
-          if (!card) {
-            throw new Error("Invalid card index.");
-          }
-          nextState = handleCardAction(state, card, action.mode);
-        }
-
+        const nextState = applyAction(state, action);
         this.sessions.set(sessionId, nextState);
         return { sessionId, state: nextState, possibleActions: listPossibleActions(nextState) };
+      }
+      case "step_action_rl": {
+        const sessionId = this.readSessionId(request.params);
+        const action = this.readAction(request.params);
+        const state = this.getSessionState(sessionId);
+        validateAction(state, action);
+        const nextState = applyAction(state, action);
+        this.sessions.set(sessionId, nextState);
+        return toRlSnapshot(sessionId, nextState);
       }
       case "close_session": {
         const sessionId = this.readSessionId(request.params);

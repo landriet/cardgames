@@ -79,24 +79,24 @@ def evaluate_model_on_deck_seeds(
     all_wins: list[float] = []
     total_truncated = 0
 
-    for idx, deck_seed in enumerate(deck_seeds):
-        env = build_vec_env(
-            num_envs=num_envs,
-            vec_env_kind=vec_env_kind,
-            start_method=start_method,
-            max_episode_steps=max_episode_steps,
-            seed=base_seed + idx,
-            wrap_action_masker=False,
-            deck_seed=deck_seed,
-            reward_mode=reward_mode,
-        )
-        scores: list[float] = []
-        wins: list[float] = []
-        truncated_games = 0
-        completed_or_truncated = 0
-
-        try:
+    env = build_vec_env(
+        num_envs=num_envs,
+        vec_env_kind=vec_env_kind,
+        start_method=start_method,
+        max_episode_steps=max_episode_steps,
+        seed=base_seed,
+        wrap_action_masker=False,
+        deck_seed=deck_seeds[0] if deck_seeds else None,
+        reward_mode=reward_mode,
+    )
+    try:
+        for deck_seed in deck_seeds:
+            env.env_method("set_deck_seed", int(deck_seed))
             obs = env.reset()
+            scores: list[float] = []
+            wins: list[float] = []
+            truncated_games = 0
+            completed_or_truncated = 0
             while completed_or_truncated < games_per_seed:
                 masks = np.asarray(env.env_method("action_masks"), dtype=bool)
                 actions, _ = model.predict(obs, action_masks=masks, deterministic=True)
@@ -117,12 +117,11 @@ def evaluate_model_on_deck_seeds(
                         scores.append(score)
                         wins.append(1.0 if info.get("victory") else 0.0)
                     completed_or_truncated += 1
-        finally:
-            env.close()
-
-        total_truncated += truncated_games
-        all_scores.extend(scores)
-        all_wins.extend(wins)
+            total_truncated += truncated_games
+            all_scores.extend(scores)
+            all_wins.extend(wins)
+    finally:
+        env.close()
 
     scores_np = np.asarray(all_scores, dtype=np.float64)
     wins_np = np.asarray(all_wins, dtype=np.float64)

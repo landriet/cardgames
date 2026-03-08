@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import subprocess
-import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -17,6 +16,7 @@ class EngineWorkerClient:
         self._cwd = cwd or repo_root
         self._command = command or ["npx", "tsx", "src/engine-lib/worker/engineWorker.ts"]
         self._process: Optional[subprocess.Popen[str]] = None
+        self._next_request_id = 1
 
     def start(self) -> None:
         if self._process and self._process.poll() is None:
@@ -47,13 +47,14 @@ class EngineWorkerClient:
         self.start()
         assert self._process and self._process.stdin and self._process.stdout
 
-        request_id = str(uuid.uuid4())
+        request_id = str(self._next_request_id)
+        self._next_request_id += 1
         payload = {
             "id": request_id,
             "method": method,
             "params": params or {},
         }
-        self._process.stdin.write(json.dumps(payload) + "\n")
+        self._process.stdin.write(json.dumps(payload, separators=(",", ":")) + "\n")
         self._process.stdin.flush()
 
         line = self._process.stdout.readline()
@@ -78,11 +79,23 @@ class EngineWorkerClient:
             params["deckSeed"] = int(deck_seed)
         return self.request("create_session", params)
 
+    def create_session_rl(self, deck_seed: Optional[int] = None) -> Dict[str, Any]:
+        params: Dict[str, Any] = {}
+        if deck_seed is not None:
+            params["deckSeed"] = int(deck_seed)
+        return self.request("create_session_rl", params)
+
     def reset_session(self, session_id: str, deck_seed: Optional[int] = None) -> Dict[str, Any]:
         params: Dict[str, Any] = {"sessionId": session_id}
         if deck_seed is not None:
             params["deckSeed"] = int(deck_seed)
         return self.request("reset_session", params)
+
+    def reset_session_rl(self, session_id: str, deck_seed: Optional[int] = None) -> Dict[str, Any]:
+        params: Dict[str, Any] = {"sessionId": session_id}
+        if deck_seed is not None:
+            params["deckSeed"] = int(deck_seed)
+        return self.request("reset_session_rl", params)
 
     def get_state(self, session_id: str) -> Dict[str, Any]:
         return self.request("get_state", {"sessionId": session_id})
@@ -92,6 +105,9 @@ class EngineWorkerClient:
 
     def step_action(self, session_id: str, action: Dict[str, Any]) -> Dict[str, Any]:
         return self.request("step_action", {"sessionId": session_id, "action": action})
+
+    def step_action_rl(self, session_id: str, action: Dict[str, Any]) -> Dict[str, Any]:
+        return self.request("step_action_rl", {"sessionId": session_id, "action": action})
 
     def close_session(self, session_id: str) -> Dict[str, Any]:
         return self.request("close_session", {"sessionId": session_id})
