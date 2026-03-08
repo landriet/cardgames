@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import json
 import subprocess
+import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+MAX_WORKER_RETRIES = 2
 
 
 class EngineWorkerClient:
@@ -43,35 +46,65 @@ class EngineWorkerClient:
                 self._process.kill()
         self._process = None
 
-    def request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def _restart(self) -> None:
+        self.stop()
         self.start()
-        assert self._process and self._process.stdin and self._process.stdout
 
-        request_id = str(self._next_request_id)
-        self._next_request_id += 1
-        payload = {
-            "id": request_id,
-            "method": method,
-            "params": params or {},
-        }
-        self._process.stdin.write(json.dumps(payload, separators=(",", ":")) + "\n")
-        self._process.stdin.flush()
+    def _drain_stderr(self) -> str:
+        if not self._process or not self._process.stderr:
+            return ""
+        try:
+            self._process.stderr.close()
+        except OSError:
+            pass
+        try:
+            self._process.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            self._process.kill()
+        return "(stderr drained after worker crash)"
 
-        line = self._process.stdout.readline()
-        if not line:
-            stderr = ""
-            if self._process.stderr:
-                stderr = self._process.stderr.read()
-            raise RuntimeError(f"Worker closed unexpectedly. stderr={stderr}")
+    def request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        last_error: Optional[Exception] = None
 
-        response = json.loads(line)
-        if response.get("id") != request_id:
-            raise RuntimeError("Worker response ID mismatch.")
-        if not response.get("ok"):
-            error = response.get("error", {})
-            message = error.get("message", "Unknown worker error")
-            raise RuntimeError(message)
-        return response["result"]
+        for attempt in range(1, MAX_WORKER_RETRIES + 1):
+            self.start()
+            assert self._process and self._process.stdin and self._process.stdout
+
+            request_id = str(self._next_request_id)
+            self._next_request_id += 1
+            payload = {
+                "id": request_id,
+                "method": method,
+                "params": params or {},
+            }
+
+            try:
+                self._process.stdin.write(json.dumps(payload, separators=(",", ":")) + "\n")
+                self._process.stdin.flush()
+            except OSError as exc:
+                last_error = RuntimeError(f"Worker stdin write failed (attempt {attempt}): {exc}")
+                warnings.warn(str(last_error), stacklevel=2)
+                self._restart()
+                continue
+
+            line = self._process.stdout.readline()
+            if not line:
+                stderr_note = self._drain_stderr()
+                last_error = RuntimeError(f"Worker closed unexpectedly (attempt {attempt}). {stderr_note}")
+                warnings.warn(str(last_error), stacklevel=2)
+                self._restart()
+                continue
+
+            response = json.loads(line)
+            if response.get("id") != request_id:
+                raise RuntimeError("Worker response ID mismatch.")
+            if not response.get("ok"):
+                error = response.get("error", {})
+                message = error.get("message", "Unknown worker error")
+                raise RuntimeError(message)
+            return response["result"]
+
+        raise last_error or RuntimeError("Worker request failed after retries.")
 
     def create_session(self, deck_seed: Optional[int] = None) -> Dict[str, Any]:
         params: Dict[str, Any] = {}

@@ -10,6 +10,7 @@ import numpy as np
 from sb3_contrib import MaskablePPO
 from sb3_contrib.common.maskable.utils import get_action_masks
 from stable_baselines3.common.callbacks import BaseCallback, CallbackList, CheckpointCallback
+from utils import bootstrap_mean_ci
 from vec_env_utils import START_METHOD_CHOICES, VEC_ENV_CHOICES, build_vec_env, resolve_num_envs, resolve_vec_env_kind
 
 
@@ -29,22 +30,6 @@ def linear_schedule(start: float, end: float):
         return float(end + (start - end) * progress_remaining)
 
     return _schedule
-
-
-def bootstrap_mean_ci(values: np.ndarray, confidence: float = 0.95, num_bootstrap: int = 1000, seed: int = 12345) -> tuple[float, float]:
-    if values.size == 0:
-        return (0.0, 0.0)
-    if values.size == 1:
-        v = float(values[0])
-        return (v, v)
-
-    rng = np.random.default_rng(seed)
-    samples = rng.choice(values, size=(num_bootstrap, values.size), replace=True)
-    means = samples.mean(axis=1)
-    alpha = 1.0 - confidence
-    low = float(np.quantile(means, alpha / 2.0))
-    high = float(np.quantile(means, 1.0 - alpha / 2.0))
-    return (low, high)
 
 
 def parse_eval_seeds(eval_seeds: Optional[str]) -> list[int]:

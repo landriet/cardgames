@@ -87,7 +87,7 @@ def play(
             masks = env.action_masks()
             action, _ = model.predict(_obs, action_masks=masks, deterministic=deterministic)
             action_idx = int(action)
-            selected_action = env._discrete_to_worker_action(action_idx)
+            selected_action = env.discrete_to_worker_action(action_idx)
             room_cards = state.get("currentRoom", {}).get("cards", [])
             print(f"Chosen action: idx={action_idx} -> {format_worker_action(selected_action, room_cards)}")
 

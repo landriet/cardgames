@@ -23,9 +23,9 @@ def main() -> None:
     e = float(evaluation.get("avg_score", 0.0))
 
     if b == 0.0:
-      lift = float("inf") if e > 0 else float("-inf") if e < 0 else 0.0
+        lift = float("inf") if e > 0 else float("-inf") if e < 0 else 0.0
     else:
-      lift = ((e - b) / abs(b)) * 100.0
+        lift = ((e - b) / abs(b)) * 100.0
 
     print(f"baseline avg_score: {b:.3f}")
     print(f"eval avg_score:     {e:.3f}")

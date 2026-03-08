@@ -70,7 +70,7 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
             return self._last_obs.copy(), -1.0, False, False, {"invalid_action": True}
 
         prev_stats = self._step_stats.copy()
-        worker_action = self._discrete_to_worker_action(action)
+        worker_action = self.discrete_to_worker_action(action)
         result = self.client.step_action_rl(self.session_id, worker_action)
         self._apply_snapshot(result)
 
@@ -98,13 +98,15 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         )
 
     def close(self):
-        if self.session_id is not None:
-            try:
-                self.client.close_session(self.session_id)
-            except RuntimeError:
-                pass
-            self.session_id = None
-        self.client.stop()
+        try:
+            if self.session_id is not None:
+                try:
+                    self.client.close_session(self.session_id)
+                except Exception:
+                    pass
+                self.session_id = None
+        finally:
+            self.client.stop()
 
     def action_masks(self) -> np.ndarray:
         return self._last_mask.copy()
@@ -202,7 +204,7 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         }
         return total, components
 
-    def _discrete_to_worker_action(self, action_idx: int) -> Dict[str, Any]:
+    def discrete_to_worker_action(self, action_idx: int) -> Dict[str, Any]:
         if action_idx == 0:
             return {"actionType": "enterRoom"}
         if action_idx == 1:
