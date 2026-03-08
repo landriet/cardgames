@@ -17,6 +17,8 @@ def evaluate_random(
     num_envs: Optional[int] = None,
     vec_env_kind: Optional[str] = None,
     start_method: str = "spawn",
+    reward_mode: str = "baseline",
+    obs_version: int = 1,
 ) -> dict:
     resolved_num_envs = resolve_num_envs(num_envs)
     resolved_vec_env_kind = resolve_vec_env_kind(vec_env_kind, resolved_num_envs)
@@ -27,6 +29,8 @@ def evaluate_random(
         max_episode_steps=max_episode_steps,
         seed=seed,
         wrap_action_masker=False,
+        reward_mode=reward_mode,
+        obs_version=obs_version,
     )
     rng = np.random.default_rng(seed)
 
@@ -85,6 +89,8 @@ def main() -> None:
     parser.add_argument("--vec-env", choices=VEC_ENV_CHOICES, default=None, help="Vectorization backend. Default: subproc when num_envs>1.")
     parser.add_argument("--start-method", choices=START_METHOD_CHOICES, default="spawn", help="Subprocess start method for SubprocVecEnv.")
     parser.add_argument("--max-episode-steps", type=int, default=200)
+    parser.add_argument("--reward-mode", choices=("baseline", "dense_v1", "dense_v2"), default="baseline")
+    parser.add_argument("--obs-version", type=int, choices=[1, 2], default=1, help="Observation version: 1 (74-dim) or 2 (84-dim).")
     parser.add_argument("--out", type=Path, default=Path("python_ai/results/random_baseline.json"))
     args = parser.parse_args()
 
@@ -95,6 +101,8 @@ def main() -> None:
         num_envs=args.num_envs,
         vec_env_kind=args.vec_env,
         start_method=args.start_method,
+        reward_mode=args.reward_mode,
+        obs_version=args.obs_version,
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2), encoding="utf-8")

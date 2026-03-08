@@ -46,6 +46,7 @@ def make_env_factory(
     deck_seed: Optional[int] = None,
     reward_mode: str = "baseline",
     reward_debug: bool = False,
+    obs_version: int = 1,
 ) -> Callable[[], object]:
     worker_seed = seed + worker_idx * 100_003
 
@@ -55,6 +56,7 @@ def make_env_factory(
             deck_seed=deck_seed,
             reward_mode=reward_mode,
             reward_debug=reward_debug,
+            obs_version=obs_version,
         )
         env.action_space.seed(worker_seed)
         env.observation_space.seed(worker_seed)
@@ -76,6 +78,7 @@ def build_vec_env(
     deck_seed: Optional[int] = None,
     reward_mode: str = "baseline",
     reward_debug: bool = False,
+    obs_version: int = 1,
 ) -> VecEnv:
     env_factories = [
         make_env_factory(
@@ -86,6 +89,7 @@ def build_vec_env(
             deck_seed=deck_seed,
             reward_mode=reward_mode,
             reward_debug=reward_debug,
+            obs_version=obs_version,
         )
         for worker_idx in range(num_envs)
     ]

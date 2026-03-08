@@ -49,6 +49,7 @@ def evaluate(
     start_method: str = "spawn",
     deck_seed: Optional[int] = None,
     reward_mode: str = "baseline",
+    obs_version: int = 1,
 ) -> dict:
     resolved_num_envs = resolve_num_envs(num_envs)
     resolved_vec_env_kind = resolve_vec_env_kind(vec_env_kind, resolved_num_envs)
@@ -61,6 +62,7 @@ def evaluate(
         wrap_action_masker=False,
         deck_seed=deck_seed,
         reward_mode=reward_mode,
+        obs_version=obs_version,
     )
     model = MaskablePPO.load(str(model_path))
 
@@ -126,6 +128,7 @@ def evaluate_across_deck_seeds(
     vec_env_kind: Optional[str] = None,
     start_method: str = "spawn",
     reward_mode: str = "baseline",
+    obs_version: int = 1,
 ) -> dict:
     per_seed_results: list[dict] = []
     all_scores: list[float] = []
@@ -143,6 +146,7 @@ def evaluate_across_deck_seeds(
             start_method=start_method,
             deck_seed=deck_seed,
             reward_mode=reward_mode,
+            obs_version=obs_version,
         )
         result["deck_seed"] = deck_seed
         per_seed_results.append(result)
@@ -192,7 +196,8 @@ def main() -> None:
         help="Comma-separated deterministic deck seeds for multi-seed evaluation, e.g. '101,202,303'.",
     )
     parser.add_argument("--seeds-file", type=Path, default=None, help="Optional file containing one deterministic deck seed per line.")
-    parser.add_argument("--reward-mode", choices=("baseline", "dense_v1"), default="baseline")
+    parser.add_argument("--reward-mode", choices=("baseline", "dense_v1", "dense_v2"), default="baseline")
+    parser.add_argument("--obs-version", type=int, choices=[1, 2], default=1, help="Observation version: 1 (74-dim) or 2 (84-dim).")
     parser.add_argument("--out", type=Path, default=Path("python_ai/results/eval.json"))
     args = parser.parse_args()
 
@@ -211,6 +216,7 @@ def main() -> None:
             vec_env_kind=args.vec_env,
             start_method=args.start_method,
             reward_mode=args.reward_mode,
+            obs_version=args.obs_version,
         )
     else:
         result = evaluate(
@@ -223,6 +229,7 @@ def main() -> None:
             start_method=args.start_method,
             deck_seed=args.deck_seed,
             reward_mode=args.reward_mode,
+            obs_version=args.obs_version,
         )
 
     args.out.parent.mkdir(parents=True, exist_ok=True)

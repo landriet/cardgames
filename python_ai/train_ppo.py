@@ -59,6 +59,7 @@ def evaluate_model_on_deck_seeds(
     vec_env_kind: str,
     start_method: str,
     reward_mode: str,
+    obs_version: int = 1,
 ) -> dict:
     all_scores: list[float] = []
     all_wins: list[float] = []
@@ -73,6 +74,7 @@ def evaluate_model_on_deck_seeds(
         wrap_action_masker=False,
         deck_seed=deck_seeds[0] if deck_seeds else None,
         reward_mode=reward_mode,
+        obs_version=obs_version,
     )
     try:
         for deck_seed in deck_seeds:
@@ -153,6 +155,7 @@ class PeriodicEvalCallback(BaseCallback):
         eval_start_method: str,
         eval_max_episode_steps: int,
         reward_mode: str,
+        obs_version: int = 1,
         save_dir: Path,
         verbose: int = 1,
     ) -> None:
@@ -166,6 +169,7 @@ class PeriodicEvalCallback(BaseCallback):
         self.eval_start_method = eval_start_method
         self.eval_max_episode_steps = eval_max_episode_steps
         self.reward_mode = reward_mode
+        self.obs_version = int(obs_version)
         self.save_dir = save_dir
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
@@ -200,6 +204,7 @@ class PeriodicEvalCallback(BaseCallback):
             vec_env_kind=self.eval_vec_env_kind,
             start_method=self.eval_start_method,
             reward_mode=self.reward_mode,
+            obs_version=self.obs_version,
         )
         metrics["timestep"] = self.num_timesteps
         metrics["elapsed_seconds"] = round(time.time() - self.start_time, 3)
@@ -253,6 +258,8 @@ def train(
     target_kl: Optional[float] = None,
     reward_mode: str = "baseline",
     reward_debug: bool = False,
+    obs_version: int = 1,
+    device: str = "auto",
 ) -> None:
     resolved_num_envs = resolve_num_envs(num_envs)
     resolved_vec_env_kind = resolve_vec_env_kind(vec_env_kind, resolved_num_envs)
@@ -272,6 +279,7 @@ def train(
         wrap_action_masker=True,
         reward_mode=reward_mode,
         reward_debug=reward_debug,
+        obs_version=obs_version,
     )
 
     run_save_dir = save_dir or (model_out.parent / f"{model_out.stem}_artifacts")
@@ -280,7 +288,7 @@ def train(
     eval_callback: Optional[PeriodicEvalCallback] = None
     try:
         if resume_from is not None:
-            model = MaskablePPO.load(str(resume_from), env=vec_env)
+            model = MaskablePPO.load(str(resume_from), env=vec_env, device=device)
             model.set_random_seed(seed)
         else:
             n_steps = derive_n_steps(resolved_num_envs)
@@ -288,7 +296,8 @@ def train(
             batch_size = derive_batch_size(rollout_size)
             print(
                 f"Training config: num_envs={resolved_num_envs}, vec_env={resolved_vec_env_kind}, "
-                f"n_steps={n_steps}, rollout_size={rollout_size}, batch_size={batch_size}, start_method={start_method}"
+                f"n_steps={n_steps}, rollout_size={rollout_size}, batch_size={batch_size}, "
+                f"start_method={start_method}, device={device}, obs_version={obs_version}"
             )
             lr = linear_schedule(lr_start, lr_end) if abs(lr_start - lr_end) > 1e-12 else float(lr_start)
             model = MaskablePPO(
@@ -305,6 +314,7 @@ def train(
                 vf_coef=float(vf_coef),
                 max_grad_norm=float(max_grad_norm),
                 target_kl=target_kl,
+                device=device,
                 verbose=1,
             )
 
@@ -332,6 +342,7 @@ def train(
                 eval_start_method=eval_start_method,
                 eval_max_episode_steps=max_episode_steps,
                 reward_mode=reward_mode,
+                obs_version=obs_version,
                 save_dir=run_save_dir,
             )
             callbacks.append(eval_callback)
@@ -361,6 +372,7 @@ def train(
             "max_episode_steps": max_episode_steps,
             "reward_mode": reward_mode,
             "reward_debug": reward_debug,
+            "obs_version": obs_version,
             "resume_from": str(resume_from) if resume_from is not None else None,
             "lr_start": lr_start,
             "lr_end": lr_end,
@@ -423,8 +435,10 @@ def main() -> None:
     parser.add_argument("--max-grad-norm", type=float, default=0.5)
     parser.add_argument("--target-kl", type=float, default=None)
 
-    parser.add_argument("--reward-mode", choices=("baseline", "dense_v1"), default="baseline")
+    parser.add_argument("--reward-mode", choices=("baseline", "dense_v1", "dense_v2"), default="baseline")
     parser.add_argument("--reward-debug", action="store_true", help="Attach reward components in env info for debugging.")
+    parser.add_argument("--obs-version", type=int, choices=[1, 2], default=1, help="Observation version: 1 (74-dim) or 2 (84-dim).")
+    parser.add_argument("--device", type=str, default="auto", help="PyTorch device: 'cpu', 'mps', 'cuda', or 'auto'.")
 
     args = parser.parse_args()
 
@@ -458,6 +472,8 @@ def main() -> None:
         target_kl=args.target_kl,
         reward_mode=args.reward_mode,
         reward_debug=args.reward_debug,
+        obs_version=args.obs_version,
+        device=args.device,
     )
 
 
