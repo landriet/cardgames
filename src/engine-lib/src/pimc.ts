@@ -2,6 +2,16 @@ import { DungeonCard, Game, GameAction, RuleConfig } from "./index";
 import { SimulationResult } from "./simulation";
 import { createSolverContext, solveRootActionsWithContext } from "./solver";
 
+function mulberry32(seed: number): () => number {
+  return () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 function cardKey(card: DungeonCard): string {
   return `${card.type}-${card.suit}-${card.rank}`;
 }
@@ -59,10 +69,10 @@ export function getUnseenCards(game: Game): DungeonCard[] {
   return result;
 }
 
-export function shuffle<T>(array: T[]): T[] {
+export function shuffle<T>(array: T[], rng: () => number = Math.random): T[] {
   const arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rng() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
@@ -87,7 +97,7 @@ function actionKey(a: GameAction): string {
   return a.actionType;
 }
 
-export function pimcBestAction(game: Game, numSamples: number, nodeLimit?: number): PimcResult {
+export function pimcBestAction(game: Game, numSamples: number, nodeLimit?: number, rng: () => number = Math.random): PimcResult {
   const actions = game.getPossibleActions();
 
   if (actions.length === 0) {
@@ -115,7 +125,10 @@ export function pimcBestAction(game: Game, numSamples: number, nodeLimit?: numbe
   const solverContext = createSolverContext(Game.createDeck());
 
   for (let s = 0; s < numSamples; s++) {
-    const sampledDeck = shuffle(unseen.map((c) => c.clone()));
+    const sampledDeck = shuffle(
+      unseen.map((c) => c.clone()),
+      rng,
+    );
 
     const clone = game.clone();
     clone.deck = sampledDeck;
@@ -168,12 +181,14 @@ export interface PimcGameResult {
   moves: Array<{ action: GameAction; stats: ActionStats[] }>;
 }
 
-export function runPimcGame(numSamples: number, rules?: RuleConfig, nodeLimit?: number): PimcGameResult {
-  const game = new Game(undefined, undefined, rules);
+export function runPimcGame(numSamples: number, rules?: RuleConfig, nodeLimit?: number, seed?: number): PimcGameResult {
+  const rng = typeof seed === "number" && Number.isInteger(seed) ? mulberry32(seed) : Math.random;
+  const deck = typeof seed === "number" && Number.isInteger(seed) ? Game.createDeck(seed) : undefined;
+  const game = new Game(deck, undefined, rules);
   const moves: PimcGameResult["moves"] = [];
 
   while (!game.gameOver && !game.victory) {
-    const result = pimcBestAction(game, numSamples, nodeLimit);
+    const result = pimcBestAction(game, numSamples, nodeLimit, rng);
     if (result.stats.length === 0) break;
 
     doAction(game, result.bestAction);
@@ -188,12 +203,20 @@ export function runPimcGame(numSamples: number, rules?: RuleConfig, nodeLimit?: 
   };
 }
 
-export function runPimcSimulation(numGames: number, numSamples: number, rules?: RuleConfig, nodeLimit?: number): SimulationResult {
+export function runPimcSimulation(
+  numGames: number,
+  numSamples: number,
+  rules?: RuleConfig,
+  nodeLimit?: number,
+  seed?: number,
+): SimulationResult {
+  const rng = typeof seed === "number" && Number.isInteger(seed) ? mulberry32(seed) : Math.random;
   const scores: number[] = [];
   let wins = 0;
 
   for (let i = 0; i < numGames; i++) {
-    const result = runPimcGame(numSamples, rules, nodeLimit);
+    const gameSeed = Math.floor(rng() * 0x100000000);
+    const result = runPimcGame(numSamples, rules, nodeLimit, gameSeed);
     scores.push(result.score);
     if (result.victory) wins++;
   }

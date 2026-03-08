@@ -186,3 +186,30 @@ describe("pimcBestAction with fully-visible state", () => {
     expect(result.stats.length).toBeGreaterThan(0);
   });
 });
+
+describe("pimcBestAction seeding", () => {
+  function seededRng(seed: number): () => number {
+    return () => {
+      seed |= 0;
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  it("is deterministic with the same seed", () => {
+    const gameA = createGameWithState({
+      deck: Game.createDeck(12345),
+      room: [],
+      player: new Player(20, 20),
+      roomBeingEntered: false,
+      canDeferRoom: true,
+    });
+    const gameB = gameA.clone();
+
+    const first = pimcBestAction(gameA, 10, undefined, seededRng(2026));
+    const second = pimcBestAction(gameB, 10, undefined, seededRng(2026));
+    expect(second).toEqual(first);
+  });
+});

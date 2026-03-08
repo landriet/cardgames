@@ -3,8 +3,42 @@ import { GameAction } from "./src/index";
 
 console.debug = () => {};
 
+function readIntFlag(argv: string[], names: string[]): number | undefined {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    for (const name of names) {
+      if (arg === name) {
+        const value = argv[i + 1];
+        if (value === undefined) return undefined;
+        const parsed = parseInt(value, 10);
+        return Number.isInteger(parsed) ? parsed : undefined;
+      }
+      if (arg.startsWith(`${name}=`)) {
+        const parsed = parseInt(arg.slice(name.length + 1), 10);
+        return Number.isInteger(parsed) ? parsed : undefined;
+      }
+    }
+  }
+  return undefined;
+}
+
 const verbose = process.argv.includes("-v") || process.argv.includes("--verbose");
-const positionalArgs = process.argv.slice(2).filter((a) => !a.startsWith("-"));
+const args = process.argv.slice(2);
+const seed = readIntFlag(args, ["--seed", "-s"]);
+const positionalArgs: string[] = [];
+for (let i = 0; i < args.length; i++) {
+  const arg = args[i];
+  if (arg === "--seed" || arg === "-s") {
+    i++;
+    continue;
+  }
+  if (arg.startsWith("--seed=") || arg.startsWith("-s=") || arg === "--verbose" || arg === "-v") {
+    continue;
+  }
+  if (!arg.startsWith("-")) {
+    positionalArgs.push(arg);
+  }
+}
 const numGames = parseInt(positionalArgs[0] ?? "10", 10);
 const numSamples = parseInt(positionalArgs[1] ?? "50", 10);
 
@@ -25,6 +59,9 @@ function formatStats(stats: ActionStats[]): string {
 }
 
 console.log(`PIMC Simulation: ${numGames} games, ${numSamples} samples per decision`);
+if (seed !== undefined) {
+  console.log(`Seed: ${seed}`);
+}
 console.log("---");
 
 const startTotal = performance.now();
@@ -32,7 +69,8 @@ const results: PimcGameResult[] = [];
 
 for (let i = 0; i < numGames; i++) {
   const startGame = performance.now();
-  const result = runPimcGame(numSamples);
+  const gameSeed = seed !== undefined ? seed + i : undefined;
+  const result = runPimcGame(numSamples, undefined, undefined, gameSeed);
   const elapsed = performance.now() - startGame;
   results.push(result);
 

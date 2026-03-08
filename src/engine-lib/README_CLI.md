@@ -21,13 +21,17 @@ npm install -D tsx
 ### 1) Exact solver benchmark
 
 ```bash
-npx tsx src/engine-lib/benchmark-solver.ts
+npx tsx src/engine-lib/benchmark-solver.ts [--seed <n>]
 ```
 
 What it does:
 
 - Runs the exact DP/oracle solver on a fixed deck.
 - Prints victory, score, nodes explored, and elapsed time.
+
+Flags:
+
+- `-s`, `--seed <n>`: Use a deterministic shuffled deck for reproducible runs.
 
 Use this when:
 
@@ -36,7 +40,7 @@ Use this when:
 ### 2) PIMC benchmark
 
 ```bash
-npx tsx src/engine-lib/benchmark-pimc.ts <numGames> <numSamples> [-v]
+npx tsx src/engine-lib/benchmark-pimc.ts <numGames> <numSamples> [-v] [--seed <n>]
 ```
 
 Example:
@@ -54,6 +58,7 @@ What it does:
 Flags:
 
 - `-v`, `--verbose`: Print per-move details and action stats.
+- `-s`, `--seed <n>`: Make runs reproducible by seeding deck/sampling randomness.
 
 ### 3) Rule-set benchmark
 
