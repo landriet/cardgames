@@ -8,7 +8,6 @@ export default function RoomCards({
   onCardHover,
   onCardUnhover,
   hoveredCard,
-  equippedWeapon: _equippedWeapon,
   health,
   maxHealth,
 }: {
@@ -17,8 +16,6 @@ export default function RoomCards({
   onCardHover?: (card: DungeonCard) => void;
   onCardUnhover?: () => void;
   hoveredCard: DungeonCard | null;
-  /** Accepted for future use (e.g. weapon-adjusted damage preview); not used in badge computation yet. */
-  equippedWeapon: DungeonCard | null;
   health: number;
   maxHealth: number;
 }) {

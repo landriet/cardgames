@@ -150,7 +150,6 @@ export default function ScoundrelGame() {
             onCardHover={setHoveredCard}
             onCardUnhover={() => setHoveredCard(null)}
             hoveredCard={hoveredCard}
-            equippedWeapon={game.equippedWeapon}
             health={game.health}
             maxHealth={game.maxHealth}
           />
