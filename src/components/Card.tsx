@@ -42,7 +42,7 @@ export const Card: React.FC<CardProps> = ({ suit, rank, faceUp = true, className
         </div>
       ) : (
         <div
-          style={{ width: "86px", height: "128px" }}
+          style={{ width: "82px", height: "128px" }}
           className={`rounded-lg shadow-lg border border-gray-300 bg-white flex items-center justify-center relative select-none ${className}`}
         >
           <div className="w-full h-full flex items-center justify-center rounded-lg bg-blue-800 border-2 border-white relative overflow-hidden">
