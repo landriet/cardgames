@@ -1544,3 +1544,227 @@ class TestFullGameIntegration:
                 state = avoid_room(state)
             else:
                 state = play_card(state, action.card_index, mode=action.mode or "barehanded")
+
+
+# ---------------------------------------------------------------------------
+# Task 1: encode_observation_v2 (84-dim)
+# ---------------------------------------------------------------------------
+
+
+class TestEncodeObservationV2:
+    """Tests for encode_observation_v2, which extends the 74-dim v1 obs with 10 derived features."""
+
+    def test_v2_output_shape(self):
+        """Output must be shape (84,) with dtype float32."""
+        from engine import encode_observation_v2, init_game
+
+        state = init_game(seed=42)
+        obs = encode_observation_v2(state)
+        assert obs.shape == (84,)
+        assert obs.dtype == np.float32
+
+    def test_v2_first_74_match_v1(self):
+        """First 74 elements of v2 must be identical to encode_observation output."""
+        from engine import encode_observation, encode_observation_v2, init_game
+
+        state = init_game(seed=42)
+        obs_v1 = encode_observation(state)
+        obs_v2 = encode_observation_v2(state)
+        np.testing.assert_array_equal(obs_v2[:74], obs_v1)
+
+    def test_v2_unseen_counts_at_start(self):
+        """Features 74-76 (unseen monster/potion/weapon counts) must be in [0, 1] at game start."""
+        from engine import encode_observation_v2, init_game
+
+        state = init_game(seed=1)
+        obs = encode_observation_v2(state)
+        # At game start a room has been dealt (4 cards), so ~40 cards are unseen.
+        # All three ratios must be in valid [0, 1] range.
+        assert 0.0 <= obs[74] <= 1.0, f"unseen_monster_count ratio out of range: {obs[74]}"
+        assert 0.0 <= obs[75] <= 1.0, f"unseen_potion_count ratio out of range: {obs[75]}"
+        assert 0.0 <= obs[76] <= 1.0, f"unseen_weapon_count ratio out of range: {obs[76]}"
+
+    def test_v2_deck_progress_empty_deck(self):
+        """With an empty deck, deck_progress (obs[82]) must equal 1.0."""
+        from engine import Card, CardType, GameState, Suit, encode_observation_v2
+
+        # Construct a near-end state: empty deck, one card remaining in room.
+        state = GameState(
+            deck=[],
+            discard=[Card(CardType.MONSTER, Suit.CLUBS, 5)],
+            room=[Card(CardType.MONSTER, Suit.CLUBS, 3)],
+            equipped_weapon=None,
+            last_monster_defeated=None,
+            monsters_on_weapon=[],
+            health=10,
+            max_health=20,
+            can_defer_room=False,
+            last_action_was_defer=False,
+            game_over=False,
+            victory=False,
+            potion_taken_this_turn=False,
+            potions_taken_this_turn=0,
+            room_being_entered=True,
+            cards_resolved_this_turn=0,
+            last_resolved_card_type=None,
+            last_resolved_potion_value=None,
+        )
+        obs = encode_observation_v2(state)
+        # deck_progress = 1 - len(deck)/44 = 1 - 0/44 = 1.0
+        assert obs[82] == pytest.approx(1.0), f"Expected deck_progress=1.0, got {obs[82]}"
+
+    def test_v2_weapon_kills_remaining(self):
+        """weapon_kills_remaining: with weapon rank=8, last_killed rank=6, killable monsters should = 3."""
+        from engine import Card, CardType, GameState, Suit, encode_observation_v2
+
+        weapon = Card(CardType.WEAPON, Suit.DIAMONDS, 8)
+        last_killed = Card(CardType.MONSTER, Suit.CLUBS, 6)
+        # Deck monsters with ranks 3, 5, 7, 10 (killable if rank <= last_killed rank 6 → 3, 5)
+        deck_monsters = [
+            Card(CardType.MONSTER, Suit.CLUBS, 3),
+            Card(CardType.MONSTER, Suit.CLUBS, 5),
+            Card(CardType.MONSTER, Suit.CLUBS, 7),
+            Card(CardType.MONSTER, Suit.CLUBS, 10),
+        ]
+        # Room monster rank=4 (killable: 4 <= 6 → yes)
+        room_monster = Card(CardType.MONSTER, Suit.CLUBS, 4)
+
+        state = GameState(
+            deck=deck_monsters,
+            discard=[],
+            room=[room_monster],
+            equipped_weapon=weapon,
+            last_monster_defeated=last_killed,
+            monsters_on_weapon=[],
+            health=20,
+            max_health=20,
+            can_defer_room=False,
+            last_action_was_defer=False,
+            game_over=False,
+            victory=False,
+            potion_taken_this_turn=False,
+            potions_taken_this_turn=0,
+            room_being_entered=True,
+            cards_resolved_this_turn=0,
+            last_resolved_card_type=None,
+            last_resolved_potion_value=None,
+        )
+        obs = encode_observation_v2(state)
+        # Killable: deck[3] + deck[5] + room[4] = 3 monsters; obs[79] = 3/4 = 0.75
+        assert obs[79] == pytest.approx(0.75), f"Expected weapon_kills_remaining=0.75, got {obs[79]}"
+
+    def test_v2_weapon_equipped_no_kill_yet(self):
+        """obs[80] must equal weapon.rank/14 even when last_monster_defeated is None (freshly equipped weapon)."""
+        from engine import Card, CardType, GameState, Suit, encode_observation_v2
+
+        weapon = Card(CardType.WEAPON, Suit.DIAMONDS, 8)
+        state = GameState(
+            deck=[],
+            discard=[],
+            room=[],
+            equipped_weapon=weapon,
+            # No kill has been made yet with this weapon.
+            last_monster_defeated=None,
+            monsters_on_weapon=[],
+            health=20,
+            max_health=20,
+            can_defer_room=False,
+            last_action_was_defer=False,
+            game_over=False,
+            victory=False,
+            potion_taken_this_turn=False,
+            potions_taken_this_turn=0,
+            room_being_entered=True,
+            cards_resolved_this_turn=0,
+            last_resolved_card_type=None,
+            last_resolved_potion_value=None,
+        )
+        obs = encode_observation_v2(state)
+        # A freshly equipped weapon can still kill, so obs[80] must reflect its rank.
+        assert obs[80] == pytest.approx(8 / 14), f"Expected weapon_effective_damage_ratio={8/14:.4f}, got {obs[80]}"
+
+    def test_v2_no_weapon_zeros(self):
+        """At game start (no weapon equipped), obs[79] and obs[80] must be 0."""
+        from engine import encode_observation_v2, init_game
+
+        state = init_game(seed=5)
+        # init_game starts before any room is entered; equipped_weapon is None.
+        obs = encode_observation_v2(state)
+        assert obs[79] == pytest.approx(0.0), f"Expected weapon_kills_remaining=0 with no weapon, got {obs[79]}"
+        assert obs[80] == pytest.approx(0.0), f"Expected weapon_effective_damage_ratio=0 with no weapon, got {obs[80]}"
+
+    def test_v2_health_risk_and_survival(self):
+        """health_risk_ratio and survival_margin calculated correctly with health=5, two target monsters unseen."""
+        from engine import Card, CardType, GameState, Suit, _CANONICAL_ORDER, encode_observation_v2
+
+        # "Unseen" is defined as cards in _CANONICAL_ORDER NOT in {discard, room, equipped, on_weapon}.
+        # To make only m10 and m8 unseen, we must discard all other canonical monsters (and all
+        # non-monster canonical cards) so they register as "seen" and are excluded from the
+        # unseen set.
+        m10 = Card(CardType.MONSTER, Suit.CLUBS, 10)
+        m8 = Card(CardType.MONSTER, Suit.CLUBS, 8)
+        target_unseen = {m10, m8}
+
+        # Discard every canonical card that is NOT one of our two target monsters.
+        discard = [c for c in _CANONICAL_ORDER if c not in target_unseen]
+
+        state = GameState(
+            deck=[m10, m8],
+            discard=discard,
+            room=[],
+            equipped_weapon=None,
+            last_monster_defeated=None,
+            monsters_on_weapon=[],
+            health=5,
+            max_health=20,
+            can_defer_room=False,
+            last_action_was_defer=False,
+            game_over=False,
+            victory=False,
+            potion_taken_this_turn=False,
+            potions_taken_this_turn=0,
+            room_being_entered=False,
+            cards_resolved_this_turn=0,
+            last_resolved_card_type=None,
+            last_resolved_potion_value=None,
+        )
+        obs = encode_observation_v2(state)
+        # With only m10 and m8 unseen: avg_unseen_monster_rank = (10 + 8) / 2 = 9
+        # health_risk_ratio = 9 / max(5, 1) = 1.8 → clamped to 1.0
+        assert obs[81] == pytest.approx(1.0), f"Expected health_risk_ratio=1.0, got {obs[81]}"
+        # sum_unseen_monster_ranks = 18; survival_margin = 5 / (18 + 1) = 5/19
+        expected_survival = 5.0 / 19.0
+        assert obs[83] == pytest.approx(expected_survival, abs=1e-5), f"Expected survival_margin={expected_survival:.4f}, got {obs[83]}"
+
+    def test_v2_all_features_bounded(self):
+        """All 84 features must remain in [0, 1] over 20 steps from seed=100."""
+        from engine import (
+            avoid_room,
+            encode_observation_v2,
+            enter_room,
+            get_legal_actions,
+            init_game,
+            play_card,
+        )
+
+        state = init_game(seed=100)
+
+        for step in range(20):
+            if state.game_over or state.victory:
+                break
+
+            obs = encode_observation_v2(state)
+            out_of_range = [(i, float(obs[i])) for i in range(84) if not (0.0 <= obs[i] <= 1.0)]
+            assert not out_of_range, f"Step {step}: features out of [0,1]: {out_of_range}"
+
+            actions = get_legal_actions(state)
+            if not actions:
+                break
+
+            action = actions[0]
+            if action.action_type == "enterRoom":
+                state = enter_room(state)
+            elif action.action_type == "skipRoom":
+                state = avoid_room(state)
+            else:
+                state = play_card(state, action.card_index, mode=action.mode or "barehanded")

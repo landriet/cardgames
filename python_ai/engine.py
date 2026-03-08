@@ -15,6 +15,7 @@ import ctypes
 import random
 from dataclasses import dataclass, field
 from enum import Enum
+from itertools import chain
 from typing import Callable, List, Optional
 
 
@@ -581,6 +582,34 @@ def calculate_score(state: GameState) -> int:
 
 _MAX_RANK = 14
 
+# Total card counts per type in the canonical 44-card deck.
+# Hearts (potions): 2–10 → 9 cards.
+# Diamonds (weapons): 2–10 → 9 cards.
+# Clubs + Spades (monsters): 2–14 × 2 = 26 cards.
+_TOTAL_MONSTERS = 26
+_TOTAL_POTIONS = 9
+_TOTAL_WEAPONS = 9
+
+
+def _build_seen_set(state: GameState) -> set:
+    """Return the set of cards that have already left the deck.
+
+    A card is "seen" if it is currently in the discard pile, the active room,
+    equipped as a weapon, or stacked on the weapon from previous kills.
+    Used by observation encoders to derive which canonical cards are still
+    unseen (i.e. potentially remaining in the deck).
+    """
+    seen: set = set()
+    for card in state.discard:
+        seen.add(card)
+    for card in state.room:
+        seen.add(card)
+    if state.equipped_weapon is not None:
+        seen.add(state.equipped_weapon)
+    for card in state.monsters_on_weapon:
+        seen.add(card)
+    return seen
+
 
 def encode_observation(state: GameState) -> "np.ndarray":  # type: ignore[name-defined]
     """Encode *state* as a 74-dimensional float32 observation vector.
@@ -648,6 +677,109 @@ def encode_observation(state: GameState) -> "np.ndarray":  # type: ignore[name-d
     _mark_seen(state.equipped_weapon)
     for card in monsters_on_weapon:
         _mark_seen(card)
+
+    return obs
+
+
+def encode_observation_v2(state: GameState) -> "np.ndarray":  # type: ignore[name-defined]
+    """Encode *state* as an 84-dimensional float32 observation vector.
+
+    The first 74 dimensions are identical to ``encode_observation``.
+    Dimensions 74–83 add ten derived features that provide richer strategic
+    context for the RL agent:
+
+        [74]  unseen_monster_count / 26
+        [75]  unseen_potion_count / 9
+        [76]  unseen_weapon_count / 9
+        [77]  avg_unseen_monster_rank / 14
+        [78]  max_unseen_monster_rank / 14
+        [79]  weapon_kills_remaining / 4
+              (monsters in deck+room with rank <= kill_limit; 0 if no weapon)
+        [80]  equipped_weapon.rank / 14 if weapon exists, else 0
+        [81]  health_risk_ratio
+              (avg_unseen_monster_rank / max(health, 1), clamped to [0, 1])
+        [82]  deck_progress  (1 - len(deck) / 44)
+        [83]  survival_margin
+              (health / (sum_unseen_monster_ranks + 1), clamped to [0, 1])
+
+    "Unseen" cards are those in ``_CANONICAL_ORDER`` that are NOT currently in
+    {discard ∪ room ∪ equipped_weapon ∪ monsters_on_weapon}.  They may still
+    be in the deck or have not yet been encountered at all.
+    """
+    import numpy as np
+
+    obs = np.zeros(84, dtype=np.float32)
+
+    # First 74 dims come directly from the existing encoder.
+    obs[:74] = encode_observation(state)
+
+    # Build the seen set once via the shared helper, then derive unseen cards.
+    seen = _build_seen_set(state)
+
+    # --- Partition unseen cards by type. ---
+    unseen_monsters: list = []
+    unseen_potions: list = []
+    unseen_weapons: list = []
+    for card in _CANONICAL_ORDER:
+        if card in seen:
+            continue
+        if card.card_type == CardType.MONSTER:
+            unseen_monsters.append(card)
+        elif card.card_type == CardType.POTION:
+            unseen_potions.append(card)
+        elif card.card_type == CardType.WEAPON:
+            unseen_weapons.append(card)
+
+    obs[74] = len(unseen_monsters) / _TOTAL_MONSTERS
+    obs[75] = len(unseen_potions) / _TOTAL_POTIONS
+    obs[76] = len(unseen_weapons) / _TOTAL_WEAPONS
+
+    # --- Average and maximum unseen monster rank. ---
+    if unseen_monsters:
+        ranks = [c.rank for c in unseen_monsters]
+        avg_unseen_monster_rank = sum(ranks) / len(ranks)
+        max_unseen_monster_rank = max(ranks)
+        sum_unseen_monster_ranks = sum(ranks)
+    else:
+        avg_unseen_monster_rank = 0.0
+        max_unseen_monster_rank = 0
+        sum_unseen_monster_ranks = 0
+
+    obs[77] = avg_unseen_monster_rank / _MAX_RANK
+    obs[78] = max_unseen_monster_rank / _MAX_RANK
+
+    # --- Weapon-based features. ---
+    if state.equipped_weapon is not None:
+        # Determine the kill limit: the rank of the last monster defeated, or
+        # None if the weapon has never killed (no kill limit applied yet,
+        # meaning all monsters are potentially killable in future).
+        kill_limit = state.last_monster_defeated.rank if state.last_monster_defeated is not None else None
+
+        if kill_limit is not None:
+            # Count monsters in deck+room with rank <= kill_limit.
+            killable_count = sum(
+                1 for c in chain(state.deck, state.room)
+                if c.card_type == CardType.MONSTER and c.rank <= kill_limit
+            )
+        else:
+            # Weapon equipped but no kill on record yet — all monsters are
+            # reachable in principle; treat full killable count as all unseen.
+            killable_count = sum(
+                1 for c in chain(state.deck, state.room)
+                if c.card_type == CardType.MONSTER
+            )
+        obs[79] = min(killable_count, 4) / 4.0
+        obs[80] = state.equipped_weapon.rank / _MAX_RANK
+    # If no weapon, obs[79] and obs[80] remain 0.
+
+    # --- Health risk ratio: how dangerous are unseen monsters relative to current HP. ---
+    obs[81] = min(avg_unseen_monster_rank / max(state.health, 1), 1.0)
+
+    # --- Deck progress: fraction of original 44-card deck that has been consumed. ---
+    obs[82] = 1.0 - min(len(state.deck), 44) / 44.0
+
+    # --- Survival margin: can the player survive all remaining monsters? ---
+    obs[83] = min(state.health / (sum_unseen_monster_ranks + 1), 1.0)
 
     return obs
 
