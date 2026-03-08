@@ -3,11 +3,14 @@ import React from "react";
 export type Suit = "hearts" | "diamonds" | "clubs" | "spades";
 export type Rank = "A" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "J" | "Q" | "K";
 
+export type GameCardType = "monster" | "weapon" | "potion";
+
 export interface CardProps {
   suit: Suit;
   rank: Rank;
   faceUp?: boolean;
   className?: string;
+  cardType?: GameCardType;
 }
 
 const suitSymbols: Record<Suit, string> = {
@@ -24,13 +27,19 @@ const suitColors: Record<Suit, string> = {
   spades: "text-black",
 };
 
-export const Card: React.FC<CardProps> = ({ suit, rank, faceUp = true, className = "" }) => {
+const cardTypeBorderColors: Record<GameCardType, string> = {
+  monster: "border-l-4 border-l-red-500",
+  weapon: "border-l-4 border-l-blue-500",
+  potion: "border-l-4 border-l-green-500",
+};
+
+export const Card: React.FC<CardProps> = ({ suit, rank, faceUp = true, className = "", cardType }) => {
   return (
     <>
       {faceUp ? (
         <div
           style={{ width: "82px", height: "128px" }}
-          className={`rounded-lg shadow-lg border border-gray-300 bg-white flex items-center justify-center relative select-none ${className}`}
+          className={`rounded-lg shadow-lg border border-gray-300 bg-white flex items-center justify-center relative select-none ${cardType ? cardTypeBorderColors[cardType] : ""} ${className}`}
         >
           <div className="w-full h-full flex flex-col justify-between p-2">
             <div className={`text-lg font-bold ${suitColors[suit]}`}>{rank}</div>
