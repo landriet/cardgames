@@ -9,7 +9,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from scoundrel_env import OBS_SIZE, ScoundrelEnv
+from scoundrel_env import OBS_SIZES, ScoundrelEnv
+
+# Keep backward-compatible alias so existing tests that reference OBS_SIZE still work.
+OBS_SIZE = OBS_SIZES[1]
 
 
 # ---------------------------------------------------------------------------
@@ -255,3 +258,50 @@ class TestRewardModes:
         components = info["rewardComponents"]
         assert "total" in components
         assert "health" in components
+
+
+# ---------------------------------------------------------------------------
+# Test: obs_version parameter (v1 / v2)
+# ---------------------------------------------------------------------------
+
+
+class TestObsV2Integration:
+    """Test ScoundrelEnv with obs_version=2 (84-dim observation)."""
+
+    def test_v2_obs_shape(self):
+        env = ScoundrelEnv(obs_version=2)
+        obs, _ = env.reset()
+        assert obs.shape == (84,), f"Expected obs shape (84,), got {obs.shape}"
+
+    def test_v2_obs_space(self):
+        env = ScoundrelEnv(obs_version=2)
+        assert env.observation_space.shape == (84,)
+
+    def test_v2_step_obs_shape(self):
+        env = ScoundrelEnv(obs_version=2)
+        obs, _ = env.reset()
+        mask = env.action_masks()
+        action = int(np.where(mask)[0][0])
+        obs2, _, _, _, _ = env.step(action)
+        assert obs2.shape == (84,), f"Expected obs shape (84,) after step, got {obs2.shape}"
+
+    def test_v1_default_unchanged(self):
+        """Default obs_version=1 must still produce a 74-dim observation."""
+        env = ScoundrelEnv()
+        obs, _ = env.reset()
+        assert obs.shape == (74,), f"Expected default obs shape (74,), got {obs.shape}"
+
+    def test_v2_full_episode(self):
+        """Play a full episode with obs_version=2 and confirm all obs are 84-dim."""
+        env = ScoundrelEnv(obs_version=2)
+        obs, _ = env.reset()
+        assert obs.shape == (84,)
+        done = False
+        steps = 0
+        while not done and steps < 200:
+            mask = env.action_masks()
+            action = int(np.where(mask)[0][0])
+            obs, _, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
+            steps += 1
+            assert obs.shape == (84,), f"Step {steps}: expected obs shape (84,), got {obs.shape}"

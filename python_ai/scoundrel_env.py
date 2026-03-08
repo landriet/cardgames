@@ -12,13 +12,16 @@ from engine import (
     build_action_mask,
     calculate_score,
     encode_observation,
+    encode_observation_v2,
     enter_room,
     init_game,
     play_card,
 )
 
-# 10 player features + 16 room slot features + 4 monster-on-weapon ranks + 44 seen-card bits
-OBS_SIZE = 74
+# Observation sizes keyed by version:
+#   v1 (74): 10 player + 16 room slot + 4 monster-on-weapon ranks + 44 seen-card bits
+#   v2 (84): v1 + 10 additional room-context features
+OBS_SIZES: dict[int, int] = {1: 74, 2: 84}
 
 
 class ScoundrelEnv(gym.Env[np.ndarray, int]):
@@ -30,8 +33,13 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         deck_seed: Optional[int] = None,
         reward_mode: str = "baseline",
         reward_debug: bool = False,
+        obs_version: int = 1,
     ) -> None:
         super().__init__()
+        if obs_version not in OBS_SIZES:
+            raise ValueError(f"Unsupported obs_version: {obs_version}. Must be one of {sorted(OBS_SIZES.keys())}.")
+        self.obs_version = obs_version
+        obs_size = OBS_SIZES[obs_version]
         self._state: Optional[GameState] = None
         self.last_health = 20.0
         self.max_episode_steps = max_episode_steps
@@ -40,7 +48,7 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         self.reward_debug = reward_debug
         self.episode_steps = 0
 
-        self._last_obs = np.zeros(OBS_SIZE, dtype=np.float32)
+        self._last_obs = np.zeros(obs_size, dtype=np.float32)
         self._last_mask = np.zeros(10, dtype=bool)
         self._step_stats: Dict[str, Any] = {
             "health": 20.0,
@@ -54,7 +62,7 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         }
 
         self.action_space = spaces.Discrete(10)
-        self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(OBS_SIZE,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(obs_size,), dtype=np.float32)
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
@@ -127,7 +135,10 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
     def _sync_from_state(self, state: GameState) -> None:
         """Recompute obs vector, action mask, and step stats from a GameState."""
         terminal = state.game_over or state.victory
-        self._last_obs = encode_observation(state)
+        if self.obs_version == 2:
+            self._last_obs = encode_observation_v2(state)
+        else:
+            self._last_obs = encode_observation(state)
         self._last_mask = build_action_mask(state)
         self._step_stats = {
             "health": float(state.health),
@@ -238,4 +249,4 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         raise RuntimeError(f"No worker action mapped for discrete action index {action_idx}.")
 
 
-__all__ = ["ScoundrelEnv"]
+__all__ = ["OBS_SIZES", "ScoundrelEnv"]
