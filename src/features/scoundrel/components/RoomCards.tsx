@@ -60,7 +60,7 @@ export default function RoomCards({
           >
             {card ? (
               <>
-                <Card suit={card.suit as any} rank={rankToString(card.rank) as any} faceUp={true} cardType={card.type} />
+                <Card suit={card.suit as any} rank={rankToString(card.rank) as any} faceUp={true} />
                 {hovered && card.type === "monster" && (
                   <div className="absolute top-1 right-1 bg-red-600 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow z-30">
                     -{card.rank}

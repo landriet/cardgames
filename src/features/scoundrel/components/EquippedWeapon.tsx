@@ -10,11 +10,11 @@ export default function EquippedWeapon({ weapon, monsters }: { weapon: DungeonCa
   return (
     <div className="flex flex-row items-start">
       <div className="flex-shrink-0">
-        <Card suit={weapon.suit as any} rank={rankToString(weapon.rank) as any} faceUp={true} cardType={weapon.type} />
+        <Card suit={weapon.suit as any} rank={rankToString(weapon.rank) as any} faceUp={true} />
       </div>
       {monsters.map((monster: DungeonCard, idx: number) => (
         <div key={idx} className="flex-shrink-0 -ml-12">
-          <Card suit={monster.suit as any} rank={rankToString(monster.rank) as any} faceUp={true} cardType={monster.type} />
+          <Card suit={monster.suit as any} rank={rankToString(monster.rank) as any} faceUp={true} />
         </div>
       ))}
     </div>
