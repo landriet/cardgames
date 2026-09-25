@@ -66,7 +66,10 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
-        self._state = init_game(seed=self.deck_seed)
+        game_seed = self.deck_seed
+        if game_seed is None:
+            game_seed = seed if seed is not None else int(self.np_random.integers(0, 2**32, dtype=np.uint32))
+        self._state = init_game(seed=game_seed)
         self._sync_from_state(self._state)
         self.last_health = float(self._step_stats["health"])
         self.episode_steps = 0

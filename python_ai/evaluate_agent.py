@@ -51,7 +51,10 @@ def evaluate(
     reward_mode: str = "baseline",
     obs_version: int = 1,
 ) -> dict:
-    resolved_num_envs = resolve_num_envs(num_envs)
+    # A single requested deck seed should evaluate that exact deck. Running
+    # more than one worker would allow a different worker's first game to
+    # finish first and become the reported result.
+    resolved_num_envs = 1 if deck_seed is not None and games == 1 else resolve_num_envs(num_envs)
     resolved_vec_env_kind = resolve_vec_env_kind(vec_env_kind, resolved_num_envs)
     env = build_vec_env(
         num_envs=resolved_num_envs,
@@ -60,10 +63,10 @@ def evaluate(
         max_episode_steps=max_episode_steps,
         seed=seed,
         wrap_action_masker=False,
-        deck_seed=deck_seed,
         reward_mode=reward_mode,
         obs_version=obs_version,
     )
+    env.seed(int(deck_seed) if deck_seed is not None else seed)
     model = MaskablePPO.load(str(model_path))
 
     terminal_scores: list[float] = []
@@ -133,6 +136,8 @@ def evaluate_across_deck_seeds(
     per_seed_results: list[dict] = []
     all_scores: list[float] = []
     all_wins: list[float] = []
+    seed_avg_scores: list[float] = []
+    seed_win_rates: list[float] = []
     total_truncated = 0
 
     for idx, deck_seed in enumerate(deck_seeds):
@@ -154,14 +159,16 @@ def evaluate_across_deck_seeds(
         completed = int(result.get("completed_games", 0))
         wins = int(result.get("wins", 0))
         if completed > 0:
+            seed_avg_scores.append(float(result["avg_score"]))
+            seed_win_rates.append(wins / completed)
             all_wins.extend([1.0] * wins)
             all_wins.extend([0.0] * max(completed - wins, 0))
         total_truncated += int(result.get("truncated_games", 0))
 
     scores_np = np.asarray(all_scores, dtype=np.float64)
     wins_np = np.asarray(all_wins, dtype=np.float64)
-    score_ci_low, score_ci_high = bootstrap_mean_ci(scores_np)
-    win_ci_low, win_ci_high = bootstrap_mean_ci(wins_np)
+    score_ci_low, score_ci_high = bootstrap_mean_ci(np.asarray(seed_avg_scores, dtype=np.float64))
+    win_ci_low, win_ci_high = bootstrap_mean_ci(np.asarray(seed_win_rates, dtype=np.float64))
 
     return {
         "deck_seeds": list(deck_seeds),

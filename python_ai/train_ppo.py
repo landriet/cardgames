@@ -63,22 +63,23 @@ def evaluate_model_on_deck_seeds(
 ) -> dict:
     all_scores: list[float] = []
     all_wins: list[float] = []
+    seed_avg_scores: list[float] = []
+    seed_win_rates: list[float] = []
     total_truncated = 0
 
     env = build_vec_env(
-        num_envs=num_envs,
+        num_envs=1 if games_per_seed == 1 else num_envs,
         vec_env_kind=vec_env_kind,
         start_method=start_method,
         max_episode_steps=max_episode_steps,
         seed=base_seed,
         wrap_action_masker=False,
-        deck_seed=deck_seeds[0] if deck_seeds else None,
         reward_mode=reward_mode,
         obs_version=obs_version,
     )
     try:
         for deck_seed in deck_seeds:
-            env.env_method("set_deck_seed", int(deck_seed))
+            env.seed(int(deck_seed))
             obs = env.reset()
             scores: list[float] = []
             wins: list[float] = []
@@ -107,13 +108,16 @@ def evaluate_model_on_deck_seeds(
             total_truncated += truncated_games
             all_scores.extend(scores)
             all_wins.extend(wins)
+            if scores:
+                seed_avg_scores.append(float(np.mean(scores)))
+                seed_win_rates.append(float(np.mean(wins)))
     finally:
         env.close()
 
     scores_np = np.asarray(all_scores, dtype=np.float64)
     wins_np = np.asarray(all_wins, dtype=np.float64)
-    score_ci_low, score_ci_high = bootstrap_mean_ci(scores_np)
-    win_ci_low, win_ci_high = bootstrap_mean_ci(wins_np)
+    score_ci_low, score_ci_high = bootstrap_mean_ci(np.asarray(seed_avg_scores, dtype=np.float64))
+    win_ci_low, win_ci_high = bootstrap_mean_ci(np.asarray(seed_win_rates, dtype=np.float64))
 
     return {
         "deck_seeds": deck_seeds,
@@ -322,7 +326,7 @@ def train(
         if save_freq > 0:
             callbacks.append(
                 CheckpointCallback(
-                    save_freq=save_freq,
+                    save_freq=max(save_freq // resolved_num_envs, 1),
                     save_path=str(run_save_dir / "checkpoints"),
                     name_prefix="checkpoint",
                 )

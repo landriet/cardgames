@@ -22,7 +22,7 @@ for (const suit of ["hearts", "diamonds", "clubs", "spades"] as const) {
     canonicalDeck.push([cardType, suit, rank]);
   }
 }
-const cardIndex = new Map(canonicalDeck.map((card, idx) => [`${card[0]}:${card[1]}:${card[2]}`, idx] as const));
+const cardIndex = new Map<string, number>(canonicalDeck.map((card, idx) => [`${card[0]}:${card[1]}:${card[2]}`, idx] as const));
 
 function isString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
@@ -84,13 +84,13 @@ function cardRank(card: DungeonCard | null | undefined): number {
   return card ? card.rank / MAX_RANK : 0;
 }
 
-function encodeObservation(state: ScoundrelGameState): number[] {
+function encodeObservation(state: ScoundrelGameState, knownSeenCards: ReadonlySet<string> = new Set()): number[] {
   const obs = Array.from({ length: 74 }, () => 0);
   const roomCards = state.currentRoom.cards;
   const monstersOnWeapon = state.monstersOnWeapon ?? [];
   const maxHealth = Math.max(state.maxHealth || 1, 1);
 
-  obs[0] = state.health / maxHealth;
+  obs[0] = Math.max(0, Math.min(state.health / maxHealth, 1));
   obs[1] = state.maxHealth / 20;
   obs[2] = cardRank(state.equippedWeapon);
   obs[3] = cardRank(state.lastMonsterDefeated);
@@ -127,14 +127,18 @@ function encodeObservation(state: ScoundrelGameState): number[] {
   for (const card of roomCards) markSeen(card);
   markSeen(state.equippedWeapon);
   for (const card of monstersOnWeapon) markSeen(card);
+  for (const identity of knownSeenCards) {
+    const idx = cardIndex.get(identity);
+    if (idx !== undefined) obs[30 + idx] = 1;
+  }
 
   return obs;
 }
 
-function toRlSnapshot(sessionId: string, state: ScoundrelGameState): WorkerRlSnapshot {
+function toRlSnapshot(sessionId: string, state: ScoundrelGameState, knownSeenCards: ReadonlySet<string> = new Set()): WorkerRlSnapshot {
   return {
     sessionId,
-    observation: encodeObservation(state),
+    observation: encodeObservation(state, knownSeenCards),
     actionMask: buildActionMask(state),
     health: state.health,
     maxHealth: state.maxHealth,
@@ -174,6 +178,7 @@ function validateAction(state: ScoundrelGameState, action: WorkerAction): void {
 
 export class EngineWorkerService {
   private readonly sessions = new Map<string, ScoundrelGameState>();
+  private readonly knownSeenCards = new Map<string, Set<string>>();
 
   handleRequest(request: WorkerRequest): WorkerResponse {
     try {
@@ -200,25 +205,31 @@ export class EngineWorkerService {
         const sessionId = randomUUID();
         const state = initGame({ deckSeed: this.readDeckSeed(request.params) });
         this.sessions.set(sessionId, state);
+        this.knownSeenCards.set(sessionId, new Set());
         return { sessionId, state, possibleActions: listPossibleActions(state) };
       }
       case "create_session_rl": {
         const sessionId = randomUUID();
         const state = initGame({ deckSeed: this.readDeckSeed(request.params) });
         this.sessions.set(sessionId, state);
-        return toRlSnapshot(sessionId, state);
+        const knownSeenCards = new Set<string>();
+        this.knownSeenCards.set(sessionId, knownSeenCards);
+        return toRlSnapshot(sessionId, state, knownSeenCards);
       }
       case "reset_session": {
         const sessionId = this.readSessionId(request.params);
         const state = initGame({ deckSeed: this.readDeckSeed(request.params) });
         this.sessions.set(sessionId, state);
+        this.knownSeenCards.set(sessionId, new Set());
         return { sessionId, state, possibleActions: listPossibleActions(state) };
       }
       case "reset_session_rl": {
         const sessionId = this.readSessionId(request.params);
         const state = initGame({ deckSeed: this.readDeckSeed(request.params) });
         this.sessions.set(sessionId, state);
-        return toRlSnapshot(sessionId, state);
+        const knownSeenCards = new Set<string>();
+        this.knownSeenCards.set(sessionId, knownSeenCards);
+        return toRlSnapshot(sessionId, state, knownSeenCards);
       }
       case "get_state": {
         const state = this.getSessionState(this.readSessionId(request.params));
@@ -233,6 +244,7 @@ export class EngineWorkerService {
         const action = this.readAction(request.params);
         const state = this.getSessionState(sessionId);
         validateAction(state, action);
+        this.rememberSkippedRoom(sessionId, state, action);
         const nextState = applyAction(state, action);
         this.sessions.set(sessionId, nextState);
         return { sessionId, state: nextState, possibleActions: listPossibleActions(nextState) };
@@ -242,9 +254,10 @@ export class EngineWorkerService {
         const action = this.readAction(request.params);
         const state = this.getSessionState(sessionId);
         validateAction(state, action);
+        this.rememberSkippedRoom(sessionId, state, action);
         const nextState = applyAction(state, action);
         this.sessions.set(sessionId, nextState);
-        return toRlSnapshot(sessionId, nextState);
+        return toRlSnapshot(sessionId, nextState, this.knownSeenCards.get(sessionId));
       }
       case "close_session": {
         const sessionId = this.readSessionId(request.params);
@@ -252,6 +265,7 @@ export class EngineWorkerService {
           throw new Error("Session not found.");
         }
         this.sessions.delete(sessionId);
+        this.knownSeenCards.delete(sessionId);
         return { closed: true };
       }
       default:
@@ -311,5 +325,14 @@ export class EngineWorkerService {
       throw new Error("Session not found.");
     }
     return state;
+  }
+
+  private rememberSkippedRoom(sessionId: string, state: ScoundrelGameState, action: WorkerAction): void {
+    if (action.actionType !== "skipRoom") return;
+    const knownSeenCards = this.knownSeenCards.get(sessionId) ?? new Set<string>();
+    for (const card of state.currentRoom.cards) {
+      knownSeenCards.add(cardToIdentity(card));
+    }
+    this.knownSeenCards.set(sessionId, knownSeenCards);
   }
 }

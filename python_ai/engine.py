@@ -221,6 +221,9 @@ class GameState:
     last_resolved_card_type: Optional[str]   # lastResolvedCardType
     last_resolved_potion_value: Optional[int]  # lastResolvedPotionValue
 
+    # Cards from skipped rooms remain in the deck but are known to the player.
+    known_seen_cards: List[Card] = field(default_factory=list)
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -248,6 +251,7 @@ def _copy_state(state: GameState) -> GameState:
         cards_resolved_this_turn=state.cards_resolved_this_turn,
         last_resolved_card_type=state.last_resolved_card_type,
         last_resolved_potion_value=state.last_resolved_potion_value,
+        known_seen_cards=list(state.known_seen_cards),
     )
 
 
@@ -365,6 +369,11 @@ def avoid_room(state: GameState) -> GameState:
         return _copy_state(state)
 
     new = _copy_state(state)
+    known = set(new.known_seen_cards)
+    for card in new.room:
+        if card not in known:
+            new.known_seen_cards.append(card)
+            known.add(card)
     # Push room cards to the bottom of the deck.
     new.deck = list(new.deck) + list(new.room)
     new.room = []
@@ -592,12 +601,11 @@ _TOTAL_WEAPONS = 9
 
 
 def _build_seen_set(state: GameState) -> set:
-    """Return the set of cards that have already left the deck.
+    """Return cards whose identities are known to the player.
 
-    A card is "seen" if it is currently in the discard pile, the active room,
-    equipped as a weapon, or stacked on the weapon from previous kills.
-    Used by observation encoders to derive which canonical cards are still
-    unseen (i.e. potentially remaining in the deck).
+    This includes cards in the discard pile, active room, equipped as a weapon,
+    or stacked on the weapon, plus cards from skipped rooms. Observation
+    encoders use this to derive which canonical cards remain unknown.
     """
     seen: set = set()
     for card in state.discard:
@@ -608,6 +616,7 @@ def _build_seen_set(state: GameState) -> set:
         seen.add(state.equipped_weapon)
     for card in state.monsters_on_weapon:
         seen.add(card)
+    seen.update(state.known_seen_cards)
     return seen
 
 
@@ -615,7 +624,7 @@ def encode_observation(state: GameState) -> "np.ndarray":  # type: ignore[name-d
     """Encode *state* as a 74-dimensional float32 observation vector.
 
     Layout (mirrors engineWorkerService.encodeObservation):
-        [0]     health / max_health
+        [0]     clamped health / max_health
         [1]     max_health / 20
         [2]     equipped_weapon.rank / 14  (0 if none)
         [3]     last_monster_defeated.rank / 14  (0 if none)
@@ -627,7 +636,7 @@ def encode_observation(state: GameState) -> "np.ndarray":  # type: ignore[name-d
         [9]     min(len(room), 4) / 4
         [10-25] 4 room slots × 4 features: [is_monster, is_weapon, is_potion, rank/14]
         [26-29] 4 monsters-on-weapon ranks / 14  (0 if slot empty)
-        [30-73] 44 seen-card bits (1 if card has been seen: discard ∪ room ∪ equipped ∪ on-weapon)
+        [30-73] 44 seen-card bits (1 if known: discard ∪ room ∪ equipped ∪ on-weapon ∪ skipped rooms)
     """
     import numpy as np
 
@@ -636,7 +645,7 @@ def encode_observation(state: GameState) -> "np.ndarray":  # type: ignore[name-d
     monsters_on_weapon = state.monsters_on_weapon
     max_health = max(state.max_health, 1)
 
-    obs[0] = state.health / max_health
+    obs[0] = min(max(state.health / max_health, 0.0), 1.0)
     obs[1] = state.max_health / 20.0
     obs[2] = (state.equipped_weapon.rank / _MAX_RANK) if state.equipped_weapon else 0.0
     obs[3] = (state.last_monster_defeated.rank / _MAX_RANK) if state.last_monster_defeated else 0.0
@@ -662,7 +671,7 @@ def encode_observation(state: GameState) -> "np.ndarray":  # type: ignore[name-d
             break
         obs[26 + i] = monsters_on_weapon[i].rank / _MAX_RANK
 
-    # Seen-card bits: mark any card that has left the deck (discard, room, weapon, on-weapon).
+    # Seen-card bits: mark cards known from the current state or skipped rooms.
     def _mark_seen(card: Optional[Card]) -> None:
         if card is None:
             return
@@ -676,6 +685,8 @@ def encode_observation(state: GameState) -> "np.ndarray":  # type: ignore[name-d
         _mark_seen(card)
     _mark_seen(state.equipped_weapon)
     for card in monsters_on_weapon:
+        _mark_seen(card)
+    for card in state.known_seen_cards:
         _mark_seen(card)
 
     return obs
@@ -702,9 +713,9 @@ def encode_observation_v2(state: GameState) -> "np.ndarray":  # type: ignore[nam
         [83]  survival_margin
               (health / (sum_unseen_monster_ranks + 1), clamped to [0, 1])
 
-    "Unseen" cards are those in ``_CANONICAL_ORDER`` that are NOT currently in
-    {discard ∪ room ∪ equipped_weapon ∪ monsters_on_weapon}.  They may still
-    be in the deck or have not yet been encountered at all.
+    "Unseen" cards are those in ``_CANONICAL_ORDER`` whose identities are not
+    known from {discard ∪ room ∪ equipped_weapon ∪ monsters_on_weapon ∪ skipped
+    rooms}. They may still be in the deck or have not yet been encountered.
     """
     import numpy as np
 
@@ -779,7 +790,7 @@ def encode_observation_v2(state: GameState) -> "np.ndarray":  # type: ignore[nam
     obs[82] = 1.0 - min(len(state.deck), 44) / 44.0
 
     # --- Survival margin: can the player survive all remaining monsters? ---
-    obs[83] = min(state.health / (sum_unseen_monster_ranks + 1), 1.0)
+    obs[83] = min(max(state.health / (sum_unseen_monster_ranks + 1), 0.0), 1.0)
 
     return obs
 
