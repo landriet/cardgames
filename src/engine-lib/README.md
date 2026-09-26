@@ -9,7 +9,7 @@ For engine CLI benchmark scripts (solver, PIMC, and rules analysis), see `src/en
 
 ## Game Variants
 
-Shared presets are defined in [`src/game-variants.json`](src/game-variants.json). Each preset can add or remove cards and override starting/max health, potion limit, room skipping, or the weapon kill limit. The frontend engine API accepts a `variantId` and defaults to `standard`; the Python training and evaluation commands accept `--variant` (with `--deck-variant` retained as an alias).
+Shared presets are defined in [`src/game-variants.json`](src/game-variants.json). Each preset can add or remove cards and override starting/max health, potion limit, room skipping, or the weapon kill limit and its equality rule. The `strict_weapon_kill_limit` preset lets a used weapon fight only monsters with a lower rank than its last kill. The frontend engine API accepts a `variantId` and defaults to `standard`; the Python training and evaluation commands accept `--variant` (with `--deck-variant` retained as an alias).
 
 To add a preset, add its card changes and rule overrides to the registry. A genuinely new game mechanic still needs implementation and cross-validation in both the TypeScript and Python engines before a preset can use it. The game UI currently starts with the standard preset.
 
@@ -53,6 +53,7 @@ Dungeon (face down)    Room (4 face up cards)    Discard (face down)
 - **Damage Value**: Equal to card's face value
 - **Binding**: When picked up, must equip immediately and discard previous weapon
 - **Usage Restriction**: After killing a monster, weapon can only be used on monsters with value ≤ the last monster it killed
+- The `strict_weapon_kill_limit` variant changes that comparison to strictly lower: equal-rank and higher-rank monsters must be fought barehanded. A fresh weapon may still fight any rank on its first attack.
 
 ### Health Potions (9 cards - All Hearts)
 
@@ -132,6 +133,7 @@ Choose one combat option:
 - **5 Weapon kills Queen (12)**: Can later fight any monster ≤ 12
 - **5 Weapon kills 6 Monster**: Can later only fight monsters ≤ 6
 - **Cannot use weapon on stronger monsters**: Must fight barehanded
+- **Strict Weapon Kill Limit**: After killing a 6 with the weapon, only monsters ranked 2–5 can be fought with that weapon; a new weapon starts unrestricted.
 
 ## Game End Conditions
 

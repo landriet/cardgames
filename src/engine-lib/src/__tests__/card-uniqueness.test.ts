@@ -8,6 +8,7 @@ const DEFAULT_RULES: Required<RuleConfig> = {
   canSkipRooms: true,
   canSkipConsecutive: false,
   weaponKillLimit: true,
+  weaponKillLimitStrict: false,
 };
 
 function createGameWithState(opts: {

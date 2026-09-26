@@ -1,12 +1,30 @@
-import { Game, getGameVariant, mergeGameRules, Player } from "../index";
+import { Game, getGameVariant, mergeGameRules, MonsterCard, Player, WeaponCard } from "../index";
 
 describe("shared game variants", () => {
   it("loads standard and additional-card variants from the shared registry", () => {
     expect(getGameVariant("standard").cards).toHaveLength(44);
     expect(getGameVariant("queen_hearts").cards).toHaveLength(45);
     expect(getGameVariant("jack_diamonds").cards).toHaveLength(45);
+    expect(getGameVariant("strict_weapon_kill_limit").rules.weaponKillLimitStrict).toBe(true);
     expect(Game.createDeck(7, "queen_hearts")).toHaveLength(45);
     expect(Game.createDeck(7, "jack_diamonds")).toHaveLength(45);
+  });
+
+  it("strict weapon limit permits only monsters below the last weapon kill", () => {
+    const player = new Player(20, 20);
+    player.equippedWeapon = new WeaponCard(8);
+    player.lastMonsterDefeated = new MonsterCard("clubs", 6);
+    const game = new Game(undefined, player, undefined, "strict_weapon_kill_limit");
+    const equalMonster = new MonsterCard("spades", 6);
+    const lowerMonster = new MonsterCard("clubs", 5);
+    const higherMonster = new MonsterCard("spades", 7);
+    game.currentRoom.cards = [equalMonster, lowerMonster, higherMonster];
+    game.roomBeingEntered = true;
+
+    const weaponActions = game.getPossibleActions().filter((action) => action.mode === "weapon");
+
+    expect(weaponActions.map((action) => action.card?.rank)).toEqual([5]);
+    expect(() => game.handleCardAction(equalMonster, "weapon")).toThrow(/weapon lock/i);
   });
 
   it("rejects an unknown variant id", () => {

@@ -208,7 +208,11 @@ function encodeObservationV3(state: ScoundrelGameState, knownSeenCards: Readonly
   const totalMonsterRank = monsterRanks.reduce((sum, rank) => sum + rank, 0);
   const killLimit = rules.weaponKillLimit ? state.lastMonsterDefeated?.rank : undefined;
   const killableMonsters = state.equippedWeapon
-    ? [...state.deck, ...roomCards].filter((card) => card.type === "monster" && (killLimit === undefined || card.rank <= killLimit)).length
+    ? [...state.deck, ...roomCards].filter(
+        (card) =>
+          card.type === "monster" &&
+          (killLimit === undefined || (rules.weaponKillLimitStrict ? card.rank < killLimit : card.rank <= killLimit)),
+      ).length
     : 0;
 
   obs[82] = totalCounts.monster ? unseenMonsters.length / totalCounts.monster : 0;
@@ -225,7 +229,7 @@ function encodeObservationV3(state: ScoundrelGameState, knownSeenCards: Readonly
   obs[93] = potionLimit / (potionLimit + 1);
   obs[94] = rules.canSkipRooms ? 1 : 0;
   obs[95] = rules.canSkipConsecutive ? 1 : 0;
-  obs[96] = rules.weaponKillLimit ? 1 : 0;
+  obs[96] = rules.weaponKillLimit ? (rules.weaponKillLimitStrict ? 0.5 : 1) : 0;
   obs[97] = rules.startingHealth / Math.max(rules.maxHealth, 1);
   return obs;
 }

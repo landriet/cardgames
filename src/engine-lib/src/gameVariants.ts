@@ -16,6 +16,7 @@ export interface GameRuleSettings {
   canSkipRooms: boolean;
   canSkipConsecutive: boolean;
   weaponKillLimit: boolean;
+  weaponKillLimitStrict: boolean;
 }
 
 export type RuleConfig = Partial<GameRuleSettings>;
@@ -52,6 +53,7 @@ const RULE_NAMES: readonly (keyof GameRuleSettings)[] = [
   "canSkipRooms",
   "canSkipConsecutive",
   "weaponKillLimit",
+  "weaponKillLimitStrict",
 ];
 
 function cardIdentity(card: VariantCard): string {
@@ -98,7 +100,8 @@ export function mergeGameRules(baseRules: GameRuleSettings, overrides: RuleConfi
   if (
     typeof rules.canSkipRooms !== "boolean" ||
     typeof rules.canSkipConsecutive !== "boolean" ||
-    typeof rules.weaponKillLimit !== "boolean"
+    typeof rules.weaponKillLimit !== "boolean" ||
+    typeof rules.weaponKillLimitStrict !== "boolean"
   ) {
     throw new Error("Game variant boolean rules must be true or false.");
   }

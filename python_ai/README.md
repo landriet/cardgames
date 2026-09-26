@@ -32,7 +32,7 @@ The shared registry is `src/engine-lib/src/game-variants.json`. It defines the b
 
 Select a variant with `--variant queen_hearts` or `--variant jack_diamonds`. The older `--deck-variant` option remains an alias. The Python API likewise prefers `variant_id` and still accepts `deck_variant` on deck creation, game initialization, environments, and training/evaluation helpers.
 
-The current configurable rules are `startingHealth`, `maxHealth`, `potionsPerRoom`, `canSkipRooms`, `canSkipConsecutive`, and `weaponKillLimit`. Use `init_game(..., rules_override={...})` to test rule combinations. Adding a new rule or game mechanic requires implementation and tests in both the TypeScript and Python engines; adding a registry field alone does not change gameplay.
+The current configurable rules are `startingHealth`, `maxHealth`, `potionsPerRoom`, `canSkipRooms`, `canSkipConsecutive`, `weaponKillLimit`, and `weaponKillLimitStrict`. Use `init_game(..., rules_override={...})` to test rule combinations. Adding a new rule or game mechanic requires implementation and tests in both the TypeScript and Python engines; adding a registry field alone does not change gameplay.
 
 Observation v1 (74 features) and v2 (84 features) keep their existing shapes for saved models. Use v3 (98 features) for all 52 suit/rank identities, active-variant deck features, and effective-rule features. Example:
 
@@ -259,7 +259,7 @@ Cross-validation tests require Node.js (they run the TS engine via `bridge_clien
 - Observation versions:
   - `--obs-version 1` (default): 74-dim vector (player stats, room features, seen-card bits).
   - `--obs-version 2`: 84-dim vector (v1 + unseen card counts, weapon effectiveness, health risk, deck progress, survival margin).
-  - `--obs-version 3`: 98-dim vector (bounded player features, all suit/rank seen bits, variant-aware derived features, and effective rules).
+  - `--obs-version 3`: 98-dim vector (bounded player features, all suit/rank seen bits, variant-aware derived features, and effective rules; weapon-limit mode is 0 when disabled, 0.5 when strict, and 1 when inclusive).
 - Reward modes:
   - `baseline` (existing score-first objective),
   - `dense_v1` (score-first terminal + denser shaping),

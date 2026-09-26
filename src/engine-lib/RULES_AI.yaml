@@ -86,7 +86,7 @@ state_model:
     description: "Current equipped weapon card, or null."
   weapon_lock_value:
     type: nullable_integer
-    description: "If weapon has killed at least one monster, only monsters with value <= this can be fought using weapon."
+    description: "If weapon has killed at least one monster, its configured rank limit is based on this value."
   monsters_on_weapon:
     type: list
     description: "Monsters previously killed with currently equipped weapon."
@@ -190,7 +190,7 @@ actions:
       - "selected card type == monster"
       - "equipped_weapon exists"
       - "action invoked during enter_room resolution"
-      - "weaponKillLimit == false OR weapon_lock_value is null OR monster_value <= weapon_lock_value"
+      - "weaponKillLimit == false OR weapon_lock_value is null OR (weaponKillLimitStrict == true AND monster_value < weapon_lock_value) OR (weaponKillLimitStrict == false AND monster_value <= weapon_lock_value)"
     effects:
       - "damage = max(0, monster_value - weapon_value)"
       - "health = health - damage"
@@ -203,7 +203,7 @@ combat_model:
     damage_formula: "damage = monster_value"
   with_weapon:
     damage_formula: "damage = max(0, monster_value - weapon_value)"
-    post_kill_lock_rule: "After weapon kills a monster of value V, weapon may only be used on monsters with value <= V."
+    post_kill_lock_rule: "After weapon kills a monster of value V, weapon may only be used on monsters with value <= V by default, or < V when weaponKillLimitStrict is true."
   examples:
     - "weapon 5 vs monster 3 => damage 0"
     - "weapon 5 vs monster J(11) => damage 6"
@@ -242,6 +242,7 @@ variant_rule_config:
     canSkipRooms: "Whether room avoidance is available."
     canSkipConsecutive: "Whether a room may be avoided after the previous room was avoided."
     weaponKillLimit: "Whether weapon use is restricted by the rank of the last monster killed."
+    weaponKillLimitStrict: "When weaponKillLimit is true, whether equal-rank monsters are also forbidden after the first weapon kill."
   new_mechanics: "Require code and cross-validation in both the TypeScript and Python engines."
 
 invariants:
@@ -250,7 +251,7 @@ invariants:
   - "At most potionsPerRoom potion healing effects can apply during one room entry."
   - "Consecutive avoid_room actions are illegal unless canSkipRooms and canSkipConsecutive are both true."
   - "When a new weapon is equipped, prior weapon and its attached monsters are discarded."
-  - "When weaponKillLimit is true, weapon-based monster fights must satisfy weapon_lock_value once set."
+  - "When weaponKillLimit is true, weapon-based monster fights must satisfy the inclusive or strict weapon_lock_value comparison selected by weaponKillLimitStrict."
 
 agent_notes:
   legal_action_priority_guidance:

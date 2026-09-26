@@ -31,6 +31,7 @@ if str(_PYTHON_AI_ROOT) not in sys.path:
 from bridge_client import EngineWorkerClient  # noqa: E402
 from engine import (  # noqa: E402
     Action,
+    CardType,
     build_action_mask,
     calculate_score,
     encode_observation,
@@ -274,3 +275,48 @@ def test_cross_validation_v3_jack_diamonds_variant(ts_client: EngineWorkerClient
             pass
 
     assert steps_taken >= 3
+
+
+def test_cross_validation_strict_weapon_kill_limit_variant(ts_client: EngineWorkerClient) -> None:
+    seed = 2
+    py_state = init_game(seed=seed, variant_id="strict_weapon_kill_limit")
+    ts_snap = ts_client.create_session_rl(
+        deck_seed=seed,
+        variant_id="strict_weapon_kill_limit",
+        obs_version=3,
+    )
+    session_id: str = ts_snap["sessionId"]
+    saw_equal_rank_weapon_attack_blocked = False
+
+    try:
+        for step in range(80):
+            py_obs = encode_observation_v3(py_state)
+            py_mask = build_action_mask(py_state)
+            ts_obs = np.asarray(ts_snap["observation"], dtype=np.float32)
+            ts_mask = np.asarray(ts_snap["actionMask"], dtype=bool)
+            npt.assert_allclose(py_obs, ts_obs, atol=OBS_ATOL, err_msg=f"strict weapon observation mismatch at step {step}")
+            npt.assert_array_equal(py_mask, ts_mask, err_msg=f"strict weapon action mask mismatch at step {step}")
+
+            if py_state.last_monster_defeated is not None:
+                equal_card_indices = [
+                    idx
+                    for idx, card in enumerate(py_state.room)
+                    if card.card_type == CardType.MONSTER and card.rank == py_state.last_monster_defeated.rank
+                ]
+                saw_equal_rank_weapon_attack_blocked |= any(not py_mask[3 + 2 * idx] for idx in equal_card_indices)
+
+            if py_state.game_over or py_state.victory:
+                break
+            legal_indices = [idx for idx, legal in enumerate(py_mask) if legal]
+            assert legal_indices, f"strict weapon variant has no legal actions at step {step}"
+            weapon_indices = [idx for idx in legal_indices if idx in (3, 5, 7, 9)]
+            chosen_idx = weapon_indices[0] if weapon_indices else legal_indices[0]
+            py_state = _apply_py_action(py_state, _discrete_to_py_action(chosen_idx))
+            ts_snap = ts_client.step_action_rl(session_id, _discrete_to_ts_action(chosen_idx))
+
+        assert saw_equal_rank_weapon_attack_blocked, "test sequence never reached an equal-rank monster with a used weapon"
+    finally:
+        try:
+            ts_client.close_session(session_id)
+        except Exception:
+            pass

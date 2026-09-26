@@ -185,11 +185,22 @@ export class Player {
     }
   }
 
-  fightMonster(card: MonsterCard, mode: "barehanded" | "weapon", weaponKillLimit: boolean = true): void {
+  fightMonster(
+    card: MonsterCard,
+    mode: "barehanded" | "weapon",
+    weaponKillLimit: boolean = true,
+    weaponKillLimitStrict: boolean = false,
+  ): void {
     if (mode === "barehanded") {
       this.health -= card.rank;
     } else if (this.equippedWeapon) {
-      if (weaponKillLimit && this.lastMonsterDefeated && card.rank > this.lastMonsterDefeated.rank) return;
+      if (
+        weaponKillLimit &&
+        this.lastMonsterDefeated &&
+        (weaponKillLimitStrict ? card.rank >= this.lastMonsterDefeated.rank : card.rank > this.lastMonsterDefeated.rank)
+      ) {
+        return;
+      }
       const damage = Math.max(card.rank - this.equippedWeapon.rank, 0);
       this.health -= damage;
       this.lastMonsterDefeated = card;
@@ -306,7 +317,13 @@ export class Game {
       for (const card of this.currentRoom.cards) {
         if (card.type === "monster") {
           if (this.player.equippedWeapon) {
-            if (!this.rules.weaponKillLimit || !this.player.lastMonsterDefeated || card.rank <= this.player.lastMonsterDefeated.rank) {
+            if (
+              !this.rules.weaponKillLimit ||
+              !this.player.lastMonsterDefeated ||
+              (this.rules.weaponKillLimitStrict
+                ? card.rank < this.player.lastMonsterDefeated.rank
+                : card.rank <= this.player.lastMonsterDefeated.rank)
+            ) {
               actions.push({ actionType: "playCard", card, mode: "weapon" });
             }
           }
@@ -324,7 +341,7 @@ export class Game {
   simulateCardAction(card: DungeonCard, mode?: "barehanded" | "weapon"): number {
     const simPlayer = this.player.clone();
     if (card.type === "monster") {
-      simPlayer.fightMonster(card as MonsterCard, mode ?? "barehanded", this.rules.weaponKillLimit);
+      simPlayer.fightMonster(card as MonsterCard, mode ?? "barehanded", this.rules.weaponKillLimit, this.rules.weaponKillLimitStrict);
     } else if (card.type === "weapon") {
       simPlayer.takeWeapon(card as WeaponCard);
     } else if (card.type === "potion") {
@@ -453,11 +470,17 @@ export class Game {
         if (!this.player.equippedWeapon) {
           throw new Error("Cannot fight with weapon when no weapon is equipped");
         }
-        if (this.rules.weaponKillLimit && this.player.lastMonsterDefeated && card.rank > this.player.lastMonsterDefeated.rank) {
+        if (
+          this.rules.weaponKillLimit &&
+          this.player.lastMonsterDefeated &&
+          (this.rules.weaponKillLimitStrict
+            ? card.rank >= this.player.lastMonsterDefeated.rank
+            : card.rank > this.player.lastMonsterDefeated.rank)
+        ) {
           throw new Error("Illegal weapon action: monster exceeds weapon lock");
         }
       }
-      this.player.fightMonster(card as MonsterCard, mode ?? "barehanded", this.rules.weaponKillLimit);
+      this.player.fightMonster(card as MonsterCard, mode ?? "barehanded", this.rules.weaponKillLimit, this.rules.weaponKillLimitStrict);
       this.currentRoom.removeCard(card);
       if (mode === "weapon") {
         // Monster remains stacked on weapon until the weapon is replaced.

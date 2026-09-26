@@ -7,7 +7,8 @@
     "potionsPerRoom": 1,
     "canSkipRooms": true,
     "canSkipConsecutive": false,
-    "weaponKillLimit": true
+    "weaponKillLimit": true,
+    "weaponKillLimitStrict": false
   },
   "baseDeck": [
     { "type": "potion", "suit": "hearts", "rank": 2 },
@@ -88,6 +89,14 @@
       "removedCards": [],
       "rules": {
         "canSkipRooms": false
+      }
+    },
+    "strict_weapon_kill_limit": {
+      "name": "Strict Weapon Kill Limit",
+      "addedCards": [],
+      "removedCards": [],
+      "rules": {
+        "weaponKillLimitStrict": true
       }
     }
   }

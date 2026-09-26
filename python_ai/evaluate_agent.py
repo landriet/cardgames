@@ -256,22 +256,22 @@ def format_evaluation_summary(result: dict, model_path: Path, output_path: Path)
         lines.append(score_line)
         lines.append(f"Median score: {median_score:.1f}")
 
-    per_seed = result.get("per_seed", [])
-    if per_seed:
-        lines.extend([
-            "",
-            "Per-seed results:",
-            "  seed   games   wins   win rate   avg score   median",
-        ])
-        for row in per_seed:
-            seed = row.get("deck_seed", "-")
-            row_completed = int(row.get("completed_games", 0))
-            row_wins = int(row.get("wins", 0))
-            lines.append(
-                f"  {str(seed):>5}  {row_completed:>5}/{int(row.get('games', 0)):<5}"
-                f"  {row_wins:>4}   {float(row.get('win_rate', 0.0)):>7.1%}"
-                f"  {float(row.get('avg_score', 0.0)):>9.2f}  {float(row.get('median_score', 0.0)):>7.1f}"
-            )
+    #per_seed = result.get("per_seed", [])
+    #if per_seed:
+    #    lines.extend([
+    #        "",
+    #        "Per-seed results:",
+    #        "  seed   games   wins   win rate   avg score   median",
+    #    ])
+    #    for row in per_seed:
+    #        seed = row.get("deck_seed", "-")
+    #        row_completed = int(row.get("completed_games", 0))
+    #        row_wins = int(row.get("wins", 0))
+    #        lines.append(
+    #            f"  {str(seed):>5}  {row_completed:>5}/{int(row.get('games', 0)):<5}"
+    #            f"  {row_wins:>4}   {float(row.get('win_rate', 0.0)):>7.1%}"
+    #            f"  {float(row.get('avg_score', 0.0)):>9.2f}  {float(row.get('median_score', 0.0)):>7.1f}"
+    #        )
 
     lines.extend(["", f"Full report: {output_path}"])
     return "\n".join(lines)

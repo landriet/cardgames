@@ -24,6 +24,7 @@ export function runSimulation(rules: RuleConfig, numGames: number, options: Simu
     canSkipRooms: rules.canSkipRooms ?? true,
     canSkipConsecutive: rules.canSkipConsecutive ?? false,
     weaponKillLimit: rules.weaponKillLimit ?? true,
+    weaponKillLimitStrict: rules.weaponKillLimitStrict ?? false,
   };
 
   const scores: number[] = [];

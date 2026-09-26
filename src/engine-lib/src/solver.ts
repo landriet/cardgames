@@ -31,7 +31,11 @@ export function compactStateKey(game: Game, cardIndex: CardIndex): string {
     (game.lastActionWasDefer ? 4 : 0) |
     (game.roomBeingEntered ? 8 : 0);
   const rules = game.rules;
-  const ruleFlags = (rules.canSkipRooms ? 1 : 0) | (rules.canSkipConsecutive ? 2 : 0) | (rules.weaponKillLimit ? 4 : 0);
+  const ruleFlags =
+    (rules.canSkipRooms ? 1 : 0) |
+    (rules.canSkipConsecutive ? 2 : 0) |
+    (rules.weaponKillLimit ? 4 : 0) |
+    (rules.weaponKillLimitStrict ? 8 : 0);
 
   return [
     deckIds.join(","),
@@ -119,7 +123,11 @@ interface StaticStateHash {
 
 function createStaticStateHash(game: Game): StaticStateHash {
   const rules = game.rules;
-  const ruleFlags = (rules.canSkipRooms ? 1 : 0) | (rules.canSkipConsecutive ? 2 : 0) | (rules.weaponKillLimit ? 4 : 0);
+  const ruleFlags =
+    (rules.canSkipRooms ? 1 : 0) |
+    (rules.canSkipConsecutive ? 2 : 0) |
+    (rules.weaponKillLimit ? 4 : 0) |
+    (rules.weaponKillLimitStrict ? 8 : 0);
   return {
     hash1:
       hashInteger(game.player.maxHealth, 0x9e3779b8) ^

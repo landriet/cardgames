@@ -13,14 +13,36 @@ def test_named_card_variants_are_loaded_from_the_shared_registry() -> None:
     assert hasattr(engine, "get_game_variant")
     queen_variant = engine.get_game_variant("queen_hearts")
     jack_variant = engine.get_game_variant("jack_diamonds")
+    strict_weapon_variant = engine.get_game_variant("strict_weapon_kill_limit")
 
     assert queen_variant["addedCards"] == [{"type": "potion", "suit": "hearts", "rank": 12}]
     assert jack_variant["addedCards"] == [{"type": "weapon", "suit": "diamonds", "rank": 11}]
+    assert strict_weapon_variant["rules"]["weaponKillLimitStrict"] is True
     assert len(queen_variant["cards"]) == 45
     assert queen_variant["rules"]["startingHealth"] == 20
     assert len(engine.create_deck(seed=7, variant_id="standard")) == 44
     assert len(engine.create_deck(seed=7, variant_id="queen_hearts")) == 45
     assert len(engine.create_deck(seed=7, variant_id="jack_diamonds")) == 45
+
+
+def test_strict_weapon_kill_limit_variant_blocks_equal_and_higher_ranks() -> None:
+    state = engine.init_game(seed=1, variant_id="strict_weapon_kill_limit")
+    equal = engine.Card(engine.CardType.MONSTER, engine.Suit.SPADES, 6)
+    lower = engine.Card(engine.CardType.MONSTER, engine.Suit.CLUBS, 5)
+    higher = engine.Card(engine.CardType.MONSTER, engine.Suit.SPADES, 7)
+    state.room = [equal, lower, higher]
+    state.deck = []
+    state.room_being_entered = True
+    state.equipped_weapon = engine.Card(engine.CardType.WEAPON, engine.Suit.DIAMONDS, 8)
+    state.last_monster_defeated = engine.Card(engine.CardType.MONSTER, engine.Suit.CLUBS, 6)
+
+    actions = engine.get_legal_actions(state)
+    weapon_actions = {(action.card_index, action.mode) for action in actions if action.mode == "weapon"}
+
+    assert weapon_actions == {(1, "weapon")}
+    assert engine.encode_observation_v3(state)[96] == pytest.approx(0.5)
+    with pytest.raises(ValueError, match="weapon-kill limit"):
+        engine.play_card(state, 0, "weapon")
 
 
 def test_unknown_game_variant_is_rejected() -> None:

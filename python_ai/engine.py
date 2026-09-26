@@ -72,6 +72,7 @@ _RULE_NAMES = {
     "canSkipRooms",
     "canSkipConsecutive",
     "weaponKillLimit",
+    "weaponKillLimitStrict",
 }
 
 
@@ -108,7 +109,7 @@ def _validate_rule_values(values: Any, where: str, *, require_all: bool = False)
             minimum = 1 if name in ("startingHealth", "maxHealth") else 0
             if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
                 raise ValueError(f"Invalid rule {name} at {where}: expected an integer >= {minimum}.")
-    for name in ("canSkipRooms", "canSkipConsecutive", "weaponKillLimit"):
+    for name in ("canSkipRooms", "canSkipConsecutive", "weaponKillLimit", "weaponKillLimitStrict"):
         if name in result and not isinstance(result[name], bool):
             raise ValueError(f"Invalid rule {name} at {where}: expected a boolean.")
     return result
@@ -420,6 +421,7 @@ class GameRules:
     can_skip_rooms: bool
     can_skip_consecutive: bool
     weapon_kill_limit: bool
+    weapon_kill_limit_strict: bool
 
 
 def _make_game_rules(variant_id: Optional[str] = None, overrides: Optional[Mapping[str, Any]] = None) -> GameRules:
@@ -438,6 +440,7 @@ def _make_game_rules(variant_id: Optional[str] = None, overrides: Optional[Mappi
         can_skip_rooms=values["canSkipRooms"],
         can_skip_consecutive=values["canSkipConsecutive"],
         weapon_kill_limit=values["weaponKillLimit"],
+        weapon_kill_limit_strict=values["weaponKillLimitStrict"],
     )
 
 
@@ -704,10 +707,14 @@ def _handle_monster(state: GameState, card: Card, mode: str) -> None:
         if (
             state.rules.weapon_kill_limit
             and state.last_monster_defeated is not None
-            and card.rank > state.last_monster_defeated.rank
+            and (
+                card.rank >= state.last_monster_defeated.rank
+                if state.rules.weapon_kill_limit_strict
+                else card.rank > state.last_monster_defeated.rank
+            )
         ):
             raise ValueError(
-                f"Illegal weapon action: monster rank {card.rank} exceeds "
+                f"Illegal weapon action: monster rank {card.rank} violates "
                 f"weapon-kill limit {state.last_monster_defeated.rank}."
             )
         damage = max(0, card.rank - state.equipped_weapon.rank)
@@ -777,7 +784,11 @@ def get_legal_actions(state: GameState) -> List[Action]:
                     if (
                         not state.rules.weapon_kill_limit
                         or state.last_monster_defeated is None
-                        or card.rank <= state.last_monster_defeated.rank
+                        or (
+                            card.rank < state.last_monster_defeated.rank
+                            if state.rules.weapon_kill_limit_strict
+                            else card.rank <= state.last_monster_defeated.rank
+                        )
                     ):
                         actions.append(Action(action_type="playCard", card_index=idx, mode="weapon"))
                 actions.append(Action(action_type="playCard", card_index=idx, mode="barehanded"))
@@ -997,10 +1008,13 @@ def encode_observation_v2(state: GameState) -> "np.ndarray":  # type: ignore[nam
         kill_limit = state.last_monster_defeated.rank if state.last_monster_defeated is not None else None
 
         if state.rules.weapon_kill_limit and kill_limit is not None:
-            # Count monsters in deck+room with rank <= kill_limit.
+            # Count monsters in deck+room that satisfy the weapon's rank limit.
+            can_kill_equal = not state.rules.weapon_kill_limit_strict
             killable_count = sum(
-                1 for c in chain(state.deck, state.room)
-                if c.card_type == CardType.MONSTER and c.rank <= kill_limit
+                1
+                for c in chain(state.deck, state.room)
+                if c.card_type == CardType.MONSTER
+                and (c.rank < kill_limit or (can_kill_equal and c.rank == kill_limit))
             )
         else:
             # Weapon equipped but no kill on record yet — all monsters are
@@ -1060,7 +1074,8 @@ def encode_observation_v3(state: GameState) -> "np.ndarray":  # type: ignore[nam
     obs[93] = state.rules.potions_per_room / (state.rules.potions_per_room + 1.0)
     obs[94] = 1.0 if state.rules.can_skip_rooms else 0.0
     obs[95] = 1.0 if state.rules.can_skip_consecutive else 0.0
-    obs[96] = 1.0 if state.rules.weapon_kill_limit else 0.0
+    if state.rules.weapon_kill_limit:
+        obs[96] = 0.5 if state.rules.weapon_kill_limit_strict else 1.0
     obs[97] = min(max(state.rules.starting_health / max_health, 0.0), 1.0)
     return obs
 
