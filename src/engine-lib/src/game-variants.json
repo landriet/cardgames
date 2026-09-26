@@ -81,6 +81,14 @@
       "rules": {
         "potionsPerRoom": 2
       }
+    },
+    "cant_skip_rooms": {
+      "name": "Can't Skip Rooms",
+      "addedCards": [],
+      "removedCards": [],
+      "rules": {
+        "canSkipRooms": false
+      }
     }
   }
 }

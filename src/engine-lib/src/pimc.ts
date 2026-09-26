@@ -1,4 +1,4 @@
-import { DungeonCard, Game, GameAction, RuleConfig } from "./index";
+import { DEFAULT_GAME_VARIANT, DungeonCard, Game, GameAction, RuleConfig } from "./index";
 import { SimulationResult } from "./simulation";
 import { createSolverContext, solveRootActionsWithContext } from "./solver";
 
@@ -33,9 +33,9 @@ export function getUnseenCards(game: Game): DungeonCard[] {
     seen.add(cardKey(card));
   }
 
-  // Full canonical deck minus seen cards
+  // Full active-variant deck minus seen cards
   // Use a multiset approach: count occurrences in full deck, subtract seen
-  const fullDeck = Game.createDeck();
+  const fullDeck = Game.createDeck(undefined, game.variantId);
 
   // Count how many of each key are seen
   const seenCounts = new Map<string, number>();
@@ -122,7 +122,7 @@ export function pimcBestAction(game: Game, numSamples: number, nodeLimit?: numbe
   // Initialize per-action score accumulators
   const actionScores: number[][] = actions.map(() => []);
   const actionWins: number[] = actions.map(() => 0);
-  const solverContext = createSolverContext(Game.createDeck());
+  const solverContext = createSolverContext(Game.createDeck(undefined, game.variantId));
 
   for (let s = 0; s < numSamples; s++) {
     const sampledDeck = shuffle(
@@ -181,10 +181,16 @@ export interface PimcGameResult {
   moves: Array<{ action: GameAction; stats: ActionStats[] }>;
 }
 
-export function runPimcGame(numSamples: number, rules?: RuleConfig, nodeLimit?: number, seed?: number): PimcGameResult {
+export function runPimcGame(
+  numSamples: number,
+  rules?: RuleConfig,
+  nodeLimit?: number,
+  seed?: number,
+  variantId: string = DEFAULT_GAME_VARIANT,
+): PimcGameResult {
   const rng = typeof seed === "number" && Number.isInteger(seed) ? mulberry32(seed) : Math.random;
-  const deck = typeof seed === "number" && Number.isInteger(seed) ? Game.createDeck(seed) : undefined;
-  const game = new Game(deck, undefined, rules);
+  const deck = typeof seed === "number" && Number.isInteger(seed) ? Game.createDeck(seed, variantId) : undefined;
+  const game = new Game(deck, undefined, rules, variantId);
   const moves: PimcGameResult["moves"] = [];
 
   while (!game.gameOver && !game.victory) {
@@ -209,6 +215,7 @@ export function runPimcSimulation(
   rules?: RuleConfig,
   nodeLimit?: number,
   seed?: number,
+  variantId: string = DEFAULT_GAME_VARIANT,
 ): SimulationResult {
   const rng = typeof seed === "number" && Number.isInteger(seed) ? mulberry32(seed) : Math.random;
   const scores: number[] = [];
@@ -216,7 +223,7 @@ export function runPimcSimulation(
 
   for (let i = 0; i < numGames; i++) {
     const gameSeed = Math.floor(rng() * 0x100000000);
-    const result = runPimcGame(numSamples, rules, nodeLimit, gameSeed);
+    const result = runPimcGame(numSamples, rules, nodeLimit, gameSeed, variantId);
     scores.push(result.score);
     if (result.victory) wins++;
   }

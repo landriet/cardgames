@@ -21,17 +21,34 @@ npm install -D tsx
 ### 1) Exact solver benchmark
 
 ```bash
-npx tsx src/engine-lib/benchmark-solver.ts [--seed <n>] [--exhaustive]
+npx tsx src/engine-lib/benchmark-solver.ts [--variant <id>] [--seed <n>] [--seed-list <n,n,...>] [--seed-range <start-end>] [--seeds-file <path>] [--exhaustive]
+```
+
+Run the same variant on several deterministic decks:
+
+```bash
+npx tsx src/engine-lib/benchmark-solver.ts --variant jack_diamonds --seed-list 101,202,303
+```
+
+Or use an inclusive seed range:
+
+```bash
+npx tsx src/engine-lib/benchmark-solver.ts --variant jack_diamonds --seed-range 101-110
 ```
 
 What it does:
 
-- Runs the exact DP/oracle solver on a fixed deck.
+- Runs the exact DP/oracle solver on a fully known shuffled deck for the selected variant.
 - Prints victory, score, nodes explored, and elapsed time.
 
 Flags:
 
 - `-s`, `--seed <n>`: Use a deterministic shuffled deck for reproducible runs.
+- `--seed-list <n,n,...>`: Run the same benchmark for each comma-separated seed.
+- `--seed-range <start-end>`: Run each seed in the inclusive range.
+- `--seeds-file <path>`: Read one seed per line; blank lines and lines starting with `#` are ignored.
+- Seed lists, ranges, and files are combined in order, with duplicates removed; `--seed` cannot be combined with them. Up to 10,000 seed entries are accepted per run.
+- `--variant <id>`: Select a registered game variant (defaults to `standard`).
 - `--exhaustive`: Explore all nodes (disables solver pruning/early-stop heuristics).
 
 Use this when:
@@ -41,13 +58,13 @@ Use this when:
 ### 2) PIMC benchmark
 
 ```bash
-npx tsx src/engine-lib/benchmark-pimc.ts <numGames> <numSamples> [-v] [--seed <n>]
+npx tsx src/engine-lib/benchmark-pimc.ts <numGames> <numSamples> [-v] [--seed <n>] [--variant <id>]
 ```
 
 Example:
 
 ```bash
-npx tsx src/engine-lib/benchmark-pimc.ts 10 50
+npx tsx src/engine-lib/benchmark-pimc.ts 10 50 --variant queen_hearts
 ```
 
 What it does:
@@ -60,6 +77,7 @@ Flags:
 
 - `-v`, `--verbose`: Print per-move details and action stats.
 - `-s`, `--seed <n>`: Make runs reproducible by seeding deck/sampling randomness.
+- `--variant <id>`: Select a registered game variant (defaults to `standard`).
 
 ### 3) Rule-set benchmark
 

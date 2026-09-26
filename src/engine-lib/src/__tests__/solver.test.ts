@@ -131,6 +131,37 @@ describe("compactStateKey", () => {
     expect(noHealingResult.score).toBe(10);
     expect(healingResult.score).toBe(15);
   });
+
+  it("hashes invariant rules and player values once per solve", () => {
+    const deck = [
+      new WeaponCard(8),
+      new PotionCard(5),
+      new MonsterCard("clubs", 6),
+      new MonsterCard("spades", 4),
+      new MonsterCard("clubs", 3),
+      new MonsterCard("spades", 2),
+      new WeaponCard(5),
+      new PotionCard(3),
+    ];
+    const game = createGameWithState({ deck: deck.slice(), room: [], player: new Player(20, 20) });
+    game.applyTurnRules();
+    const context = createSolverContext(deck);
+    const originalImul = Math.imul;
+    let imulCalls = 0;
+    Math.imul = ((a: number, b: number) => {
+      imulCalls++;
+      return originalImul(a, b);
+    }) as typeof Math.imul;
+
+    let result;
+    try {
+      result = solveWithContext(game, context);
+    } finally {
+      Math.imul = originalImul;
+    }
+
+    expect(imulCalls).toBeLessThan(result.nodesExplored * 24);
+  });
 });
 
 describe("solve", () => {
@@ -169,6 +200,20 @@ describe("solve", () => {
     const result = solve(game, allCards);
     expect(result.victory).toBe(true);
     expect(result.nodesExplored).toBeGreaterThan(0);
+  });
+
+  it("preserves the exact search result on a deterministic full deck", () => {
+    const deck = Game.createDeck(100);
+    const game = new Game(deck.map((card) => card.clone()));
+
+    const result = solve(
+      game,
+      deck.map((card) => card.clone()),
+    );
+
+    expect(result.victory).toBe(true);
+    expect(result.score).toBe(1);
+    expect(result.nodesExplored).toBe(7939);
   });
 
   it("returns best score on a losing deck", () => {

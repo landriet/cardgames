@@ -119,6 +119,18 @@ cd python_ai
 
 The command prints aggregate win/score metrics and a per-seed table. The `--out` JSON file retains the full per-game scores and details.
 
+Use `--seed-range` for an inclusive range of deck seeds. For example, `101-110` includes every seed from 101 through 110. Seed lists, ranges, and seed files are combined in order, with duplicates removed; use only one of these sources with `--deck-seed`. A run accepts up to 10,000 seed entries:
+
+```bash
+cd python_ai
+.venv/bin/python evaluate_agent.py \
+  --model models/p_dense_v2_30M.zip \
+  --games 1 \
+  --seed-range 101-110 \
+  --variant jack_diamonds \
+  --obs-version 1
+```
+
 Evaluate the existing model with J♦ added as a rank-11 weapon:
 
 ```bash

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -12,23 +13,48 @@ from engine import DECK_VARIANTS, DEFAULT_VARIANT_ID, DeckVariant, resolve_game_
 from utils import bootstrap_mean_ci
 from vec_env_utils import START_METHOD_CHOICES, VEC_ENV_CHOICES, build_vec_env, resolve_num_envs, resolve_vec_env_kind
 
+MAX_SEED_ENTRIES = 10_000
 
-def parse_seed_list(seed_list: Optional[str], seeds_file: Optional[Path]) -> list[int]:
+
+def parse_seed_list(
+    seed_list: Optional[str],
+    seeds_file: Optional[Path],
+    seed_range: Optional[str] = None,
+) -> list[int]:
     seeds: list[int] = []
+
+    def add_seed(seed: int) -> None:
+        if len(seeds) >= MAX_SEED_ENTRIES:
+            raise ValueError(f"At most {MAX_SEED_ENTRIES} seed entries can be evaluated at once.")
+        seeds.append(seed)
 
     if seed_list:
         for token in seed_list.split(","):
             token = token.strip()
             if not token:
                 continue
-            seeds.append(int(token))
+            add_seed(int(token))
+
+    if seed_range is not None:
+        match = re.fullmatch(r"\s*(-?\d+)\s*-\s*(-?\d+)\s*", seed_range)
+        if match is None:
+            raise ValueError(f"Invalid --seed-range {seed_range!r}; use START-END, for example 101-110.")
+        start, end = (int(token) for token in match.groups())
+        if start < 0 or end < 0:
+            raise ValueError(f"Invalid --seed-range {seed_range!r}; bounds must be non-negative.")
+        if start > end:
+            raise ValueError(f"Invalid --seed-range {seed_range!r}; start must be <= end.")
+        range_size = end - start + 1
+        if len(seeds) + range_size > MAX_SEED_ENTRIES:
+            raise ValueError(f"A single evaluation can include at most {MAX_SEED_ENTRIES} seed entries.")
+        seeds.extend(range(start, end + 1))
 
     if seeds_file is not None:
         for line in seeds_file.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()
             if not stripped or stripped.startswith("#"):
                 continue
-            seeds.append(int(stripped))
+            add_seed(int(stripped))
 
     seen: set[int] = set()
     unique: list[int] = []
@@ -254,7 +280,12 @@ def format_evaluation_summary(result: dict, model_path: Path, output_path: Path)
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate trained Scoundrel PPO model.")
     parser.add_argument("--model", type=Path, required=True)
-    parser.add_argument("--games", type=int, default=1000, help="Games per evaluation run (or per deck seed when using --seed-list).")
+    parser.add_argument(
+        "--games",
+        type=int,
+        default=1000,
+        help="Games per evaluation run (or per deck seed when using --seed-list/--seed-range).",
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--num-envs", type=int, default=None, help="Parallel environments/workers. Default: cpu_count-1.")
     parser.add_argument("--vec-env", choices=VEC_ENV_CHOICES, default=None, help="Vectorization backend. Default: subproc when num_envs>1.")
@@ -266,6 +297,12 @@ def main() -> None:
         type=str,
         default=None,
         help="Comma-separated deterministic deck seeds for multi-seed evaluation, e.g. '101,202,303'.",
+    )
+    parser.add_argument(
+        "--seed-range",
+        type=str,
+        default=None,
+        help="Inclusive range of deterministic deck seeds, e.g. '101-110' (maximum 10000 seed entries per run).",
     )
     parser.add_argument("--seeds-file", type=Path, default=None, help="Optional file containing one deterministic deck seed per line.")
     parser.add_argument("--reward-mode", choices=("baseline", "dense_v1", "dense_v2"), default="baseline")
@@ -281,9 +318,9 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=Path("python_ai/results/eval.json"))
     args = parser.parse_args()
 
-    deck_seeds = parse_seed_list(args.seed_list, args.seeds_file)
+    deck_seeds = parse_seed_list(args.seed_list, args.seeds_file, args.seed_range)
     if deck_seeds and args.deck_seed is not None:
-        raise ValueError("Use either --deck-seed or --seed-list/--seeds-file, not both.")
+        raise ValueError("Use either --deck-seed or --seed-list/--seed-range/--seeds-file, not both.")
 
     if deck_seeds:
         result = evaluate_across_deck_seeds(

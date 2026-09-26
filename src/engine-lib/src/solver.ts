@@ -112,6 +112,30 @@ function hashInteger(value: number, seed: number): number {
   return (hash ^ (hash >>> 16)) >>> 0;
 }
 
+interface StaticStateHash {
+  hash1: number;
+  hash2: number;
+}
+
+function createStaticStateHash(game: Game): StaticStateHash {
+  const rules = game.rules;
+  const ruleFlags = (rules.canSkipRooms ? 1 : 0) | (rules.canSkipConsecutive ? 2 : 0) | (rules.weaponKillLimit ? 4 : 0);
+  return {
+    hash1:
+      hashInteger(game.player.maxHealth, 0x9e3779b8) ^
+      hashInteger(rules.startingHealth, 0x9e3779ba) ^
+      hashInteger(rules.maxHealth, 0x9e3779bd) ^
+      hashInteger(rules.potionsPerRoom, 0x9e3779bc) ^
+      hashInteger(ruleFlags, 0xc2b2ae35),
+    hash2:
+      hashInteger(game.player.maxHealth, 0x85ebca6a) ^
+      hashInteger(rules.startingHealth, 0x85ebca68) ^
+      hashInteger(rules.maxHealth, 0x85ebca6f) ^
+      hashInteger(rules.potionsPerRoom, 0x85ebca6e) ^
+      hashInteger(ruleFlags, 0x27d4eb2f),
+  };
+}
+
 type CardIdentityIndex = Map<DungeonCard, number>;
 
 type TranspositionEntry = { victory: boolean; score: number; bestAction?: GameAction };
@@ -230,9 +254,9 @@ function buildCardIdentityIndex(game: Game, context: SolverContext): CardIdentit
 
 const _mowScratch = new Uint8Array(52);
 
-function zobristStateKey(game: Game, cardIdentity: CardIdentityIndex, table: ZobristTable): bigint {
-  let h1 = 0;
-  let h2 = 0;
+function zobristStateKey(game: Game, cardIdentity: CardIdentityIndex, table: ZobristTable, staticHash: StaticStateHash): bigint {
+  let h1 = staticHash.hash1;
+  let h2 = staticHash.hash2;
 
   for (const card of game.deck) {
     const idx = cardIdentity.get(card)!;
@@ -267,19 +291,10 @@ function zobristStateKey(game: Game, cardIdentity: CardIdentityIndex, table: Zob
     h2 ^= table.monsterOnWeapon[1][slot];
   }
 
-  const rules = game.rules;
   h1 ^= hashInteger(game.player.health, 0x9e3779b9);
   h2 ^= hashInteger(game.player.health, 0x85ebca6b);
-  h1 ^= hashInteger(game.player.maxHealth, 0x9e3779b8);
-  h2 ^= hashInteger(game.player.maxHealth, 0x85ebca6a);
   h1 ^= hashInteger(game.player.potionsTakenThisTurn, 0x9e3779bb);
   h2 ^= hashInteger(game.player.potionsTakenThisTurn, 0x85ebca69);
-  h1 ^= hashInteger(rules.startingHealth, 0x9e3779ba);
-  h2 ^= hashInteger(rules.startingHealth, 0x85ebca68);
-  h1 ^= hashInteger(rules.maxHealth, 0x9e3779bd);
-  h2 ^= hashInteger(rules.maxHealth, 0x85ebca6f);
-  h1 ^= hashInteger(rules.potionsPerRoom, 0x9e3779bc);
-  h2 ^= hashInteger(rules.potionsPerRoom, 0x85ebca6e);
 
   const wr = game.player.equippedWeapon ? game.player.equippedWeapon.rank : 0;
   h1 ^= table.weaponRank[0][wr];
@@ -294,11 +309,8 @@ function zobristStateKey(game: Game, cardIdentity: CardIdentityIndex, table: Zob
     (game.canDeferRoom ? 2 : 0) |
     (game.lastActionWasDefer ? 4 : 0) |
     (game.roomBeingEntered ? 8 : 0);
-  const ruleFlags = (rules.canSkipRooms ? 1 : 0) | (rules.canSkipConsecutive ? 2 : 0) | (rules.weaponKillLimit ? 4 : 0);
   h1 ^= table.flags[0][flags];
   h2 ^= table.flags[1][flags];
-  h1 ^= hashInteger(ruleFlags, 0xc2b2ae35);
-  h2 ^= hashInteger(ruleFlags, 0x27d4eb2f);
 
   return (BigInt(h1 >>> 0) << 32n) | BigInt(h2 >>> 0);
 }
@@ -318,6 +330,7 @@ function makeDfs(
   exhaustive: boolean,
 ): () => { victory: boolean; score: number } {
   const transpositionTable = context.transpositionTable;
+  const staticHash = createStaticStateHash(game);
 
   function dfs(): { victory: boolean; score: number } {
     nodeLimitRef.count++;
@@ -334,7 +347,7 @@ function makeDfs(
       return { victory: false, score: game.calculateScore() - roomMonsterValue };
     }
 
-    const stateKey = zobristStateKey(game, cardIdentity, context.zobrist);
+    const stateKey = zobristStateKey(game, cardIdentity, context.zobrist, staticHash);
     const cached = transpositionTable.get(stateKey);
     if (cached) return { victory: cached.victory, score: cached.score };
 
@@ -548,11 +561,12 @@ function undoAction(game: Game): void {
 function replayBestPath(rootGame: Game, context: SolverContext): SolveTraceStep[] {
   const replay = rootGame.clone();
   const replayCardIdentity = buildCardIdentityIndex(replay, context);
+  const staticHash = createStaticStateHash(replay);
   const trace: SolveTraceStep[] = [];
   let step = 1;
 
   while (!replay.gameOver && !replay.victory) {
-    const stateKey = zobristStateKey(replay, replayCardIdentity, context.zobrist);
+    const stateKey = zobristStateKey(replay, replayCardIdentity, context.zobrist, staticHash);
     const cached = context.transpositionTable.get(stateKey);
     if (!cached?.bestAction) break;
 

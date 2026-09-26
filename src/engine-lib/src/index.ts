@@ -598,14 +598,17 @@ export class Game {
   }
 
   calculateScore(): number {
-    const monstersLeft = this.deck.filter((card) => card.type === "monster");
-    const monstersValue = monstersLeft.reduce((sum, card) => sum + card.rank, 0);
     if (this.victory) {
       let score = this.player.health;
       if (this.player.health === this.player.maxHealth && this.lastResolvedCardType === "potion" && this.lastResolvedPotionValue !== null) {
         score += this.lastResolvedPotionValue;
       }
       return score;
+    }
+
+    let monstersValue = 0;
+    for (const card of this.deck) {
+      if (card.type === "monster") monstersValue += card.rank;
     }
     return this.player.health - monstersValue;
   }

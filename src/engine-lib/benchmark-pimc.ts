@@ -1,5 +1,5 @@
 import { runPimcGame, PimcGameResult, ActionStats } from "./src/pimc";
-import { GameAction } from "./src/index";
+import { DEFAULT_GAME_VARIANT, GameAction, getGameVariant } from "./src/index";
 
 console.debug = () => {};
 
@@ -22,17 +22,32 @@ function readIntFlag(argv: string[], names: string[]): number | undefined {
   return undefined;
 }
 
+function readStringFlag(argv: string[], name: string): string | undefined {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === name) {
+      const value = argv[i + 1];
+      if (value === undefined) throw new Error(`${name} requires a value.`);
+      return value;
+    }
+    if (arg.startsWith(`${name}=`)) return arg.slice(name.length + 1);
+  }
+  return undefined;
+}
+
 const verbose = process.argv.includes("-v") || process.argv.includes("--verbose");
 const args = process.argv.slice(2);
 const seed = readIntFlag(args, ["--seed", "-s"]);
+const variantId = readStringFlag(args, "--variant") ?? DEFAULT_GAME_VARIANT;
+const variant = getGameVariant(variantId);
 const positionalArgs: string[] = [];
 for (let i = 0; i < args.length; i++) {
   const arg = args[i];
-  if (arg === "--seed" || arg === "-s") {
+  if (arg === "--seed" || arg === "-s" || arg === "--variant") {
     i++;
     continue;
   }
-  if (arg.startsWith("--seed=") || arg.startsWith("-s=") || arg === "--verbose" || arg === "-v") {
+  if (arg.startsWith("--seed=") || arg.startsWith("-s=") || arg.startsWith("--variant=") || arg === "--verbose" || arg === "-v") {
     continue;
   }
   if (!arg.startsWith("-")) {
@@ -59,6 +74,7 @@ function formatStats(stats: ActionStats[]): string {
 }
 
 console.log(`PIMC Simulation: ${numGames} games, ${numSamples} samples per decision`);
+console.log(`Variant: ${variant.name} (${variantId})`);
 if (seed !== undefined) {
   console.log(`Seed: ${seed}`);
 }
@@ -70,7 +86,7 @@ const results: PimcGameResult[] = [];
 for (let i = 0; i < numGames; i++) {
   const startGame = performance.now();
   const gameSeed = seed !== undefined ? seed + i : undefined;
-  const result = runPimcGame(numSamples, undefined, undefined, gameSeed);
+  const result = runPimcGame(numSamples, undefined, undefined, gameSeed, variantId);
   const elapsed = performance.now() - startGame;
   results.push(result);
 
