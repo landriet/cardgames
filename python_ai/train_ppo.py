@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
+from engine import DECK_VARIANTS, DEFAULT_VARIANT_ID, DeckVariant, resolve_game_variant_id
 from sb3_contrib import MaskablePPO
 from sb3_contrib.common.maskable.utils import get_action_masks
 from stable_baselines3.common.callbacks import BaseCallback, CallbackList, CheckpointCallback
@@ -60,7 +61,10 @@ def evaluate_model_on_deck_seeds(
     start_method: str,
     reward_mode: str,
     obs_version: int = 1,
+    variant_id: Optional[str] = None,
+    deck_variant: Optional[DeckVariant] = None,
 ) -> dict:
+    resolved_variant = resolve_game_variant_id(variant_id, deck_variant)
     all_scores: list[float] = []
     all_wins: list[float] = []
     seed_avg_scores: list[float] = []
@@ -76,6 +80,7 @@ def evaluate_model_on_deck_seeds(
         wrap_action_masker=False,
         reward_mode=reward_mode,
         obs_version=obs_version,
+        variant_id=resolved_variant,
     )
     try:
         for deck_seed in deck_seeds:
@@ -122,6 +127,9 @@ def evaluate_model_on_deck_seeds(
     return {
         "deck_seeds": deck_seeds,
         "games_per_seed": games_per_seed,
+        "variant_id": resolved_variant,
+        "deck_variant": resolved_variant,
+        "obs_version": obs_version,
         "games": games_per_seed * len(deck_seeds),
         "completed_games": int(scores_np.size),
         "truncated_games": int(total_truncated),
@@ -160,6 +168,8 @@ class PeriodicEvalCallback(BaseCallback):
         eval_max_episode_steps: int,
         reward_mode: str,
         obs_version: int = 1,
+        variant_id: Optional[str] = None,
+        deck_variant: Optional[DeckVariant] = None,
         save_dir: Path,
         verbose: int = 1,
     ) -> None:
@@ -174,6 +184,8 @@ class PeriodicEvalCallback(BaseCallback):
         self.eval_max_episode_steps = eval_max_episode_steps
         self.reward_mode = reward_mode
         self.obs_version = int(obs_version)
+        self.variant_id = resolve_game_variant_id(variant_id, deck_variant)
+        self.deck_variant = self.variant_id
         self.save_dir = save_dir
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
@@ -209,6 +221,7 @@ class PeriodicEvalCallback(BaseCallback):
             start_method=self.eval_start_method,
             reward_mode=self.reward_mode,
             obs_version=self.obs_version,
+            variant_id=self.variant_id,
         )
         metrics["timestep"] = self.num_timesteps
         metrics["elapsed_seconds"] = round(time.time() - self.start_time, 3)
@@ -263,8 +276,11 @@ def train(
     reward_mode: str = "baseline",
     reward_debug: bool = False,
     obs_version: int = 1,
+    variant_id: Optional[str] = None,
+    deck_variant: Optional[DeckVariant] = None,
     device: str = "auto",
 ) -> None:
+    resolved_variant = resolve_game_variant_id(variant_id, deck_variant)
     resolved_num_envs = resolve_num_envs(num_envs)
     resolved_vec_env_kind = resolve_vec_env_kind(vec_env_kind, resolved_num_envs)
     resolved_eval_num_envs = resolve_num_envs(eval_num_envs) if eval_num_envs is not None else resolved_num_envs
@@ -284,6 +300,7 @@ def train(
         reward_mode=reward_mode,
         reward_debug=reward_debug,
         obs_version=obs_version,
+        variant_id=resolved_variant,
     )
 
     run_save_dir = save_dir or (model_out.parent / f"{model_out.stem}_artifacts")
@@ -347,6 +364,7 @@ def train(
                 eval_max_episode_steps=max_episode_steps,
                 reward_mode=reward_mode,
                 obs_version=obs_version,
+                variant_id=resolved_variant,
                 save_dir=run_save_dir,
             )
             callbacks.append(eval_callback)
@@ -377,6 +395,8 @@ def train(
             "reward_mode": reward_mode,
             "reward_debug": reward_debug,
             "obs_version": obs_version,
+            "variant_id": resolved_variant,
+            "deck_variant": resolved_variant,
             "resume_from": str(resume_from) if resume_from is not None else None,
             "lr_start": lr_start,
             "lr_end": lr_end,
@@ -441,7 +461,15 @@ def main() -> None:
 
     parser.add_argument("--reward-mode", choices=("baseline", "dense_v1", "dense_v2"), default="baseline")
     parser.add_argument("--reward-debug", action="store_true", help="Attach reward components in env info for debugging.")
-    parser.add_argument("--obs-version", type=int, choices=[1, 2], default=1, help="Observation version: 1 (74-dim) or 2 (84-dim).")
+    parser.add_argument("--obs-version", type=int, choices=[1, 2, 3], default=1, help="Observation version: v1 (74), v2 (84), or v3 (98).")
+    parser.add_argument(
+        "--variant",
+        "--deck-variant",
+        dest="variant_id",
+        choices=DECK_VARIANTS,
+        default=DEFAULT_VARIANT_ID,
+        help="Registered game variant (legacy alias: --deck-variant).",
+    )
     parser.add_argument("--device", type=str, default="auto", help="PyTorch device: 'cpu', 'mps', 'cuda', or 'auto'.")
 
     args = parser.parse_args()
@@ -477,6 +505,7 @@ def main() -> None:
         reward_mode=args.reward_mode,
         reward_debug=args.reward_debug,
         obs_version=args.obs_version,
+        variant_id=args.variant_id,
         device=args.device,
     )
 

@@ -306,6 +306,14 @@ class TestObsV2Integration:
             steps += 1
             assert obs.shape == (84,), f"Step {steps}: expected obs shape (84,), got {obs.shape}"
 
+    def test_v3_obs_shape_and_variant_id(self):
+        env = ScoundrelEnv(obs_version=3, variant_id="jack_diamonds", deck_seed=7)
+        obs, _ = env.reset()
+
+        assert obs.shape == (98,)
+        assert env._state is not None
+        assert env._state.variant_id == "jack_diamonds"
+
 
 # ---------------------------------------------------------------------------
 # Test: dense_v2 reward mode

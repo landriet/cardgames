@@ -112,10 +112,27 @@ class EngineWorkerClient:
             params["deckSeed"] = int(deck_seed)
         return self.request("create_session", params)
 
-    def create_session_rl(self, deck_seed: Optional[int] = None) -> Dict[str, Any]:
+    def create_session_rl(
+        self,
+        deck_seed: Optional[int] = None,
+        *,
+        variant_id: Optional[str] = None,
+        obs_version: Optional[int] = None,
+        rules: Optional[Dict[str, Any]] = None,
+        deck_variant: Optional[str] = None,
+    ) -> Dict[str, Any]:
         params: Dict[str, Any] = {}
         if deck_seed is not None:
             params["deckSeed"] = int(deck_seed)
+        if variant_id is not None and deck_variant is not None and variant_id != deck_variant:
+            raise ValueError("variant_id and deck_variant must match when both are provided.")
+        resolved_variant = variant_id if variant_id is not None else deck_variant
+        if resolved_variant is not None:
+            params["variantId"] = resolved_variant
+        if obs_version is not None:
+            params["obsVersion"] = int(obs_version)
+        if rules is not None:
+            params["rules"] = dict(rules)
         return self.request("create_session_rl", params)
 
     def reset_session(self, session_id: str, deck_seed: Optional[int] = None) -> Dict[str, Any]:

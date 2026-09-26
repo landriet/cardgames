@@ -36,9 +36,9 @@ export function toEngineGame(state: ScoundrelGameState): Game {
     .filter((card) => card.type === "monster")
     .map((card) => new MonsterCard(card.suit, card.rank as EngineRank));
   player.potionTakenThisTurn = !!state.potionTakenThisTurn;
-  player.potionsTakenThisTurn = state.potionTakenThisTurn ? 1 : 0;
+  player.potionsTakenThisTurn = state.potionsTakenThisTurn ?? (state.potionTakenThisTurn ? 1 : 0);
 
-  const game = new Game([], player);
+  const game = new Game([], player, state.variantRules, state.variantId);
   game.deck = state.deck.map(toEngineCard);
   game.discard = state.discard.map(toEngineCard);
   game.currentRoom = new Room(state.currentRoom.cards.map(toEngineCard));

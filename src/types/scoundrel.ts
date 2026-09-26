@@ -1,4 +1,5 @@
 // Types for Scoundrel card game
+import type { GameRuleSettings } from "../engine-lib/src/gameVariants";
 
 export type Suit = "hearts" | "diamonds" | "clubs" | "spades";
 export type Rank = 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14; // 11=J, 12=Q, 13=K, 14=A
@@ -19,6 +20,8 @@ export interface Room {
 }
 
 export interface ScoundrelGameState {
+  variantId?: string;
+  variantRules?: GameRuleSettings;
   deck: DungeonCard[];
   discard: DungeonCard[];
   currentRoom: Room;
@@ -33,6 +36,7 @@ export interface ScoundrelGameState {
   victory: boolean;
   cardsResolvedThisTurn?: number;
   potionTakenThisTurn?: boolean;
+  potionsTakenThisTurn?: number;
   score?: number;
   pendingMonsterChoice?: { monster: DungeonCard };
 }

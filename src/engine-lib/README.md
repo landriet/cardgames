@@ -7,6 +7,12 @@ For engine CLI benchmark scripts (solver, PIMC, and rules analysis), see `src/en
 
 ## Setup
 
+## Game Variants
+
+Shared presets are defined in [`src/game-variants.json`](src/game-variants.json). Each preset can add or remove cards and override starting/max health, potion limit, room skipping, or the weapon kill limit. The frontend engine API accepts a `variantId` and defaults to `standard`; the Python training and evaluation commands accept `--variant` (with `--deck-variant` retained as an alias).
+
+To add a preset, add its card changes and rule overrides to the registry. A genuinely new game mechanic still needs implementation and cross-validation in both the TypeScript and Python engines before a preset can use it. The game UI currently starts with the standard preset.
+
 ### Deck Preparation
 
 1. Start with a standard deck of playing cards
@@ -19,7 +25,7 @@ For engine CLI benchmark scripts (solver, PIMC, and rules analysis), see `src/en
 
 ### Health Tracking
 
-- Start with 20 Health points
+- Start with the preset's starting Health (20 in the standard rules)
 - Track this on paper or in memory
 
 ### Table Layout
@@ -52,8 +58,8 @@ Dungeon (face down)    Room (4 face up cards)    Discard (face down)
 
 - **Healing Value**: Equal to card's face value
 - **Restrictions**:
-  - Only one potion per turn (second potion is discarded with no effect)
-  - Cannot exceed maximum health of 20
+  - Only the preset's allowed number of potions per turn can heal (one in the standard rules)
+  - Cannot exceed the preset's maximum health (20 in the standard rules)
   - Discard after use
 
 ## Gameplay
@@ -137,7 +143,7 @@ Choose one combat option:
 ### Victory (Complete entire Dungeon)
 
 - **Score**: Your remaining positive health
-- **Special**: If health is exactly 20 and last card was a health potion, add potion's value to score
+- **Special**: If health equals maximum health and the last card was a health potion, add the potion's value to score
 
 ## Key Strategic Notes
 

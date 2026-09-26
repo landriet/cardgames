@@ -18,6 +18,9 @@ export interface ScoundrelGameState {
 }
 // Scoundrel Engine Library
 // Export all main classes and types
+import { DEFAULT_GAME_VARIANT, getGameRules, getGameVariant, type RuleConfig } from "./gameVariants";
+export { DEFAULT_GAME_VARIANT, GAME_VARIANT_IDS, getGameRules, getGameVariant, mergeGameRules } from "./gameVariants";
+export type { GameRuleSettings, GameVariant, RuleConfig, VariantCard } from "./gameVariants";
 
 export type Suit = "hearts" | "diamonds" | "clubs" | "spades";
 export type Rank = 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
@@ -76,24 +79,6 @@ export class PotionCard extends DungeonCard {
 }
 
 export type GameAction = { actionType: string; card?: DungeonCard; mode?: "barehanded" | "weapon" };
-
-export interface RuleConfig {
-  startingHealth?: number;
-  maxHealth?: number;
-  potionsPerRoom?: number;
-  canSkipRooms?: boolean;
-  canSkipConsecutive?: boolean;
-  weaponKillLimit?: boolean;
-}
-
-const DEFAULT_RULES: Required<RuleConfig> = {
-  startingHealth: 20,
-  maxHealth: 20,
-  potionsPerRoom: 1,
-  canSkipRooms: true,
-  canSkipConsecutive: false,
-  weaponKillLimit: true,
-};
 
 export class Room {
   cards: DungeonCard[];
@@ -230,6 +215,7 @@ export class Game {
   currentRoom: Room = new Room([]);
   player: Player;
   rules: Required<RuleConfig>;
+  variantId: string;
   canDeferRoom: boolean = true;
   lastActionWasDefer: boolean = false;
   gameOver: boolean = false;
@@ -262,9 +248,11 @@ export class Game {
     _savedActualHealAmount?: number;
   } | null = null;
 
-  constructor(deck?: DungeonCard[], player?: Player, rules?: RuleConfig) {
-    this.rules = { ...DEFAULT_RULES, ...rules };
-    this.deck = deck ?? Game.createDeck();
+  constructor(deck?: DungeonCard[], player?: Player, rules?: RuleConfig, variantId: string = DEFAULT_GAME_VARIANT) {
+    this.variantId = variantId;
+    this.rules = getGameRules(variantId, rules);
+    this.canDeferRoom = this.rules.canSkipRooms;
+    this.deck = deck ?? Game.createDeck(undefined, variantId);
     this.player = player ?? new Player(this.rules.startingHealth, this.rules.maxHealth);
     this.applyTurnRules();
   }
@@ -279,19 +267,12 @@ export class Game {
     };
   }
 
-  static createDeck(seed?: number): DungeonCard[] {
-    const suits: Suit[] = ["hearts", "diamonds", "clubs", "spades"];
-    const deck: DungeonCard[] = [];
-    for (const suit of suits) {
-      for (let rank = 2; rank <= 14; rank++) {
-        if ((suit === "hearts" || suit === "diamonds") && (rank === 11 || rank === 12 || rank === 13 || rank === 14)) continue;
-        let card: DungeonCard;
-        if (suit === "hearts") card = new PotionCard(rank as Rank);
-        else if (suit === "diamonds") card = new WeaponCard(rank as Rank);
-        else card = new MonsterCard(suit, rank as Rank);
-        deck.push(card);
-      }
-    }
+  static createDeck(seed?: number, variantId: string = DEFAULT_GAME_VARIANT): DungeonCard[] {
+    const deck = getGameVariant(variantId).cards.map((card) => {
+      if (card.type === "potion") return new PotionCard(card.rank as Rank);
+      if (card.type === "weapon") return new WeaponCard(card.rank as Rank);
+      return new MonsterCard(card.suit as Suit, card.rank as Rank);
+    });
     if (typeof seed === "number" && Number.isInteger(seed)) {
       return Game.shuffle(deck, Game.mulberry32(seed));
     }
@@ -314,10 +295,12 @@ export class Game {
     const actions: GameAction[] = [];
     if (!this.roomBeingEntered) {
       actions.push({ actionType: "enterRoom" });
-      if (this.rules.canSkipRooms && this.canDeferRoom && this.currentRoom.cards.length > 0) {
-        if (this.rules.canSkipConsecutive || !this.lastActionWasDefer) {
-          actions.push({ actionType: "skipRoom" });
-        }
+      if (
+        this.rules.canSkipRooms &&
+        this.currentRoom.cards.length > 0 &&
+        (this.rules.canSkipConsecutive || (this.canDeferRoom && !this.lastActionWasDefer))
+      ) {
+        actions.push({ actionType: "skipRoom" });
       }
     } else {
       for (const card of this.currentRoom.cards) {
@@ -366,7 +349,7 @@ export class Game {
     const savedPotionTakenThisTurn = this.player.potionTakenThisTurn;
     const savedPotionsTakenThisTurn = this.player.potionsTakenThisTurn;
     const savedCardsResolvedThisTurn = this.cardsResolvedThisTurn;
-    this.canDeferRoom = true;
+    this.canDeferRoom = this.rules.canSkipRooms;
     this.lastActionWasDefer = false;
     this.player.potionTakenThisTurn = false;
     this.player.potionsTakenThisTurn = 0;
@@ -396,7 +379,13 @@ export class Game {
   }
 
   avoidRoom(): void {
-    if (!this.canDeferRoom || this.lastActionWasDefer || this.currentRoom.cards.length === 0) return;
+    if (
+      !this.rules.canSkipRooms ||
+      (!this.rules.canSkipConsecutive && (!this.canDeferRoom || this.lastActionWasDefer)) ||
+      this.currentRoom.cards.length === 0
+    ) {
+      return;
+    }
     const prevLastAction = this.lastAction;
     const savedRoom = this.currentRoom.cards.slice();
     const savedDeckLength = this.deck.length;
@@ -613,7 +602,7 @@ export class Game {
     const monstersValue = monstersLeft.reduce((sum, card) => sum + card.rank, 0);
     if (this.victory) {
       let score = this.player.health;
-      if (this.player.health === 20 && this.lastResolvedCardType === "potion" && this.lastResolvedPotionValue !== null) {
+      if (this.player.health === this.player.maxHealth && this.lastResolvedCardType === "potion" && this.lastResolvedPotionValue !== null) {
         score += this.lastResolvedPotionValue;
       }
       return score;
@@ -624,6 +613,7 @@ export class Game {
   clone(): Game {
     const cloned = Object.create(Game.prototype) as Game;
     cloned.rules = { ...this.rules };
+    cloned.variantId = this.variantId;
     cloned.deck = this.deck.map((card) => card.clone());
     cloned.discard = this.discard.map((card) => card.clone());
     cloned.currentRoom = this.currentRoom.clone();
@@ -653,7 +643,8 @@ export class Game {
   }
 
   static fromJSON(obj: any): Game {
-    const game = new Game(undefined, undefined, obj.rules);
+    const variantId = obj.variantId ?? DEFAULT_GAME_VARIANT;
+    const game = new Game(undefined, undefined, obj.rules, variantId);
     game.deck = obj.deck.map((card: any) => new DungeonCard(card.type, card.suit, card.rank));
     game.discard = obj.discard.map((card: any) => new DungeonCard(card.type, card.suit, card.rank));
     game.currentRoom = new Room(obj.currentRoom.cards.map((card: any) => new DungeonCard(card.type, card.suit, card.rank)));

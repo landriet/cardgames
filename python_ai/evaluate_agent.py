@@ -8,6 +8,7 @@ from typing import Optional, Sequence
 import numpy as np
 from sb3_contrib import MaskablePPO
 
+from engine import DECK_VARIANTS, DEFAULT_VARIANT_ID, DeckVariant, resolve_game_variant_id
 from utils import bootstrap_mean_ci
 from vec_env_utils import START_METHOD_CHOICES, VEC_ENV_CHOICES, build_vec_env, resolve_num_envs, resolve_vec_env_kind
 
@@ -50,7 +51,10 @@ def evaluate(
     deck_seed: Optional[int] = None,
     reward_mode: str = "baseline",
     obs_version: int = 1,
+    variant_id: Optional[str] = None,
+    deck_variant: Optional[DeckVariant] = None,
 ) -> dict:
+    resolved_variant = resolve_game_variant_id(variant_id, deck_variant)
     # A single requested deck seed should evaluate that exact deck. Running
     # more than one worker would allow a different worker's first game to
     # finish first and become the reported result.
@@ -65,6 +69,7 @@ def evaluate(
         wrap_action_masker=False,
         reward_mode=reward_mode,
         obs_version=obs_version,
+        variant_id=resolved_variant,
     )
     env.seed(int(deck_seed) if deck_seed is not None else seed)
     model = MaskablePPO.load(str(model_path))
@@ -111,6 +116,9 @@ def evaluate(
         "games": games,
         "completed_games": completed_games,
         "wins": wins,
+        "variant_id": resolved_variant,
+        "deck_variant": resolved_variant,
+        "obs_version": obs_version,
         "truncated_games": truncated_games,
         "avg_score": float(scores_np.mean()) if completed_games else 0.0,
         "avg_score_ci95": [score_ci_low, score_ci_high],
@@ -132,7 +140,10 @@ def evaluate_across_deck_seeds(
     start_method: str = "spawn",
     reward_mode: str = "baseline",
     obs_version: int = 1,
+    variant_id: Optional[str] = None,
+    deck_variant: Optional[DeckVariant] = None,
 ) -> dict:
+    resolved_variant = resolve_game_variant_id(variant_id, deck_variant)
     per_seed_results: list[dict] = []
     all_scores: list[float] = []
     all_wins: list[float] = []
@@ -152,6 +163,7 @@ def evaluate_across_deck_seeds(
             deck_seed=deck_seed,
             reward_mode=reward_mode,
             obs_version=obs_version,
+            variant_id=resolved_variant,
         )
         result["deck_seed"] = deck_seed
         per_seed_results.append(result)
@@ -172,9 +184,13 @@ def evaluate_across_deck_seeds(
 
     return {
         "deck_seeds": list(deck_seeds),
+        "variant_id": resolved_variant,
+        "deck_variant": resolved_variant,
+        "obs_version": obs_version,
         "games_per_seed": games_per_seed,
         "games": games_per_seed * len(deck_seeds),
         "completed_games": int(scores_np.size),
+        "wins": int(wins_np.sum()),
         "truncated_games": total_truncated,
         "avg_score": float(scores_np.mean()) if scores_np.size else 0.0,
         "avg_score_ci95": [score_ci_low, score_ci_high],
@@ -184,6 +200,55 @@ def evaluate_across_deck_seeds(
         "scores": all_scores,
         "per_seed": per_seed_results,
     }
+
+
+def format_evaluation_summary(result: dict, model_path: Path, output_path: Path) -> str:
+    """Format the key evaluation metrics without printing the raw score arrays."""
+    completed = int(result.get("completed_games", 0))
+    requested = int(result.get("games", completed))
+    wins = int(result.get("wins", round(float(result.get("win_rate", 0.0)) * completed)))
+    win_rate = float(result.get("win_rate", 0.0))
+    avg_score = float(result.get("avg_score", 0.0))
+    median_score = float(result.get("median_score", 0.0))
+    win_ci = result.get("win_rate_ci95")
+    score_ci = result.get("avg_score_ci95")
+
+    lines = [
+        f"Evaluation summary: {model_path}",
+        f"Variant: {result.get('variant_id', result.get('deck_variant', DEFAULT_VARIANT_ID))} | observation v{result.get('obs_version', 1)}",
+        f"Games: {completed}/{requested} completed ({int(result.get('truncated_games', 0))} truncated)",
+    ]
+    if completed:
+        win_line = f"Win rate: {win_rate:.1%} ({wins}/{completed})"
+        if win_ci and len(win_ci) == 2:
+            win_line += f" | 95% CI {float(win_ci[0]):.1%}–{float(win_ci[1]):.1%}"
+        lines.append(win_line)
+
+        score_line = f"Average score: {avg_score:.2f}"
+        if score_ci and len(score_ci) == 2:
+            score_line += f" | 95% CI {float(score_ci[0]):.2f}–{float(score_ci[1]):.2f}"
+        lines.append(score_line)
+        lines.append(f"Median score: {median_score:.1f}")
+
+    per_seed = result.get("per_seed", [])
+    if per_seed:
+        lines.extend([
+            "",
+            "Per-seed results:",
+            "  seed   games   wins   win rate   avg score   median",
+        ])
+        for row in per_seed:
+            seed = row.get("deck_seed", "-")
+            row_completed = int(row.get("completed_games", 0))
+            row_wins = int(row.get("wins", 0))
+            lines.append(
+                f"  {str(seed):>5}  {row_completed:>5}/{int(row.get('games', 0)):<5}"
+                f"  {row_wins:>4}   {float(row.get('win_rate', 0.0)):>7.1%}"
+                f"  {float(row.get('avg_score', 0.0)):>9.2f}  {float(row.get('median_score', 0.0)):>7.1f}"
+            )
+
+    lines.extend(["", f"Full report: {output_path}"])
+    return "\n".join(lines)
 
 
 def main() -> None:
@@ -204,7 +269,15 @@ def main() -> None:
     )
     parser.add_argument("--seeds-file", type=Path, default=None, help="Optional file containing one deterministic deck seed per line.")
     parser.add_argument("--reward-mode", choices=("baseline", "dense_v1", "dense_v2"), default="baseline")
-    parser.add_argument("--obs-version", type=int, choices=[1, 2], default=1, help="Observation version: 1 (74-dim) or 2 (84-dim).")
+    parser.add_argument("--obs-version", type=int, choices=[1, 2, 3], default=1, help="Observation version: v1 (74), v2 (84), or v3 (98).")
+    parser.add_argument(
+        "--variant",
+        "--deck-variant",
+        dest="variant_id",
+        choices=DECK_VARIANTS,
+        default=DEFAULT_VARIANT_ID,
+        help="Registered game variant (legacy alias: --deck-variant).",
+    )
     parser.add_argument("--out", type=Path, default=Path("python_ai/results/eval.json"))
     args = parser.parse_args()
 
@@ -224,6 +297,7 @@ def main() -> None:
             start_method=args.start_method,
             reward_mode=args.reward_mode,
             obs_version=args.obs_version,
+            variant_id=args.variant_id,
         )
     else:
         result = evaluate(
@@ -237,11 +311,12 @@ def main() -> None:
             deck_seed=args.deck_seed,
             reward_mode=args.reward_mode,
             obs_version=args.obs_version,
+            variant_id=args.variant_id,
         )
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2), encoding="utf-8")
-    print(json.dumps(result, indent=2))
+    print(format_evaluation_summary(result, args.model, args.out))
 
 
 if __name__ == "__main__":

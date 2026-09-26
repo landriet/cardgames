@@ -7,6 +7,7 @@ import numpy as np
 from sb3_contrib.common.wrappers import ActionMasker
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecEnv
 
+from engine import DeckVariant
 from scoundrel_env import ScoundrelEnv
 
 VecEnvKind = Literal["subproc", "dummy"]
@@ -47,6 +48,8 @@ def make_env_factory(
     reward_mode: str = "baseline",
     reward_debug: bool = False,
     obs_version: int = 1,
+    variant_id: Optional[str] = None,
+    deck_variant: Optional[DeckVariant] = None,
 ) -> Callable[[], object]:
     worker_seed = seed + worker_idx * 100_003
 
@@ -57,6 +60,8 @@ def make_env_factory(
             reward_mode=reward_mode,
             reward_debug=reward_debug,
             obs_version=obs_version,
+            variant_id=variant_id,
+            deck_variant=deck_variant,
         )
         env.action_space.seed(worker_seed)
         env.observation_space.seed(worker_seed)
@@ -79,6 +84,8 @@ def build_vec_env(
     reward_mode: str = "baseline",
     reward_debug: bool = False,
     obs_version: int = 1,
+    variant_id: Optional[str] = None,
+    deck_variant: Optional[DeckVariant] = None,
 ) -> VecEnv:
     env_factories = [
         make_env_factory(
@@ -90,6 +97,8 @@ def build_vec_env(
             reward_mode=reward_mode,
             reward_debug=reward_debug,
             obs_version=obs_version,
+            variant_id=variant_id,
+            deck_variant=deck_variant,
         )
         for worker_idx in range(num_envs)
     ]

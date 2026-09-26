@@ -106,6 +106,31 @@ describe("compactStateKey", () => {
 
     expect(compactStateKey(game1, cardIndex)).not.toBe(compactStateKey(game2, cardIndex));
   });
+
+  it("keeps solver cache entries separate when potion limits differ", () => {
+    const potion = new PotionCard(5);
+    const context = createSolverContext([potion]);
+    const noPotionHealing = createGameWithState({
+      deck: [],
+      room: [potion.clone()],
+      player: new Player(10, 20),
+      roomBeingEntered: true,
+    });
+    noPotionHealing.rules = { ...DEFAULT_RULES, potionsPerRoom: 0 };
+    const onePotionHealing = createGameWithState({
+      deck: [],
+      room: [potion.clone()],
+      player: new Player(10, 20),
+      roomBeingEntered: true,
+    });
+    onePotionHealing.rules = { ...DEFAULT_RULES, potionsPerRoom: 1 };
+
+    const noHealingResult = solveWithContext(noPotionHealing, context, { exhaustive: true });
+    const healingResult = solveWithContext(onePotionHealing, context, { exhaustive: true });
+
+    expect(noHealingResult.score).toBe(10);
+    expect(healingResult.score).toBe(15);
+  });
 });
 
 describe("solve", () => {

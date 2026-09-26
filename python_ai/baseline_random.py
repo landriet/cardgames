@@ -7,6 +7,7 @@ from typing import Optional
 
 import numpy as np
 
+from engine import DECK_VARIANTS, DEFAULT_VARIANT_ID, DeckVariant, resolve_game_variant_id
 from vec_env_utils import START_METHOD_CHOICES, VEC_ENV_CHOICES, build_vec_env, resolve_num_envs, resolve_vec_env_kind
 
 
@@ -19,7 +20,10 @@ def evaluate_random(
     start_method: str = "spawn",
     reward_mode: str = "baseline",
     obs_version: int = 1,
+    variant_id: Optional[str] = None,
+    deck_variant: Optional[DeckVariant] = None,
 ) -> dict:
+    resolved_variant = resolve_game_variant_id(variant_id, deck_variant)
     resolved_num_envs = resolve_num_envs(num_envs)
     resolved_vec_env_kind = resolve_vec_env_kind(vec_env_kind, resolved_num_envs)
     env = build_vec_env(
@@ -31,6 +35,7 @@ def evaluate_random(
         wrap_action_masker=False,
         reward_mode=reward_mode,
         obs_version=obs_version,
+        variant_id=resolved_variant,
     )
     rng = np.random.default_rng(seed)
 
@@ -74,6 +79,9 @@ def evaluate_random(
         "games": games,
         "completed_games": completed_games,
         "truncated_games": truncated_games,
+        "variant_id": resolved_variant,
+        "deck_variant": resolved_variant,
+        "obs_version": obs_version,
         "avg_score": float(np.mean(terminal_scores)) if terminal_scores else 0.0,
         "median_score": float(np.median(terminal_scores)) if terminal_scores else 0.0,
         "win_rate": float(wins / completed_games) if completed_games else 0.0,
@@ -90,7 +98,15 @@ def main() -> None:
     parser.add_argument("--start-method", choices=START_METHOD_CHOICES, default="spawn", help="Subprocess start method for SubprocVecEnv.")
     parser.add_argument("--max-episode-steps", type=int, default=200)
     parser.add_argument("--reward-mode", choices=("baseline", "dense_v1", "dense_v2"), default="baseline")
-    parser.add_argument("--obs-version", type=int, choices=[1, 2], default=1, help="Observation version: 1 (74-dim) or 2 (84-dim).")
+    parser.add_argument("--obs-version", type=int, choices=[1, 2, 3], default=1, help="Observation version: v1 (74), v2 (84), or v3 (98).")
+    parser.add_argument(
+        "--variant",
+        "--deck-variant",
+        dest="variant_id",
+        choices=DECK_VARIANTS,
+        default=DEFAULT_VARIANT_ID,
+        help="Registered game variant (legacy alias: --deck-variant).",
+    )
     parser.add_argument("--out", type=Path, default=Path("python_ai/results/random_baseline.json"))
     args = parser.parse_args()
 
@@ -103,6 +119,7 @@ def main() -> None:
         start_method=args.start_method,
         reward_mode=args.reward_mode,
         obs_version=args.obs_version,
+        variant_id=args.variant_id,
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2), encoding="utf-8")

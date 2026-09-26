@@ -69,6 +69,14 @@ describe("engineAdapter", () => {
     expect(actions.some((action) => action.actionType === "skipRoom")).toBe(true);
   });
 
+  it("allows consecutive skips when the selected rules enable them", () => {
+    const initial = initGame({ deckSeed: 19, rules: { canSkipConsecutive: true } });
+    const afterFirstSkip = avoidRoom(initial);
+
+    expect(afterFirstSkip.canDeferRoom).toBe(false);
+    expect(getPossibleActions(afterFirstSkip).some((action) => action.actionType === "skipRoom")).toBe(true);
+  });
+
   it("does not throw if simulateCardActionHealth receives a stale hovered card", () => {
     const state = initGameWithStaticDeck();
     const staleCard: DungeonCard = { type: "potion", suit: "hearts", rank: 2 };
@@ -96,6 +104,23 @@ describe("engineAdapter", () => {
     expect(next.currentRoom.cards).toContainEqual(strongMonster);
   });
 
+  it("does not apply the weapon rank lock when the selected rules disable it", () => {
+    const strongMonster: DungeonCard = { type: "monster", suit: "spades", rank: 9 };
+    const state: ScoundrelGameState = {
+      ...initGame({ deckSeed: 17, rules: { weaponKillLimit: false } }),
+      health: 20,
+      equippedWeapon: { type: "weapon", suit: "diamonds", rank: 7 },
+      lastMonsterDefeated: { type: "monster", suit: "clubs", rank: 4 },
+      currentRoom: { cards: [strongMonster] },
+    };
+
+    const next = handleCardAction(state, strongMonster, "weapon");
+
+    expect(next.pendingMonsterChoice).toBeUndefined();
+    expect(next.health).toBe(18);
+    expect(next.lastMonsterDefeated).toEqual(strongMonster);
+  });
+
   it("advances room after 3 resolved cards even when first action is taking a weapon", () => {
     const state = initGameWithStaticDeck();
     const weapon = state.currentRoom.cards.find((card) => card.type === "weapon" && card.rank === 7)!;
@@ -115,5 +140,23 @@ describe("engineAdapter", () => {
     const second = initGame({ deckSeed: 777 });
     expect(first.currentRoom.cards).toEqual(second.currentRoom.cards);
     expect(first.deck).toEqual(second.deck);
+  });
+
+  it("starts and continues a selected game variant with its rule overrides", () => {
+    const state = initGame({
+      deckSeed: 7,
+      variantId: "queen_hearts",
+      rules: { startingHealth: 26, maxHealth: 30, potionsPerRoom: 2 },
+    });
+
+    expect(state.variantId).toBe("queen_hearts");
+    expect(state.health).toBe(26);
+    expect(state.maxHealth).toBe(30);
+    expect(state.deck.length + state.currentRoom.cards.length).toBe(45);
+
+    const next = handleCardAction(state, state.currentRoom.cards[0]);
+    expect(next.variantId).toBe("queen_hearts");
+    expect(next.variantRules?.maxHealth).toBe(30);
+    expect(next.maxHealth).toBe(30);
   });
 });

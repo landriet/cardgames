@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 from sb3_contrib import MaskablePPO
 
-from engine import Action, Card, CardType, GameState, get_legal_actions
+from engine import Action, Card, CardType, DECK_VARIANTS, DEFAULT_VARIANT_ID, GameState, get_legal_actions
 from scoundrel_env import ScoundrelEnv
 
 
@@ -74,12 +74,14 @@ def play(
     deck_seed: Optional[int],
     reward_mode: str,
     obs_version: int,
+    variant_id: str = DEFAULT_VARIANT_ID,
 ) -> None:
     env = ScoundrelEnv(
         max_episode_steps=max_episode_steps,
         deck_seed=deck_seed,
         reward_mode=reward_mode,
         obs_version=obs_version,
+        variant_id=variant_id,
     )
     model = MaskablePPO.load(str(model_path))
 
@@ -136,7 +138,15 @@ def main() -> None:
     parser.add_argument("--max-episode-steps", type=int, default=200)
     parser.add_argument("--deck-seed", type=int, default=None, help="Deterministic game deck seed.")
     parser.add_argument("--reward-mode", choices=("baseline", "dense_v1", "dense_v2"), default="baseline")
-    parser.add_argument("--obs-version", type=int, choices=[1, 2], default=1, help="Observation version: 1 (74-dim) or 2 (84-dim).")
+    parser.add_argument("--obs-version", type=int, choices=[1, 2, 3], default=1, help="Observation version: v1 (74), v2 (84), or v3 (98).")
+    parser.add_argument(
+        "--variant",
+        "--deck-variant",
+        dest="variant_id",
+        choices=DECK_VARIANTS,
+        default=DEFAULT_VARIANT_ID,
+        help="Registered game variant (legacy alias: --deck-variant).",
+    )
     parser.add_argument("--sleep", type=float, default=0.0, help="Seconds to wait between steps for readability.")
     args = parser.parse_args()
 
@@ -149,6 +159,7 @@ def main() -> None:
         deck_seed=args.deck_seed,
         reward_mode=args.reward_mode,
         obs_version=args.obs_version,
+        variant_id=args.variant_id,
     )
 
 

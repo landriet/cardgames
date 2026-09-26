@@ -253,6 +253,15 @@ class TestCreateDeck:
         # The deck must have exactly 44 cards with correct composition
         assert len(deck) == 44
 
+    def test_jack_diamonds_variant_adds_rank_11_weapon(self):
+        from engine import Card, CardType, Suit, create_deck
+
+        deck = create_deck(seed=42, deck_variant="jack_diamonds")
+        jack_of_diamonds = Card(CardType.WEAPON, Suit.DIAMONDS, 11)
+
+        assert len(deck) == 45
+        assert deck.count(jack_of_diamonds) == 1
+
 
 # ---------------------------------------------------------------------------
 # Task 2: GameState dataclass and init_game
@@ -1583,6 +1592,21 @@ class TestEncodeObservationV2:
         assert 0.0 <= obs[74] <= 1.0, f"unseen_monster_count ratio out of range: {obs[74]}"
         assert 0.0 <= obs[75] <= 1.0, f"unseen_potion_count ratio out of range: {obs[75]}"
         assert 0.0 <= obs[76] <= 1.0, f"unseen_weapon_count ratio out of range: {obs[76]}"
+
+    def test_v2_counts_unseen_jack_of_diamonds_as_weapon(self):
+        from engine import Card, CardType, Suit, encode_observation_v2, init_game
+
+        state = init_game(seed=42, deck_variant="jack_diamonds")
+        obs = encode_observation_v2(state)
+        seen = set(state.discard + state.room + state.monsters_on_weapon + state.known_seen_cards)
+        if state.equipped_weapon is not None:
+            seen.add(state.equipped_weapon)
+        standard_weapons = [Card(CardType.WEAPON, Suit.DIAMONDS, rank) for rank in range(2, 11)]
+        unseen_weapons = sum(card not in seen for card in standard_weapons)
+        jack_of_diamonds = Card(CardType.WEAPON, Suit.DIAMONDS, 11)
+        unseen_weapons += int(jack_of_diamonds not in seen)
+
+        assert abs(float(obs[76]) - unseen_weapons / 10.0) < 1e-6
 
     def test_v2_deck_progress_empty_deck(self):
         """With an empty deck, deck_progress (obs[82]) must equal 1.0."""

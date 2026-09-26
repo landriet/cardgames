@@ -12,11 +12,15 @@ All bit-level arithmetic matches the JavaScript behaviour exactly:
 from __future__ import annotations
 
 import ctypes
+import json
 import random
+from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum
+from functools import lru_cache
 from itertools import chain
-from typing import Callable, List, Optional
+from pathlib import Path
+from typing import Any, Callable, List, Mapping, Optional
 
 
 # ---------------------------------------------------------------------------
@@ -57,6 +61,190 @@ class Card:
     card_type: CardType
     suit: Suit
     rank: int  # 2–14
+
+
+DeckVariant = str
+_REGISTRY_PATH = Path(__file__).resolve().parents[1] / "src" / "engine-lib" / "src" / "game-variants.json"
+_RULE_NAMES = {
+    "startingHealth",
+    "maxHealth",
+    "potionsPerRoom",
+    "canSkipRooms",
+    "canSkipConsecutive",
+    "weaponKillLimit",
+}
+
+
+def _validate_card_record(record: Any, where: str) -> dict[str, Any]:
+    if not isinstance(record, dict):
+        raise ValueError(f"Invalid card record at {where}: expected an object.")
+    if set(record) != {"type", "suit", "rank"}:
+        raise ValueError(f"Invalid card record at {where}: expected type, suit, and rank.")
+    try:
+        CardType(record["type"])
+        Suit(record["suit"])
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Invalid card type or suit at {where}.") from exc
+    rank = record["rank"]
+    if isinstance(rank, bool) or not isinstance(rank, int) or not 2 <= rank <= 14:
+        raise ValueError(f"Invalid card rank at {where}: expected an integer from 2 through 14.")
+    return {"type": record["type"], "suit": record["suit"], "rank": rank}
+
+
+def _validate_rule_values(values: Any, where: str, *, require_all: bool = False) -> dict[str, Any]:
+    if not isinstance(values, dict):
+        raise ValueError(f"Invalid rules at {where}: expected an object.")
+    unknown = set(values) - _RULE_NAMES
+    if unknown:
+        raise ValueError(f"Invalid rules at {where}: unknown setting(s) {sorted(unknown)}.")
+    if require_all and set(values) != _RULE_NAMES:
+        missing = sorted(_RULE_NAMES - set(values))
+        raise ValueError(f"Invalid rules at {where}: missing setting(s) {missing}.")
+
+    result = dict(values)
+    for name in ("startingHealth", "maxHealth", "potionsPerRoom"):
+        if name in result:
+            value = result[name]
+            minimum = 1 if name in ("startingHealth", "maxHealth") else 0
+            if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+                raise ValueError(f"Invalid rule {name} at {where}: expected an integer >= {minimum}.")
+    for name in ("canSkipRooms", "canSkipConsecutive", "weaponKillLimit"):
+        if name in result and not isinstance(result[name], bool):
+            raise ValueError(f"Invalid rule {name} at {where}: expected a boolean.")
+    return result
+
+
+def _load_variant_registry() -> dict[str, Any]:
+    try:
+        with _REGISTRY_PATH.open(encoding="utf-8") as registry_file:
+            registry = json.load(registry_file)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"Could not load game variant registry at {_REGISTRY_PATH}.") from exc
+
+    if (
+        not isinstance(registry, dict)
+        or isinstance(registry.get("schemaVersion"), bool)
+        or registry.get("schemaVersion") != 1
+    ):
+        raise ValueError("Invalid game variant registry: schemaVersion must be 1.")
+    variants = registry.get("variants")
+    if not isinstance(variants, dict) or not variants:
+        raise ValueError("Invalid game variant registry: variants must be a non-empty object.")
+    default_variant = registry.get("defaultVariant")
+    if not isinstance(default_variant, str) or default_variant not in variants:
+        raise ValueError("Invalid game variant registry: defaultVariant must name a registered variant.")
+
+    registry["defaultRules"] = _validate_rule_values(registry.get("defaultRules"), "defaultRules", require_all=True)
+    if registry["defaultRules"]["startingHealth"] > registry["defaultRules"]["maxHealth"]:
+        raise ValueError("Invalid default rules: startingHealth cannot exceed maxHealth.")
+    base_deck = registry.get("baseDeck")
+    if not isinstance(base_deck, list) or not base_deck:
+        raise ValueError("Invalid game variant registry: baseDeck must be a non-empty array.")
+    registry["baseDeck"] = [_validate_card_record(card, f"baseDeck[{idx}]") for idx, card in enumerate(base_deck)]
+    base_cards = {_card_identity(card) for card in registry["baseDeck"]}
+    if len(base_cards) != len(registry["baseDeck"]):
+        raise ValueError("Invalid game variant registry: baseDeck contains duplicate card identities.")
+
+    normalized_variants: dict[str, dict[str, Any]] = {}
+    for variant_id, record in variants.items():
+        if not isinstance(variant_id, str) or not variant_id:
+            raise ValueError("Invalid game variant registry: variant IDs must be non-empty strings.")
+        if not isinstance(record, dict) or not isinstance(record.get("name"), str):
+            raise ValueError(f"Invalid game variant {variant_id!r}: expected an object with a name.")
+        added = record.get("addedCards")
+        removed = record.get("removedCards")
+        if not isinstance(added, list) or not isinstance(removed, list):
+            raise ValueError(f"Invalid game variant {variant_id!r}: addedCards and removedCards must be arrays.")
+        normalized_added = [_validate_card_record(card, f"variants.{variant_id}.addedCards[{idx}]") for idx, card in enumerate(added)]
+        normalized_removed = [_validate_card_record(card, f"variants.{variant_id}.removedCards[{idx}]") for idx, card in enumerate(removed)]
+        removed_ids = [_card_identity(card) for card in normalized_removed]
+        if len(set(removed_ids)) != len(removed_ids):
+            raise ValueError(f"Invalid game variant {variant_id!r}: removedCards contains duplicate identities.")
+        if any(identity not in base_cards for identity in removed_ids):
+            raise ValueError(f"Invalid game variant {variant_id!r}: removedCards must be in baseDeck.")
+        available = base_cards - set(removed_ids)
+        added_ids = [_card_identity(card) for card in normalized_added]
+        if len(set(added_ids)) != len(added_ids) or any(identity in available for identity in added_ids):
+            raise ValueError(f"Invalid game variant {variant_id!r}: addedCards duplicate an active card identity.")
+        rules = _validate_rule_values(record.get("rules", {}), f"variants.{variant_id}.rules")
+        effective_rules = dict(registry["defaultRules"])
+        effective_rules.update(rules)
+        if effective_rules["startingHealth"] > effective_rules["maxHealth"]:
+            raise ValueError(f"Invalid game variant {variant_id!r}: startingHealth cannot exceed maxHealth.")
+        normalized_variants[variant_id] = {
+            "name": record["name"],
+            "addedCards": normalized_added,
+            "removedCards": normalized_removed,
+            "rules": rules,
+        }
+    registry["variants"] = normalized_variants
+    return registry
+
+
+def _card_identity(record: Mapping[str, Any]) -> tuple[str, int]:
+    return (str(record["suit"]), int(record["rank"]))
+
+
+_VARIANT_REGISTRY = _load_variant_registry()
+DEFAULT_VARIANT_ID = str(_VARIANT_REGISTRY["defaultVariant"])
+DECK_VARIANTS: tuple[DeckVariant, ...] = tuple(_VARIANT_REGISTRY["variants"].keys())
+
+
+def get_game_variant(variant_id: str) -> dict[str, Any]:
+    """Return a copy of one fully resolved variant from the shared registry."""
+    if variant_id not in _VARIANT_REGISTRY["variants"]:
+        raise ValueError(f"unknown game variant: {variant_id}")
+    variant = deepcopy(_VARIANT_REGISTRY["variants"][variant_id])
+    removed = {_card_identity(card) for card in variant["removedCards"]}
+    cards = [card for card in _VARIANT_REGISTRY["baseDeck"] if _card_identity(card) not in removed]
+    cards.extend(variant["addedCards"])
+    rules = dict(_VARIANT_REGISTRY["defaultRules"])
+    rules.update(variant["rules"])
+    return {
+        "id": variant_id,
+        "name": variant["name"],
+        "cards": deepcopy(cards),
+        "addedCards": variant["addedCards"],
+        "removedCards": variant["removedCards"],
+        "rules": rules,
+    }
+
+
+def resolve_game_variant_id(variant_id: Optional[str] = None, deck_variant: Optional[str] = None) -> str:
+    if variant_id is not None and deck_variant is not None and variant_id != deck_variant:
+        raise ValueError("variant_id and deck_variant must match when both are provided.")
+    selected = variant_id if variant_id is not None else deck_variant
+    if selected is None:
+        selected = DEFAULT_VARIANT_ID
+    if selected not in _VARIANT_REGISTRY["variants"]:
+        raise ValueError(f"unknown game variant: {selected}")
+    return selected
+
+
+def _card_from_record(record: Mapping[str, Any]) -> Card:
+    return Card(CardType(record["type"]), Suit(record["suit"]), int(record["rank"]))
+
+
+@lru_cache(maxsize=None)
+def _variant_deck_tuple(variant_id: str) -> tuple[Card, ...]:
+    variant = get_game_variant(variant_id)
+    removed = {_card_identity(card) for card in variant["removedCards"]}
+    cards = [record for record in _VARIANT_REGISTRY["baseDeck"] if _card_identity(record) not in removed]
+    cards.extend(variant["addedCards"])
+    return tuple(_card_from_record(record) for record in cards)
+
+
+def _variant_deck(variant_id: str) -> List[Card]:
+    return list(_variant_deck_tuple(variant_id))
+
+
+QUEEN_OF_HEARTS = Card(CardType.POTION, Suit.HEARTS, 12)
+JACK_OF_DIAMONDS = Card(CardType.WEAPON, Suit.DIAMONDS, 11)
+VARIANT_EXTRA_CARDS: dict[DeckVariant, Card] = {
+    variant_id: _card_from_record(record)
+    for variant_id, variant in _VARIANT_REGISTRY["variants"].items()
+    for record in variant["addedCards"][:1]
+}
 
 
 # ---------------------------------------------------------------------------
@@ -135,22 +323,9 @@ def mulberry32(seed: int) -> Callable[[], float]:
 # Deck creation
 # ---------------------------------------------------------------------------
 
-# Ordered list of all 44 canonical cards in creation order (before shuffle).
-# This order is also used as the canonical index for the seen-card observation
-# bits (hearts 2-10, diamonds 2-10, clubs 2-14, spades 2-14).
-_CANONICAL_ORDER: List[Card] = []
-for _suit in (Suit.HEARTS, Suit.DIAMONDS, Suit.CLUBS, Suit.SPADES):
-    for _rank in range(2, 15):
-        # Hearts and diamonds skip face cards (J=11, Q=12, K=13, A=14)
-        if _suit in (Suit.HEARTS, Suit.DIAMONDS) and _rank >= 11:
-            continue
-        if _suit == Suit.HEARTS:
-            _ct = CardType.POTION
-        elif _suit == Suit.DIAMONDS:
-            _ct = CardType.WEAPON
-        else:
-            _ct = CardType.MONSTER
-        _CANONICAL_ORDER.append(Card(_ct, _suit, _rank))
+# Ordered list of canonical base cards in registry creation order. This order
+# remains the seen-card bit order for v1/v2 observations.
+_CANONICAL_ORDER: List[Card] = [_card_from_record(record) for record in _VARIANT_REGISTRY["baseDeck"]]
 
 # Fast lookup: card → canonical index (used in encode_observation)
 _CARD_TO_CANONICAL_IDX: dict[Card, int] = {
@@ -167,14 +342,22 @@ def _fisher_yates_shuffle(cards: List[Card], rng: Callable[[], float]) -> List[C
     return arr
 
 
-def create_deck(seed: Optional[int] = None) -> List[Card]:
-    """Return a fresh 44-card deck.
+def create_deck(
+    seed: Optional[int] = None,
+    variant_id: Optional[str] = None,
+    deck_variant: Optional[str] = None,
+) -> List[Card]:
+    """Return a shuffled deck built from a registered game variant.
 
     If *seed* is provided the deck is shuffled deterministically using
     mulberry32 (identical output to ``Game.createDeck(seed)`` in TypeScript).
     Without a seed the deck is shuffled with Python's ``random.shuffle``.
+
+    ``variant_id`` is the preferred identifier. ``deck_variant`` remains as a
+    compatibility alias for callers using the earlier Python API.
     """
-    deck = list(_CANONICAL_ORDER)  # copy in canonical creation order
+    resolved_variant = resolve_game_variant_id(variant_id, deck_variant)
+    deck = _variant_deck(resolved_variant)
     if seed is not None:
         rng = mulberry32(seed)
         return _fisher_yates_shuffle(deck, rng)
@@ -223,6 +406,39 @@ class GameState:
 
     # Cards from skipped rooms remain in the deck but are known to the player.
     known_seen_cards: List[Card] = field(default_factory=list)
+    variant_id: str = DEFAULT_VARIANT_ID
+    rules: "GameRules" = field(default_factory=lambda: _make_game_rules())
+
+
+@dataclass(frozen=True)
+class GameRules:
+    """Effective settings merged from registry defaults, variant, and overrides."""
+
+    starting_health: int
+    max_health: int
+    potions_per_room: int
+    can_skip_rooms: bool
+    can_skip_consecutive: bool
+    weapon_kill_limit: bool
+
+
+def _make_game_rules(variant_id: Optional[str] = None, overrides: Optional[Mapping[str, Any]] = None) -> GameRules:
+    values = dict(_VARIANT_REGISTRY["defaultRules"])
+    if variant_id is not None:
+        values.update(get_game_variant(variant_id)["rules"])
+    if overrides is not None:
+        values.update(_validate_rule_values(dict(overrides), "rules_override"))
+    values = _validate_rule_values(values, "effective rules", require_all=True)
+    if values["startingHealth"] > values["maxHealth"]:
+        raise ValueError("Invalid effective rules: startingHealth cannot exceed maxHealth.")
+    return GameRules(
+        starting_health=values["startingHealth"],
+        max_health=values["maxHealth"],
+        potions_per_room=values["potionsPerRoom"],
+        can_skip_rooms=values["canSkipRooms"],
+        can_skip_consecutive=values["canSkipConsecutive"],
+        weapon_kill_limit=values["weaponKillLimit"],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -252,6 +468,8 @@ def _copy_state(state: GameState) -> GameState:
         last_resolved_card_type=state.last_resolved_card_type,
         last_resolved_potion_value=state.last_resolved_potion_value,
         known_seen_cards=list(state.known_seen_cards),
+        variant_id=state.variant_id,
+        rules=state.rules,
     )
 
 
@@ -295,14 +513,21 @@ def _deal_room(state: GameState) -> None:
 # ---------------------------------------------------------------------------
 
 
-def init_game(seed: Optional[int] = None) -> GameState:
+def init_game(
+    seed: Optional[int] = None,
+    variant_id: Optional[str] = None,
+    deck_variant: Optional[str] = None,
+    rules_override: Optional[Mapping[str, Any]] = None,
+) -> GameState:
     """Initialise a new game and return its starting state.
 
     Mirrors the TS flow:
         new Game(deck)          → constructor calls applyTurnRules() → deals room
         game.enterRoom()        → sets room_being_entered=True, resets flags
     """
-    deck = create_deck(seed)
+    resolved_variant = resolve_game_variant_id(variant_id, deck_variant)
+    rules = _make_game_rules(resolved_variant, rules_override)
+    deck = create_deck(seed, variant_id=resolved_variant)
     state = GameState(
         deck=deck,
         discard=[],
@@ -310,8 +535,8 @@ def init_game(seed: Optional[int] = None) -> GameState:
         equipped_weapon=None,
         last_monster_defeated=None,
         monsters_on_weapon=[],
-        health=20,
-        max_health=20,
+        health=rules.starting_health,
+        max_health=rules.max_health,
         can_defer_room=True,
         last_action_was_defer=False,
         game_over=False,
@@ -322,6 +547,8 @@ def init_game(seed: Optional[int] = None) -> GameState:
         cards_resolved_this_turn=0,
         last_resolved_card_type=None,
         last_resolved_potion_value=None,
+        variant_id=resolved_variant,
+        rules=rules,
     )
     # Constructor calls applyTurnRules which deals the initial room.
     _apply_turn_rules(state)
@@ -341,7 +568,7 @@ def enter_room(state: GameState) -> GameState:
     counters (potion flag, cards resolved).
     """
     new = _copy_state(state)
-    new.can_defer_room = True
+    new.can_defer_room = state.rules.can_skip_rooms
     new.last_action_was_defer = False
     new.potion_taken_this_turn = False
     new.potions_taken_this_turn = 0
@@ -364,8 +591,7 @@ def avoid_room(state: GameState) -> GameState:
     - Clears the room, sets canDeferRoom=False, lastActionWasDefer=True.
     - Calls applyTurnRules() which deals a fresh room.
     """
-    # Guard conditions (TS: if (!canDeferRoom || lastActionWasDefer || room.length===0) return)
-    if not state.can_defer_room or state.last_action_was_defer or len(state.room) == 0:
+    if not _can_skip_room(state):
         return _copy_state(state)
 
     new = _copy_state(state)
@@ -391,6 +617,14 @@ def avoid_room(state: GameState) -> GameState:
         new.room_being_entered = True
 
     return new
+
+
+def _can_skip_room(state: GameState) -> bool:
+    if not state.rules.can_skip_rooms or len(state.room) == 0:
+        return False
+    if state.rules.can_skip_consecutive:
+        return True
+    return state.can_defer_room and not state.last_action_was_defer
 
 
 # ---------------------------------------------------------------------------
@@ -468,7 +702,8 @@ def _handle_monster(state: GameState, card: Card, mode: str) -> None:
         if state.equipped_weapon is None:
             raise ValueError("Cannot fight with weapon: no weapon equipped.")
         if (
-            state.last_monster_defeated is not None
+            state.rules.weapon_kill_limit
+            and state.last_monster_defeated is not None
             and card.rank > state.last_monster_defeated.rank
         ):
             raise ValueError(
@@ -501,11 +736,10 @@ def _handle_weapon(state: GameState, card: Card) -> None:
 def _handle_potion(state: GameState, card: Card) -> None:
     """Apply a potion to the player (mutates in-place).
 
-    Mirrors Player.takePotion() with potionsPerRoom=1.
-    Only the first potion per turn heals; subsequent potions are discarded
-    without effect.
+    Mirrors Player.takePotion() using the active potions-per-room setting.
+    Potions beyond that limit are discarded without healing.
     """
-    potions_per_room = 1
+    potions_per_room = state.rules.potions_per_room
     if state.potions_taken_this_turn < potions_per_room:
         state.health = min(state.health + card.rank, state.max_health)
         state.potions_taken_this_turn += 1
@@ -532,17 +766,17 @@ def get_legal_actions(state: GameState) -> List[Action]:
 
     if not state.room_being_entered:
         actions.append(Action(action_type="enterRoom"))
-        # canSkipRooms=True, canSkipConsecutive=False in DEFAULT_RULES
-        if state.can_defer_room and not state.last_action_was_defer and len(state.room) > 0:
+        if _can_skip_room(state):
             actions.append(Action(action_type="skipRoom"))
     else:
         # Inside a room: generate card actions for each room card.
         for idx, card in enumerate(state.room):
             if card.card_type == CardType.MONSTER:
                 if state.equipped_weapon is not None:
-                    # Weapon is allowed unless kill-limit is violated.
+                    # The optional limit applies only after the weapon has killed once.
                     if (
-                        state.last_monster_defeated is None
+                        not state.rules.weapon_kill_limit
+                        or state.last_monster_defeated is None
                         or card.rank <= state.last_monster_defeated.rank
                     ):
                         actions.append(Action(action_type="playCard", card_index=idx, mode="weapon"))
@@ -551,7 +785,7 @@ def get_legal_actions(state: GameState) -> List[Action]:
                 actions.append(Action(action_type="playCard", card_index=idx))
 
         # engineAdapter injects skipRoom when inside a 4-card room and defer is legal.
-        if state.can_defer_room and not state.last_action_was_defer and len(state.room) == 4:
+        if len(state.room) == 4 and _can_skip_room(state):
             actions.append(Action(action_type="skipRoom"))
 
     return actions
@@ -700,8 +934,8 @@ def encode_observation_v2(state: GameState) -> "np.ndarray":  # type: ignore[nam
     context for the RL agent:
 
         [74]  unseen_monster_count / 26
-        [75]  unseen_potion_count / 9
-        [76]  unseen_weapon_count / 9
+        [75]  unseen_potion_count / 9 (10 for queen_hearts)
+        [76]  unseen_weapon_count / 9 (10 for jack_diamonds)
         [77]  avg_unseen_monster_rank / 14
         [78]  max_unseen_monster_rank / 14
         [79]  weapon_kills_remaining / 4
@@ -709,13 +943,14 @@ def encode_observation_v2(state: GameState) -> "np.ndarray":  # type: ignore[nam
         [80]  equipped_weapon.rank / 14 if weapon exists, else 0
         [81]  health_risk_ratio
               (avg_unseen_monster_rank / max(health, 1), clamped to [0, 1])
-        [82]  deck_progress  (1 - len(deck) / 44)
+        [82]  deck_progress  (1 - len(deck) / 44, or / 45 for either variant)
         [83]  survival_margin
               (health / (sum_unseen_monster_ranks + 1), clamped to [0, 1])
 
-    "Unseen" cards are those in ``_CANONICAL_ORDER`` whose identities are not
-    known from {discard ∪ room ∪ equipped_weapon ∪ monsters_on_weapon ∪ skipped
-    rooms}. They may still be in the deck or have not yet been encountered.
+    "Unseen" cards are those in ``_CANONICAL_ORDER`` (plus the active variant
+    card) whose identities are not known from
+    {discard ∪ room ∪ equipped_weapon ∪ monsters_on_weapon ∪ skipped rooms}.
+    They may still be in the deck or have not yet been encountered.
     """
     import numpy as np
 
@@ -724,26 +959,21 @@ def encode_observation_v2(state: GameState) -> "np.ndarray":  # type: ignore[nam
     # First 74 dims come directly from the existing encoder.
     obs[:74] = encode_observation(state)
 
-    # Build the seen set once via the shared helper, then derive unseen cards.
+    # Build the seen set once via the shared helper, then derive unseen cards
+    # from the active variant's exact deck composition.
     seen = _build_seen_set(state)
+    active_deck = _variant_deck_tuple(state.variant_id)
+    unseen_cards = [card for card in active_deck if card not in seen]
+    unseen_monsters = [card for card in unseen_cards if card.card_type == CardType.MONSTER]
+    unseen_potions = [card for card in unseen_cards if card.card_type == CardType.POTION]
+    unseen_weapons = [card for card in unseen_cards if card.card_type == CardType.WEAPON]
+    total_monsters = sum(card.card_type == CardType.MONSTER for card in active_deck)
+    total_potions = sum(card.card_type == CardType.POTION for card in active_deck)
+    total_weapons = sum(card.card_type == CardType.WEAPON for card in active_deck)
 
-    # --- Partition unseen cards by type. ---
-    unseen_monsters: list = []
-    unseen_potions: list = []
-    unseen_weapons: list = []
-    for card in _CANONICAL_ORDER:
-        if card in seen:
-            continue
-        if card.card_type == CardType.MONSTER:
-            unseen_monsters.append(card)
-        elif card.card_type == CardType.POTION:
-            unseen_potions.append(card)
-        elif card.card_type == CardType.WEAPON:
-            unseen_weapons.append(card)
-
-    obs[74] = len(unseen_monsters) / _TOTAL_MONSTERS
-    obs[75] = len(unseen_potions) / _TOTAL_POTIONS
-    obs[76] = len(unseen_weapons) / _TOTAL_WEAPONS
+    obs[74] = len(unseen_monsters) / total_monsters if total_monsters else 0.0
+    obs[75] = len(unseen_potions) / total_potions if total_potions else 0.0
+    obs[76] = len(unseen_weapons) / total_weapons if total_weapons else 0.0
 
     # --- Average and maximum unseen monster rank. ---
     if unseen_monsters:
@@ -766,7 +996,7 @@ def encode_observation_v2(state: GameState) -> "np.ndarray":  # type: ignore[nam
         # meaning all monsters are potentially killable in future).
         kill_limit = state.last_monster_defeated.rank if state.last_monster_defeated is not None else None
 
-        if kill_limit is not None:
+        if state.rules.weapon_kill_limit and kill_limit is not None:
             # Count monsters in deck+room with rank <= kill_limit.
             killable_count = sum(
                 1 for c in chain(state.deck, state.room)
@@ -786,12 +1016,52 @@ def encode_observation_v2(state: GameState) -> "np.ndarray":  # type: ignore[nam
     # --- Health risk ratio: how dangerous are unseen monsters relative to current HP. ---
     obs[81] = min(avg_unseen_monster_rank / max(state.health, 1), 1.0)
 
-    # --- Deck progress: fraction of original 44-card deck that has been consumed. ---
-    obs[82] = 1.0 - min(len(state.deck), 44) / 44.0
+    # --- Deck progress: fraction of the variant's original deck consumed. ---
+    deck_size = len(active_deck)
+    obs[82] = 1.0 - min(len(state.deck), deck_size) / deck_size
 
     # --- Survival margin: can the player survive all remaining monsters? ---
     obs[83] = min(max(state.health / (sum_unseen_monster_ranks + 1), 0.0), 1.0)
 
+    return obs
+
+
+def encode_observation_v3(state: GameState) -> "np.ndarray":  # type: ignore[name-defined]
+    """Encode *state* as a 98-element float32 vector for variant-aware models.
+
+    Positions 0–29 retain the v1 player, room, and weapon layout, with bounded
+    max-health, potion-usage, and active-deck ratios at positions 1, 5, and 8.
+    Positions 30–81 are seen-card bits for every suit/rank slot (four suits,
+    ranks 2–14). Positions 82–91 carry the v2 deck-derived features. Positions
+    92–97 describe the effective rules for this state.
+    """
+    import numpy as np
+
+    obs = np.zeros(98, dtype=np.float32)
+    base = encode_observation(state)
+    obs[:30] = base[:30]
+
+    max_health = max(state.max_health, 1)
+    active_deck = _variant_deck_tuple(state.variant_id)
+    obs[1] = state.max_health / (state.max_health + 20.0) if state.max_health > 0 else 0.0
+    if state.rules.potions_per_room > 0:
+        obs[5] = min(max(state.potions_taken_this_turn / state.rules.potions_per_room, 0.0), 1.0)
+    else:
+        obs[5] = 0.0
+    obs[8] = min(max(len(state.deck) / max(len(active_deck), 1), 0.0), 1.0)
+
+    suit_indices = {suit: index for index, suit in enumerate((Suit.HEARTS, Suit.DIAMONDS, Suit.CLUBS, Suit.SPADES))}
+    for card in _build_seen_set(state):
+        bit_index = 30 + suit_indices[card.suit] * 13 + (card.rank - 2)
+        obs[bit_index] = 1.0
+
+    obs[82:92] = encode_observation_v2(state)[74:84]
+    obs[92] = state.rules.starting_health / (state.rules.starting_health + 20.0)
+    obs[93] = state.rules.potions_per_room / (state.rules.potions_per_room + 1.0)
+    obs[94] = 1.0 if state.rules.can_skip_rooms else 0.0
+    obs[95] = 1.0 if state.rules.can_skip_consecutive else 0.0
+    obs[96] = 1.0 if state.rules.weapon_kill_limit else 0.0
+    obs[97] = min(max(state.rules.starting_health / max_health, 0.0), 1.0)
     return obs
 
 

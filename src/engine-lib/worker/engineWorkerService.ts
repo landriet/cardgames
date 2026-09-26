@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { DEFAULT_GAME_VARIANT, getGameRules, getGameVariant, type RuleConfig } from "../src/gameVariants";
 import type { DungeonCard, ScoundrelGameState } from "../../types/scoundrel";
 import {
   avoidRoom,
@@ -135,10 +136,109 @@ function encodeObservation(state: ScoundrelGameState, knownSeenCards: ReadonlySe
   return obs;
 }
 
-function toRlSnapshot(sessionId: string, state: ScoundrelGameState, knownSeenCards: ReadonlySet<string> = new Set()): WorkerRlSnapshot {
+const ALL_CARD_IDENTITIES = ["hearts", "diamonds", "clubs", "spades"].flatMap((suit) =>
+  Array.from({ length: 13 }, (_, idx) => `${suit}:${idx + 2}`),
+);
+const cardIdentityIndex = new Map(ALL_CARD_IDENTITIES.map((identity, index) => [identity, index] as const));
+
+function encodeObservationV3(state: ScoundrelGameState, knownSeenCards: ReadonlySet<string> = new Set()): number[] {
+  const obs = Array.from({ length: 98 }, () => 0);
+  const roomCards = state.currentRoom.cards;
+  const monstersOnWeapon = state.monstersOnWeapon ?? [];
+  const variantId = state.variantId ?? DEFAULT_GAME_VARIANT;
+  const variant = getGameVariant(variantId);
+  const rules = state.variantRules ?? getGameRules(variantId);
+  const maxHealth = Math.max(state.maxHealth, 1);
+  const potionLimit = rules.potionsPerRoom;
+  const totalCounts = {
+    monster: variant.cards.filter((card) => card.type === "monster").length,
+    potion: variant.cards.filter((card) => card.type === "potion").length,
+    weapon: variant.cards.filter((card) => card.type === "weapon").length,
+  };
+
+  obs[0] = Math.max(0, Math.min(state.health / maxHealth, 1));
+  obs[1] = maxHealth / (maxHealth + 20);
+  obs[2] = cardRank(state.equippedWeapon);
+  obs[3] = cardRank(state.lastMonsterDefeated);
+  obs[4] = Math.min(monstersOnWeapon.length, 4) / 4;
+  obs[5] = Math.max(0, Math.min((state.potionsTakenThisTurn ?? (state.potionTakenThisTurn ? 1 : 0)) / Math.max(potionLimit, 1), 1));
+  obs[6] = state.canDeferRoom ? 1 : 0;
+  obs[7] = state.lastActionWasDefer ? 1 : 0;
+  obs[8] = variant.cards.length > 0 ? Math.min(state.deck.length / variant.cards.length, 1) : 0;
+  obs[9] = Math.min(roomCards.length, 4) / 4;
+
+  for (let i = 0; i < 4; i += 1) {
+    const card = roomCards[i];
+    if (!card) continue;
+    const base = 10 + i * 4;
+    obs[base] = card.type === "monster" ? 1 : 0;
+    obs[base + 1] = card.type === "weapon" ? 1 : 0;
+    obs[base + 2] = card.type === "potion" ? 1 : 0;
+    obs[base + 3] = card.rank / MAX_RANK;
+  }
+
+  for (let i = 0; i < 4; i += 1) {
+    if (monstersOnWeapon[i]) obs[26 + i] = monstersOnWeapon[i].rank / MAX_RANK;
+  }
+
+  const seen = new Set<string>();
+  const markSeen = (card?: DungeonCard | null): void => {
+    if (!card) return;
+    seen.add(`${card.suit}:${card.rank}`);
+  };
+  for (const card of state.discard) markSeen(card);
+  for (const card of roomCards) markSeen(card);
+  markSeen(state.equippedWeapon);
+  for (const card of monstersOnWeapon) markSeen(card);
+  for (const identity of knownSeenCards) {
+    const [, suit, rank] = identity.split(":");
+    if (suit && rank) seen.add(`${suit}:${rank}`);
+  }
+  for (const identity of seen) {
+    const idx = cardIdentityIndex.get(identity);
+    if (idx !== undefined) obs[30 + idx] = 1;
+  }
+
+  const unseen = variant.cards.filter((card) => !seen.has(`${card.suit}:${card.rank}`));
+  const unseenMonsters = unseen.filter((card) => card.type === "monster");
+  const unseenPotions = unseen.filter((card) => card.type === "potion");
+  const unseenWeapons = unseen.filter((card) => card.type === "weapon");
+  const monsterRanks = unseenMonsters.map((card) => card.rank);
+  const avgMonsterRank = monsterRanks.length ? monsterRanks.reduce((sum, rank) => sum + rank, 0) / monsterRanks.length : 0;
+  const totalMonsterRank = monsterRanks.reduce((sum, rank) => sum + rank, 0);
+  const killLimit = rules.weaponKillLimit ? state.lastMonsterDefeated?.rank : undefined;
+  const killableMonsters = state.equippedWeapon
+    ? [...state.deck, ...roomCards].filter((card) => card.type === "monster" && (killLimit === undefined || card.rank <= killLimit)).length
+    : 0;
+
+  obs[82] = totalCounts.monster ? unseenMonsters.length / totalCounts.monster : 0;
+  obs[83] = totalCounts.potion ? unseenPotions.length / totalCounts.potion : 0;
+  obs[84] = totalCounts.weapon ? unseenWeapons.length / totalCounts.weapon : 0;
+  obs[85] = avgMonsterRank / MAX_RANK;
+  obs[86] = (monsterRanks.length ? Math.max(...monsterRanks) : 0) / MAX_RANK;
+  obs[87] = Math.min(killableMonsters, 4) / 4;
+  obs[88] = cardRank(state.equippedWeapon);
+  obs[89] = Math.min(avgMonsterRank / Math.max(state.health, 1), 1);
+  obs[90] = 1 - obs[8];
+  obs[91] = Math.max(0, Math.min(state.health / (totalMonsterRank + 1), 1));
+  obs[92] = rules.startingHealth / (rules.startingHealth + 20);
+  obs[93] = potionLimit / (potionLimit + 1);
+  obs[94] = rules.canSkipRooms ? 1 : 0;
+  obs[95] = rules.canSkipConsecutive ? 1 : 0;
+  obs[96] = rules.weaponKillLimit ? 1 : 0;
+  obs[97] = rules.startingHealth / Math.max(rules.maxHealth, 1);
+  return obs;
+}
+
+function toRlSnapshot(
+  sessionId: string,
+  state: ScoundrelGameState,
+  knownSeenCards: ReadonlySet<string> = new Set(),
+  obsVersion: number = 1,
+): WorkerRlSnapshot {
   return {
     sessionId,
-    observation: encodeObservation(state, knownSeenCards),
+    observation: obsVersion === 3 ? encodeObservationV3(state, knownSeenCards) : encodeObservation(state, knownSeenCards),
     actionMask: buildActionMask(state),
     health: state.health,
     maxHealth: state.maxHealth,
@@ -179,6 +279,7 @@ function validateAction(state: ScoundrelGameState, action: WorkerAction): void {
 export class EngineWorkerService {
   private readonly sessions = new Map<string, ScoundrelGameState>();
   private readonly knownSeenCards = new Map<string, Set<string>>();
+  private readonly sessionObsVersions = new Map<string, number>();
 
   handleRequest(request: WorkerRequest): WorkerResponse {
     try {
@@ -203,33 +304,39 @@ export class EngineWorkerService {
         return { status: "ok" };
       case "create_session": {
         const sessionId = randomUUID();
-        const state = initGame({ deckSeed: this.readDeckSeed(request.params) });
+        const state = initGame(this.readInitOptions(request.params));
         this.sessions.set(sessionId, state);
         this.knownSeenCards.set(sessionId, new Set());
         return { sessionId, state, possibleActions: listPossibleActions(state) };
       }
       case "create_session_rl": {
         const sessionId = randomUUID();
-        const state = initGame({ deckSeed: this.readDeckSeed(request.params) });
+        const state = initGame(this.readInitOptions(request.params));
         this.sessions.set(sessionId, state);
         const knownSeenCards = new Set<string>();
         this.knownSeenCards.set(sessionId, knownSeenCards);
-        return toRlSnapshot(sessionId, state, knownSeenCards);
+        const obsVersion = this.readObsVersion(request.params);
+        this.sessionObsVersions.set(sessionId, obsVersion);
+        return toRlSnapshot(sessionId, state, knownSeenCards, obsVersion);
       }
       case "reset_session": {
         const sessionId = this.readSessionId(request.params);
-        const state = initGame({ deckSeed: this.readDeckSeed(request.params) });
+        const previous = this.getSessionState(sessionId);
+        const state = initGame(this.readInitOptions(request.params, previous));
         this.sessions.set(sessionId, state);
         this.knownSeenCards.set(sessionId, new Set());
         return { sessionId, state, possibleActions: listPossibleActions(state) };
       }
       case "reset_session_rl": {
         const sessionId = this.readSessionId(request.params);
-        const state = initGame({ deckSeed: this.readDeckSeed(request.params) });
+        const previous = this.getSessionState(sessionId);
+        const state = initGame(this.readInitOptions(request.params, previous));
         this.sessions.set(sessionId, state);
         const knownSeenCards = new Set<string>();
         this.knownSeenCards.set(sessionId, knownSeenCards);
-        return toRlSnapshot(sessionId, state, knownSeenCards);
+        const obsVersion = this.readObsVersion(request.params, this.sessionObsVersions.get(sessionId) ?? 1);
+        this.sessionObsVersions.set(sessionId, obsVersion);
+        return toRlSnapshot(sessionId, state, knownSeenCards, obsVersion);
       }
       case "get_state": {
         const state = this.getSessionState(this.readSessionId(request.params));
@@ -257,7 +364,7 @@ export class EngineWorkerService {
         this.rememberSkippedRoom(sessionId, state, action);
         const nextState = applyAction(state, action);
         this.sessions.set(sessionId, nextState);
-        return toRlSnapshot(sessionId, nextState, this.knownSeenCards.get(sessionId));
+        return toRlSnapshot(sessionId, nextState, this.knownSeenCards.get(sessionId), this.sessionObsVersions.get(sessionId) ?? 1);
       }
       case "close_session": {
         const sessionId = this.readSessionId(request.params);
@@ -266,6 +373,7 @@ export class EngineWorkerService {
         }
         this.sessions.delete(sessionId);
         this.knownSeenCards.delete(sessionId);
+        this.sessionObsVersions.delete(sessionId);
         return { closed: true };
       }
       default:
@@ -289,6 +397,40 @@ export class EngineWorkerService {
     if (typeof value !== "number" || !Number.isInteger(value)) {
       throw new Error("deckSeed must be an integer.");
     }
+    return value;
+  }
+
+  private readVariantId(params?: Record<string, unknown>, fallback: string = DEFAULT_GAME_VARIANT): string {
+    const value = params?.variantId;
+    if (value === undefined) return fallback;
+    if (!isString(value)) throw new Error("variantId must be a non-empty string.");
+    getGameVariant(value);
+    return value;
+  }
+
+  private readRules(params?: Record<string, unknown>, fallback?: RuleConfig): RuleConfig | undefined {
+    const value = params?.rules;
+    if (value === undefined) return fallback;
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error("rules must be an object.");
+    }
+    return value as RuleConfig;
+  }
+
+  private readInitOptions(params?: Record<string, unknown>, previous?: ScoundrelGameState) {
+    const variantId = this.readVariantId(params, previous?.variantId ?? DEFAULT_GAME_VARIANT);
+    const variantChanged = previous !== undefined && variantId !== previous.variantId;
+    return {
+      deckSeed: this.readDeckSeed(params),
+      variantId,
+      rules: this.readRules(params, variantChanged ? undefined : previous?.variantRules),
+    };
+  }
+
+  private readObsVersion(params?: Record<string, unknown>, fallback: number = 1): number {
+    const value = params?.obsVersion;
+    if (value === undefined) return fallback;
+    if (value !== 1 && value !== 3) throw new Error("obsVersion must be 1 or 3.");
     return value;
   }
 

@@ -30,8 +30,24 @@ export function compactStateKey(game: Game, cardIndex: CardIndex): string {
     (game.canDeferRoom ? 2 : 0) |
     (game.lastActionWasDefer ? 4 : 0) |
     (game.roomBeingEntered ? 8 : 0);
+  const rules = game.rules;
+  const ruleFlags = (rules.canSkipRooms ? 1 : 0) | (rules.canSkipConsecutive ? 2 : 0) | (rules.weaponKillLimit ? 4 : 0);
 
-  return `${deckIds.join(",")}|${roomIds.join(",")}|${health}|${weaponRank}|${lastMonsterRank}|${monstersOnWeapon.join(",")}|${flags.toString(16)}`;
+  return [
+    deckIds.join(","),
+    roomIds.join(","),
+    health,
+    game.player.maxHealth,
+    weaponRank,
+    lastMonsterRank,
+    monstersOnWeapon.join(","),
+    flags.toString(16),
+    game.player.potionsTakenThisTurn,
+    rules.startingHealth,
+    rules.maxHealth,
+    rules.potionsPerRoom,
+    ruleFlags.toString(16),
+  ].join("|");
 }
 
 // --- Zobrist Hashing ---
@@ -50,7 +66,6 @@ interface ZobristTable {
   cardInDeck: [Uint32Array, Uint32Array];
   cardInRoom: [Uint32Array, Uint32Array];
   monsterOnWeapon: [Uint32Array, Uint32Array];
-  health: [Uint32Array, Uint32Array];
   weaponRank: [Uint32Array, Uint32Array];
   lastMonsterRank: [Uint32Array, Uint32Array];
   flags: [Uint32Array, Uint32Array];
@@ -75,11 +90,26 @@ function createZobristTable(numCards: number, maxMoWPositions: number): ZobristT
     cardInDeck: fill(numCards),
     cardInRoom: fill(numCards),
     monsterOnWeapon: fill(maxMoWPositions * ZOBRIST_MAX_RANK),
-    health: fill(21),
     weaponRank: fill(ZOBRIST_MAX_RANK),
     lastMonsterRank: fill(ZOBRIST_MAX_RANK),
     flags: fill(16),
   };
+}
+
+function hashInteger(value: number, seed: number): number {
+  let remaining = Math.abs(Math.trunc(value));
+  let hash = seed >>> 0;
+
+  while (remaining > 0) {
+    const limb = remaining % 0x1_0000_0000;
+    hash = Math.imul(hash ^ (limb >>> 0), 0x45d9f3b);
+    remaining = Math.floor(remaining / 0x1_0000_0000);
+  }
+
+  if (value < 0) hash ^= 0x80000000;
+  hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
+  hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
+  return (hash ^ (hash >>> 16)) >>> 0;
 }
 
 type CardIdentityIndex = Map<DungeonCard, number>;
@@ -237,8 +267,19 @@ function zobristStateKey(game: Game, cardIdentity: CardIdentityIndex, table: Zob
     h2 ^= table.monsterOnWeapon[1][slot];
   }
 
-  h1 ^= table.health[0][game.player.health];
-  h2 ^= table.health[1][game.player.health];
+  const rules = game.rules;
+  h1 ^= hashInteger(game.player.health, 0x9e3779b9);
+  h2 ^= hashInteger(game.player.health, 0x85ebca6b);
+  h1 ^= hashInteger(game.player.maxHealth, 0x9e3779b8);
+  h2 ^= hashInteger(game.player.maxHealth, 0x85ebca6a);
+  h1 ^= hashInteger(game.player.potionsTakenThisTurn, 0x9e3779bb);
+  h2 ^= hashInteger(game.player.potionsTakenThisTurn, 0x85ebca69);
+  h1 ^= hashInteger(rules.startingHealth, 0x9e3779ba);
+  h2 ^= hashInteger(rules.startingHealth, 0x85ebca68);
+  h1 ^= hashInteger(rules.maxHealth, 0x9e3779bd);
+  h2 ^= hashInteger(rules.maxHealth, 0x85ebca6f);
+  h1 ^= hashInteger(rules.potionsPerRoom, 0x9e3779bc);
+  h2 ^= hashInteger(rules.potionsPerRoom, 0x85ebca6e);
 
   const wr = game.player.equippedWeapon ? game.player.equippedWeapon.rank : 0;
   h1 ^= table.weaponRank[0][wr];
@@ -253,8 +294,11 @@ function zobristStateKey(game: Game, cardIdentity: CardIdentityIndex, table: Zob
     (game.canDeferRoom ? 2 : 0) |
     (game.lastActionWasDefer ? 4 : 0) |
     (game.roomBeingEntered ? 8 : 0);
+  const ruleFlags = (rules.canSkipRooms ? 1 : 0) | (rules.canSkipConsecutive ? 2 : 0) | (rules.weaponKillLimit ? 4 : 0);
   h1 ^= table.flags[0][flags];
   h2 ^= table.flags[1][flags];
+  h1 ^= hashInteger(ruleFlags, 0xc2b2ae35);
+  h2 ^= hashInteger(ruleFlags, 0x27d4eb2f);
 
   return (BigInt(h1 >>> 0) << 32n) | BigInt(h2 >>> 0);
 }

@@ -7,6 +7,7 @@ import numpy as np
 from gymnasium import spaces
 
 from engine import (
+    DeckVariant,
     GameState,
     avoid_room,
     build_action_mask,
@@ -14,14 +15,17 @@ from engine import (
     encode_observation,
     encode_observation_v2,
     enter_room,
+    encode_observation_v3,
     init_game,
     play_card,
+    resolve_game_variant_id,
 )
 
 # Observation sizes keyed by version:
 #   v1 (74): 10 player + 16 room slot + 4 monster-on-weapon ranks + 44 seen-card bits
 #   v2 (84): v1 + 10 additional room-context features
-OBS_SIZES: dict[int, int] = {1: 74, 2: 84}
+#   v3 (98): full card identities, variant deck features, and effective rules
+OBS_SIZES: dict[int, int] = {1: 74, 2: 84, 3: 98}
 
 
 class ScoundrelEnv(gym.Env[np.ndarray, int]):
@@ -34,11 +38,16 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         reward_mode: str = "baseline",
         reward_debug: bool = False,
         obs_version: int = 1,
+        variant_id: Optional[str] = None,
+        deck_variant: Optional[DeckVariant] = None,
     ) -> None:
         super().__init__()
         if obs_version not in OBS_SIZES:
             raise ValueError(f"Unsupported obs_version: {obs_version}. Must be one of {sorted(OBS_SIZES.keys())}.")
+        resolved_variant = resolve_game_variant_id(variant_id, deck_variant)
         self.obs_version = obs_version
+        self.variant_id = resolved_variant
+        self.deck_variant = resolved_variant  # compatibility alias for existing callers
         obs_size = OBS_SIZES[obs_version]
         self._state: Optional[GameState] = None
         self.last_health = 20.0
@@ -69,7 +78,7 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         game_seed = self.deck_seed
         if game_seed is None:
             game_seed = seed if seed is not None else int(self.np_random.integers(0, 2**32, dtype=np.uint32))
-        self._state = init_game(seed=game_seed)
+        self._state = init_game(seed=game_seed, variant_id=self.variant_id)
         self._sync_from_state(self._state)
         self.last_health = float(self._step_stats["health"])
         self.episode_steps = 0
@@ -140,6 +149,8 @@ class ScoundrelEnv(gym.Env[np.ndarray, int]):
         terminal = state.game_over or state.victory
         if self.obs_version == 2:
             self._last_obs = encode_observation_v2(state)
+        elif self.obs_version == 3:
+            self._last_obs = encode_observation_v3(state)
         else:
             self._last_obs = encode_observation(state)
         self._last_mask = build_action_mask(state)

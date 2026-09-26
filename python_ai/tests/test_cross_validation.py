@@ -34,6 +34,7 @@ from engine import (  # noqa: E402
     build_action_mask,
     calculate_score,
     encode_observation,
+    encode_observation_v3,
     enter_room,
     avoid_room,
     get_legal_actions,
@@ -226,3 +227,50 @@ def test_cross_validation_seed(seed: int, ts_client: EngineWorkerClient) -> None
     # Use a fixed per-seed RNG so that action choices are reproducible.
     rng = random.Random(seed + 10_000)
     _run_cross_validation_game(seed=seed, ts_client=ts_client, rng=rng)
+
+
+def test_cross_validation_v3_jack_diamonds_variant(ts_client: EngineWorkerClient) -> None:
+    seed = 907
+    rules = {
+        "startingHealth": 100,
+        "maxHealth": 100,
+        "potionsPerRoom": 2,
+        "canSkipRooms": False,
+        "canSkipConsecutive": True,
+        "weaponKillLimit": False,
+    }
+    py_state = init_game(seed=seed, variant_id="jack_diamonds", rules_override=rules)
+    ts_snap = ts_client.create_session_rl(
+        deck_seed=seed,
+        variant_id="jack_diamonds",
+        obs_version=3,
+        rules=rules,
+    )
+    session_id: str = ts_snap["sessionId"]
+    rng = random.Random(seed + 10_000)
+    steps_taken = 0
+
+    try:
+        for step in range(4):
+            py_obs = encode_observation_v3(py_state)
+            py_mask = build_action_mask(py_state)
+            ts_obs = np.asarray(ts_snap["observation"], dtype=np.float32)
+            ts_mask = np.asarray(ts_snap["actionMask"], dtype=bool)
+            npt.assert_allclose(py_obs, ts_obs, atol=OBS_ATOL, err_msg=f"v3 observation mismatch at step {step}")
+            npt.assert_array_equal(py_mask, ts_mask, err_msg=f"v3 action mask mismatch at step {step}")
+
+            if py_state.game_over or py_state.victory:
+                break
+            legal_indices = [idx for idx, legal in enumerate(py_mask) if legal]
+            assert legal_indices, f"v3 state has no legal actions at step {step}"
+            chosen_idx = rng.choice(legal_indices)
+            py_state = _apply_py_action(py_state, _discrete_to_py_action(chosen_idx))
+            ts_snap = ts_client.step_action_rl(session_id, _discrete_to_ts_action(chosen_idx))
+            steps_taken += 1
+    finally:
+        try:
+            ts_client.close_session(session_id)
+        except Exception:
+            pass
+
+    assert steps_taken >= 3

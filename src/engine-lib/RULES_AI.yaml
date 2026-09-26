@@ -9,6 +9,8 @@ metadata:
   intent: "AI-digestible formal rules specification for parsing, simulation, and validation."
 
 constants:
+  # Standard-preset defaults; use variant_rule_config for effective values.
+  starting_health: 20
   max_health: 20
   room_size: 4
   cards_resolved_per_enter: 3
@@ -37,6 +39,9 @@ card_value_model:
     A: 14
 
 deck_definition:
+  variant_registry: src/engine-lib/src/game-variants.json
+  default_variant: standard
+  note: "The counts and rank ranges below describe the standard preset; resolve the registry for other variants."
   base_deck: "standard_52_plus_jokers"
   excluded_cards:
     - all_jokers
@@ -68,8 +73,8 @@ deck_definition:
 state_model:
   health:
     type: integer
-    range: [0, 20]
-    initial: 20
+    range: [0, max_health]
+    initial: starting_health
   dungeon:
     type: list
     description: "Face-down draw pile."
@@ -93,6 +98,11 @@ state_model:
     initial: false
   potion_used_this_turn:
     type: boolean
+    description: "Compatibility flag; true when potions_taken_this_turn reaches the configured limit."
+    reset_point: "start_of_turn"
+  potions_taken_this_turn:
+    type: integer
+    initial: 0
     reset_point: "start_of_turn"
   terminal:
     type: boolean
@@ -113,7 +123,8 @@ actions:
   avoid_room:
     preconditions:
       - "terminal == false"
-      - "last_turn_was_avoid == false"
+      - "canSkipRooms == true"
+      - "canSkipConsecutive == true OR (canDeferRoom == true AND last_turn_was_avoid == false)"
       - "room size >= 1"
     effects:
       - "Move all room cards to bottom of dungeon preserving relative order."
@@ -121,7 +132,7 @@ actions:
       - "Set last_turn_was_avoid = true."
       - "End turn."
     notes:
-      - "Cannot avoid two rooms in a row."
+      - "The standard preset forbids consecutive avoids; variants can enable them."
 
   enter_room:
     preconditions:
@@ -154,11 +165,11 @@ actions:
       - "selected card type == potion"
       - "action invoked during enter_room resolution"
     effects:
-      - condition: "potion_used_this_turn == false"
+      - condition: "potions_taken_this_turn < potionsPerRoom"
         then:
           - "health = min(max_health, health + potion_value)"
-          - "potion_used_this_turn = true"
-      - condition: "potion_used_this_turn == true"
+          - "potions_taken_this_turn += 1"
+      - condition: "potions_taken_this_turn >= potionsPerRoom"
         then:
           - "No healing is applied."
       - "Move selected potion to discard."
@@ -179,7 +190,7 @@ actions:
       - "selected card type == monster"
       - "equipped_weapon exists"
       - "action invoked during enter_room resolution"
-      - "weapon_lock_value is null OR monster_value <= weapon_lock_value"
+      - "weaponKillLimit == false OR weapon_lock_value is null OR monster_value <= weapon_lock_value"
     effects:
       - "damage = max(0, monster_value - weapon_value)"
       - "health = health - damage"
@@ -219,15 +230,27 @@ scoring_model:
   on_victory:
     formula: "score = health"
     special_case:
-      condition: "health == 20 AND last_resolved_card_type == potion"
+      condition: "health == max_health AND last_resolved_card_type == potion"
       formula: "score = health + last_potion_value"
+
+variant_rule_config:
+  registry: src/engine-lib/src/game-variants.json
+  supported_overrides:
+    startingHealth: "Initial player health; must be at least 1 and no greater than maxHealth."
+    maxHealth: "Maximum player health and the cap used when drinking potions."
+    potionsPerRoom: "Maximum potions that can heal during one room entry."
+    canSkipRooms: "Whether room avoidance is available."
+    canSkipConsecutive: "Whether a room may be avoided after the previous room was avoided."
+    weaponKillLimit: "Whether weapon use is restricted by the rank of the last monster killed."
+  new_mechanics: "Require code and cross-validation in both the TypeScript and Python engines."
 
 invariants:
   - "health never exceeds max_health."
-  - "At most one potion healing effect can apply per turn."
-  - "Consecutive avoid_room actions are illegal."
+  - "1 <= starting_health <= max_health."
+  - "At most potionsPerRoom potion healing effects can apply during one room entry."
+  - "Consecutive avoid_room actions are illegal unless canSkipRooms and canSkipConsecutive are both true."
   - "When a new weapon is equipped, prior weapon and its attached monsters are discarded."
-  - "Weapon-based monster fights must satisfy weapon_lock_value constraint once set."
+  - "When weaponKillLimit is true, weapon-based monster fights must satisfy weapon_lock_value once set."
 
 agent_notes:
   legal_action_priority_guidance:

@@ -1,4 +1,5 @@
-import { DungeonCard as EngineDungeonCard, Game, Player } from "../../../engine-lib/src/index.ts";
+import { DEFAULT_GAME_VARIANT, DungeonCard as EngineDungeonCard, Game, getGameRules, Player } from "../../../engine-lib/src/index.ts";
+import type { RuleConfig } from "../../../engine-lib/src/index.ts";
 import type { DungeonCard, ScoundrelGameState } from "../../../types/scoundrel.ts";
 import { fromEngineCard, toEngineCard, toEngineGame } from "./engineConversion.ts";
 
@@ -12,6 +13,8 @@ export interface ScoundrelPossibleAction {
 
 export interface InitGameOptions {
   deckSeed?: number;
+  variantId?: string;
+  rules?: RuleConfig;
 }
 
 const STATIC_DECK: DungeonCard[] = [
@@ -38,6 +41,8 @@ const STATIC_DECK: DungeonCard[] = [
 
 function fromEngineGame(game: Game): ScoundrelGameState {
   const state: ScoundrelGameState = {
+    variantId: game.variantId,
+    variantRules: { ...game.rules },
     deck: game.deck.map(fromEngineCard),
     discard: game.discard.map(fromEngineCard),
     currentRoom: { cards: game.currentRoom.cards.map(fromEngineCard) },
@@ -52,6 +57,7 @@ function fromEngineGame(game: Game): ScoundrelGameState {
     victory: game.victory,
     cardsResolvedThisTurn: game.cardsResolvedThisTurn,
     potionTakenThisTurn: game.player.potionTakenThisTurn,
+    potionsTakenThisTurn: game.player.potionsTakenThisTurn,
   };
 
   if (game.gameOver || game.victory) {
@@ -84,8 +90,9 @@ export function initGameWithStaticDeck(): ScoundrelGameState {
 }
 
 export function initGame(options: InitGameOptions = {}): ScoundrelGameState {
-  const deck = Number.isInteger(options.deckSeed) ? Game.createDeck(options.deckSeed) : undefined;
-  const game = new Game(deck);
+  const variantId = options.variantId ?? DEFAULT_GAME_VARIANT;
+  const deck = Number.isInteger(options.deckSeed) ? Game.createDeck(options.deckSeed, variantId) : undefined;
+  const game = new Game(deck, undefined, options.rules, variantId);
   game.enterRoom();
   return fromEngineGame(game);
 }
@@ -102,7 +109,14 @@ export function handleCardAction(state: ScoundrelGameState, card: DungeonCard, m
     };
   }
 
-  if (card.type === "monster" && mode === "weapon" && state.lastMonsterDefeated && card.rank > state.lastMonsterDefeated.rank) {
+  const variantRules = state.variantRules ?? getGameRules(state.variantId);
+  if (
+    variantRules.weaponKillLimit &&
+    card.type === "monster" &&
+    mode === "weapon" &&
+    state.lastMonsterDefeated &&
+    card.rank > state.lastMonsterDefeated.rank
+  ) {
     return {
       ...state,
       pendingMonsterChoice: { monster: card },
@@ -172,7 +186,11 @@ export function getPossibleActions(state: ScoundrelGameState): ScoundrelPossible
 
   // Frontend flow starts directly inside a room (no explicit enter action),
   // so surface skipRoom whenever defer is currently legal for that room.
-  const canSkipCurrentRoom = state.canDeferRoom && !state.lastActionWasDefer && state.currentRoom.cards.length === 4;
+  const variantRules = state.variantRules ?? getGameRules(state.variantId);
+  const canSkipCurrentRoom =
+    variantRules.canSkipRooms &&
+    (variantRules.canSkipConsecutive || (state.canDeferRoom && !state.lastActionWasDefer)) &&
+    state.currentRoom.cards.length === 4;
   if (canSkipCurrentRoom && !actions.some((action) => action.actionType === "skipRoom")) {
     actions.push({ actionType: "skipRoom" });
   }
